@@ -3,10 +3,19 @@ import { AppError } from "./errors";
 export function realDate(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
 }
-export function deadlineAt(date: string, offset: number, timezone: string): string {
+export function deadlineAt(date: string, offset: number, timezone: string, unit: "calendar_days" | "business_days" = "calendar_days"): string {
   if (!realDate(date)) throw new AppError("DATE_INVALID", "Data de referência inválida.");
   const calendar = new Date(`${date}T18:00:00Z`);
-  calendar.setUTCDate(calendar.getUTCDate() + offset);
+  if (unit === "business_days") {
+    const direction = Math.sign(offset);
+    let remaining = Math.abs(offset);
+    while (remaining > 0) {
+      calendar.setUTCDate(calendar.getUTCDate() + direction);
+      if (calendar.getUTCDay() !== 0 && calendar.getUTCDay() !== 6) remaining--;
+    }
+  } else {
+    calendar.setUTCDate(calendar.getUTCDate() + offset);
+  }
   const target = calendar.getTime();
   let instant = target;
   const format = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });

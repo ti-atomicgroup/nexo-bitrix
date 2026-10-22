@@ -17,6 +17,7 @@ function task(
   checklist: string[],
   critical = false,
   required = true,
+  offsetUnit: "calendar_days" | "business_days" = "calendar_days",
 ): ActivityDefinition {
   return {
     id,
@@ -24,6 +25,7 @@ function task(
     description,
     assigneeRole,
     offsetDays,
+    offsetUnit,
     visibility,
     required,
     critical,
@@ -35,6 +37,16 @@ function task(
     documents: [],
   };
 }
+
+const itShutdownChecklist = [
+  "Conta Google Workspace suspensa no momento autorizado",
+  "E-mail corporativo encerrado ou encaminhado conforme política",
+  "Arquivos do Google Drive transferidos ao gestor conforme política",
+  "Acesso ao Notion revogado",
+  "Usuário Bitrix24 desativado no momento autorizado",
+  "Acessos aos demais sistemas revogados",
+  "Encerramento registrado no controle de acessos",
+];
 
 export const offboardingTemplates: StarterTemplate[] = [
   {
@@ -82,6 +94,12 @@ export const offboardingTemplates: StarterTemplate[] = [
         title: "Concluir a transição",
         activities: [
           task(
+            "voluntario-ti-aviso",
+            "TI · planejar desligamento de acessos",
+            "Tarefa nativa para avisar TI até 1 dia útil antes do último dia. Confirme o horário de revogação com People e gestor; não bloqueie a pessoa antecipadamente. Se a jornada começar após este prazo, priorize o alinhamento imediatamente.",
+            "ti", -1, "team", ["TI avisado e horário de revogação alinhado com People"], true, true, "business_days",
+          ),
+          task(
             "voluntario-conhecimento",
             "Concluir passagem de conhecimento",
             "Mapeie entregas em aberto, transfira contexto e confirme quem assume cada responsabilidade.",
@@ -93,11 +111,11 @@ export const offboardingTemplates: StarterTemplate[] = [
           task(
             "voluntario-equipamentos",
             "Conferir devolução de equipamentos",
-            "Recolha ou regularize equipamentos e materiais conforme o inventário. Registre exceções para acompanhamento.",
+            "Recolha ou regularize equipamentos e materiais conforme o inventário, em conjunto com People. Registre exceções para acompanhamento.",
             "ti",
             0,
             "team",
-            ["Equipamentos e materiais conferidos"],
+            ["Equipamentos e materiais conferidos ou inexistência registrada", "Devolução validada com People"],
             true,
           ),
           task(
@@ -107,10 +125,7 @@ export const offboardingTemplates: StarterTemplate[] = [
             "ti",
             0,
             "team",
-            [
-              "Acessos aos sistemas revogados",
-              "E-mail corporativo encerrado ou encaminhado conforme política",
-            ],
+            itShutdownChecklist,
             true,
           ),
         ],
@@ -189,6 +204,12 @@ export const offboardingTemplates: StarterTemplate[] = [
         title: "Concluir responsabilidades",
         activities: [
           task(
+            "involuntario-ti-aviso",
+            "TI · planejar desligamento de acessos",
+            "Tarefa nativa para avisar TI até 1 dia útil antes do último dia. People confirma o horário seguro de revogação; não bloqueie a pessoa antecipadamente. Se a jornada começar após este prazo, priorize o alinhamento imediatamente.",
+            "ti", -1, "team", ["TI avisado e horário de revogação confirmado por People"], true, true, "business_days",
+          ),
+          task(
             "involuntario-conhecimento",
             "Encaminhar atividades e conhecimento",
             "Registre entregas em andamento e defina novos responsáveis, respeitando o tempo e o contexto da saída.",
@@ -204,7 +225,7 @@ export const offboardingTemplates: StarterTemplate[] = [
             "ti",
             0,
             "team",
-            ["Inventário conferido"],
+            ["Equipamentos recolhidos ou inexistência registrada", "Devolução validada com People"],
             true,
           ),
           task(
@@ -214,10 +235,7 @@ export const offboardingTemplates: StarterTemplate[] = [
             "ti",
             0,
             "team",
-            [
-              "Acessos revogados",
-              "E-mail encerrado ou encaminhado conforme política",
-            ],
+            itShutdownChecklist,
             true,
           ),
         ],

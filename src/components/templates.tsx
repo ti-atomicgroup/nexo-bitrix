@@ -34,6 +34,7 @@ function newActivity(): ActivityDefinition {
     description: "",
     assigneeRole: "rh",
     offsetDays: 0,
+    offsetUnit: "calendar_days",
     required: true,
     critical: false,
     visibility: "team",
@@ -411,6 +412,7 @@ export function TemplateEditor({
                           {roleLabels[activity.assigneeRole]} · D
                           {activity.offsetDays >= 0 ? "+" : ""}
                           {activity.offsetDays}
+                          {activity.offsetUnit === "business_days" ? " úteis" : " corridos"}
                         </span>
                       </summary>
                       <div className="activity-editor-body">
@@ -479,10 +481,21 @@ export function TemplateEditor({
                                   })
                                 }
                               />
-                              <span>dias</span>
+                              <select
+                                aria-label="Tipo de dias do prazo"
+                                value={activity.offsetUnit ?? "calendar_days"}
+                                onChange={(e) =>
+                                  updateActivity(stage.id, activity.id, {
+                                    offsetUnit: e.target.value as "calendar_days" | "business_days",
+                                  })
+                                }
+                              >
+                                <option value="calendar_days">dias corridos</option>
+                                <option value="business_days">dias úteis</option>
+                              </select>
                             </div>
                             <small>
-                              Negativo = antes da data. Zero = no próprio dia.
+                              Negativo = antes da data. Zero = no próprio dia. Dias úteis ignoram sábados e domingos; feriados ainda não são descontados.
                             </small>
                           </label>
                           <label className="field">

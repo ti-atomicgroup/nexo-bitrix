@@ -38,6 +38,7 @@ const activity = z.object({
   description: z.string(),
   assigneeRole,
   offsetDays: z.number(),
+  offsetUnit: z.enum(["calendar_days", "business_days"]).optional(),
   required: z.boolean(),
   critical: z.boolean(),
   visibility: z.enum(["team", "employee", "hr"]),

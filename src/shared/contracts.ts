@@ -29,6 +29,7 @@ export interface ActivityDefinition {
   description: string;
   assigneeRole: AssigneeRole;
   offsetDays: number;
+  offsetUnit?: "calendar_days" | "business_days";
   required: boolean;
   critical: boolean;
   visibility: Visibility;
