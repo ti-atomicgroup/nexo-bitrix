@@ -10,7 +10,6 @@ import {
   Clock3,
   Layers3,
   Plus,
-  Radar,
   Route,
   Search,
   TriangleAlert,
@@ -34,6 +33,7 @@ import {
   TaskBadge,
   TypeBadge,
 } from "./ui";
+import { ReadinessQueue } from "./readiness-queue";
 
 export type View =
   "overview" | "journeys" | "tasks" | "templates" | "automations" | "settings";
@@ -205,7 +205,6 @@ export function Overview({
       .includes(query.toLowerCase()),
   );
   const firstName = workspace.session.user.name.split(" ")[0];
-  const alerts = workspace.alerts.slice(0, 4);
   return (
     <>
       <div className="page-heading">
@@ -277,6 +276,9 @@ export function Overview({
           </small>
         </div>
       </div>
+      {workspace.session.role !== "colaborador" && (
+        <ReadinessQueue workspace={workspace} onJourney={onJourney} />
+      )}
       <div className="overview-layout">
         <div className="main-column">
           <section className="workspace-section">
@@ -358,67 +360,6 @@ export function Overview({
           </section>
         </div>
         <aside className="context-column">
-          <section className="radar-panel">
-            <div className="radar-heading">
-              <span className="radar-icon">
-                <Radar size={21} />
-              </span>
-              <div>
-                <h2>Radar de prontidão</h2>
-                <p>O próximo passo está aqui.</p>
-              </div>
-              <span
-                className="live-dot"
-                title="Calculado a partir das atividades"
-              />
-            </div>
-            {alerts.length ? (
-              <div className="radar-alerts">
-                {alerts.map((alert) => (
-                  <button
-                    className={`radar-alert ${alert.severity}`}
-                    key={alert.id}
-                    onClick={() => {
-                      const j = workspace.journeys.find(
-                        (j) => j.id === alert.journeyId,
-                      );
-                      if (j) onJourney(j);
-                    }}
-                  >
-                    <span className="alert-marker">
-                      <TriangleAlert size={15} />
-                    </span>
-                    <span>
-                      <strong>{alert.title}</strong>
-                      <small>{alert.employeeName}</small>
-                      <p>{alert.reason}</p>
-                    </span>
-                    <ChevronRight size={15} />
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="radar-clear">
-                <span className="radar-orbit">
-                  <Radar size={31} />
-                </span>
-                <h3>
-                  {workspace.journeys.length
-                    ? "Nenhum alerta por aqui"
-                    : "Pronto para acompanhar"}
-                </h3>
-                <p>
-                  {workspace.journeys.length
-                    ? "As pendências críticas aparecerão aqui conforme os prazos se aproximarem."
-                    : "Ao iniciar uma jornada, o radar acompanha os prazos e destaca as pendências."}
-                </p>
-              </div>
-            )}
-            <div className="radar-footer">
-              <span className="dot dot-onboarding" />
-              {timeAgo(workspace.lastSyncAt)}
-            </div>
-          </section>
           <section className="activity-section">
             <SectionHeader title="Últimas atividades" />
             {workspace.audit.length ? (
