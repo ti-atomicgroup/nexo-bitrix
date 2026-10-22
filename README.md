@@ -70,6 +70,7 @@ Como alternativa, envie `output/nexo-onnira.zip` à Onnira Cloud AI. Na API da p
 - **Automático:** aprovação em uma etapa associada ao modelo inicia a mesma execução. Eventos repetidos não devem duplicar a movimentação.
 - **Prazos:** dias corridos relativos à data principal, com vencimento às 18h no fuso configurado. O padrão é `America/Sao_Paulo`.
 - **Modelos:** alterações criam nova versão. Jornadas existentes preservam seus snapshots.
+- **Saídas:** os modelos iniciais separam desligamento voluntário e involuntário. People pode ajustar contatos, benefícios, documentos e regras de pagamento no ambiente privado antes de iniciar uma jornada; o código público não contém dados pessoais nem promessas de pagamento.
 - **Radar:** indica responsáveis ausentes, prazos próximos e pendências críticas. Uma integração desatualizada precisa ser verificada antes de interpretar prontidão.
 - **Conclusão:** tarefas com revisão pendente e checklists obrigatórios incompletos impedem o encerramento.
 - **Revogação de acessos:** o produto cria e acompanha solicitações para a equipe responsável; não executa revogação em sistemas externos.

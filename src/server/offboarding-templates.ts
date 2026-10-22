@@ -1,0 +1,263 @@
+import type {
+  ActivityDefinition,
+  AssigneeRole,
+  JourneyTemplate,
+  Visibility,
+} from "../shared/contracts";
+
+type StarterTemplate = Omit<JourneyTemplate, "version" | "updatedAt">;
+
+function task(
+  id: string,
+  title: string,
+  description: string,
+  assigneeRole: AssigneeRole,
+  offsetDays: number,
+  visibility: Visibility,
+  checklist: string[],
+  critical = false,
+  required = true,
+): ActivityDefinition {
+  return {
+    id,
+    title,
+    description,
+    assigneeRole,
+    offsetDays,
+    visibility,
+    required,
+    critical,
+    checklist: checklist.map((title, index) => ({
+      id: `${id}-check-${index + 1}`,
+      title,
+      required: true,
+    })),
+    documents: [],
+  };
+}
+
+export const offboardingTemplates: StarterTemplate[] = [
+  {
+    id: "nexo-offboarding-voluntario",
+    name: "Saída voluntária",
+    description:
+      "Acolha a decisão da pessoa e organize com gestor e People uma transição respeitosa. Revise os prazos conforme o último dia acordado.",
+    type: "offboarding",
+    stages: [
+      {
+        id: "voluntario-alinhamento",
+        title: "Comunicar e alinhar",
+        activities: [
+          task(
+            "voluntario-comunicacao",
+            "Confirmar comunicação ao gestor",
+            "Confirme a decisão escrita pelo Atômico no Feed Bitrix, com data prevista. O gestor avisa People com discrição e registra o vínculo com a comunicação.",
+            "gestor",
+            -10,
+            "team",
+            ["Comunicação escrita e data previstas confirmadas", "People avisado"],
+          ),
+          task(
+            "voluntario-reuniao",
+            "Realizar reunião de alinhamento",
+            "Atômico, gestor e People alinham o último dia, a passagem de responsabilidades e a documentação. Registre os combinados com respeito e clareza.",
+            "gestor",
+            -7,
+            "team",
+            ["Último dia acordado", "Plano de transição combinado"],
+          ),
+          task(
+            "voluntario-entrevista",
+            "Conduzir entrevista de saída",
+            "People oferece espaço de escuta para compreender motivos e recolher feedback. Guarde observações sensíveis somente no ambiente autorizado.",
+            "rh",
+            -5,
+            "hr",
+            ["Entrevista realizada ou recusa registrada"],
+          ),
+        ],
+      },
+      {
+        id: "voluntario-transicao",
+        title: "Concluir a transição",
+        activities: [
+          task(
+            "voluntario-conhecimento",
+            "Concluir passagem de conhecimento",
+            "Mapeie entregas em aberto, transfira contexto e confirme quem assume cada responsabilidade.",
+            "gestor",
+            -2,
+            "team",
+            ["Entregas em aberto encaminhadas", "Novos responsáveis informados"],
+          ),
+          task(
+            "voluntario-equipamentos",
+            "Conferir devolução de equipamentos",
+            "Recolha ou regularize equipamentos e materiais conforme o inventário. Registre exceções para acompanhamento.",
+            "ti",
+            0,
+            "team",
+            ["Equipamentos e materiais conferidos"],
+            true,
+          ),
+          task(
+            "voluntario-acessos",
+            "Encerrar acessos e e-mail corporativo",
+            "Programe a revogação para o momento acordado com People. Confirme a execução sem antecipar o bloqueio da pessoa.",
+            "ti",
+            0,
+            "hr",
+            [
+              "Acessos aos sistemas revogados",
+              "E-mail corporativo encerrado ou encaminhado conforme política",
+            ],
+            true,
+          ),
+        ],
+      },
+      {
+        id: "voluntario-encerramento",
+        title: "Orientar e registrar",
+        activities: [
+          task(
+            "voluntario-orientacoes",
+            "Orientar sobre benefícios e documentação",
+            "People entrega orientações individuais sobre documentos, benefícios, pagamentos e apoio de transição conforme as políticas vigentes. Adicione os contatos e materiais atuais aos links desta atividade.",
+            "rh",
+            -1,
+            "employee",
+            ["Documentação e benefícios explicados", "Canais de suporte pós-saída informados"],
+          ),
+          task(
+            "voluntario-registro",
+            "Registrar desligamento no sistema",
+            "People confirma o registro formal da movimentação e confere os documentos exigidos pela política interna.",
+            "rh",
+            0,
+            "hr",
+            ["Registro formal concluído"],
+            true,
+          ),
+          task(
+            "voluntario-faq",
+            "Consultar orientações pós-saída",
+            "Consulte os canais da empresa e da parceira, as regras vigentes de pagamento e as orientações de outplacement disponibilizadas por People. Se algo não estiver claro, peça apoio na tarefa.",
+            "colaborador",
+            0,
+            "employee",
+            [],
+            false,
+            false,
+          ),
+        ],
+      },
+    ],
+  },
+  {
+    id: "nexo-offboarding-involuntario",
+    name: "Saída involuntária",
+    description:
+      "Estruture uma comunicação cuidadosa, transição segura e orientação individual. People revisa benefícios e pagamentos conforme a política aplicável.",
+    type: "offboarding",
+    stages: [
+      {
+        id: "involuntario-alinhamento",
+        title: "Alinhar e comunicar",
+        activities: [
+          task(
+            "involuntario-preparar",
+            "Alinhar comunicação entre gestor e People",
+            "Confirme a data, os responsáveis e a forma respeitosa de comunicar a decisão. Restrinja informações sensíveis ao grupo autorizado.",
+            "rh",
+            -2,
+            "hr",
+            ["Data e responsáveis confirmados"],
+          ),
+          task(
+            "involuntario-conversa",
+            "Realizar conversa de desligamento",
+            "Gestor e People explicam os próximos passos com clareza e empatia, abrem espaço para dúvidas e combinam a transição.",
+            "gestor",
+            0,
+            "team",
+            ["Próximos passos comunicados"],
+          ),
+        ],
+      },
+      {
+        id: "involuntario-transicao",
+        title: "Concluir responsabilidades",
+        activities: [
+          task(
+            "involuntario-conhecimento",
+            "Encaminhar atividades e conhecimento",
+            "Registre entregas em andamento e defina novos responsáveis, respeitando o tempo e o contexto da saída.",
+            "gestor",
+            0,
+            "team",
+            ["Atividades encaminhadas"],
+          ),
+          task(
+            "involuntario-equipamentos",
+            "Conferir equipamentos e materiais",
+            "Combine a devolução ou regularização de itens com People e registre o inventário.",
+            "ti",
+            0,
+            "team",
+            ["Inventário conferido"],
+            true,
+          ),
+          task(
+            "involuntario-acessos",
+            "Encerrar acessos e e-mail corporativo",
+            "Execute a revogação no momento autorizado por People e confirme cada sistema e o e-mail corporativo.",
+            "ti",
+            0,
+            "hr",
+            [
+              "Acessos revogados",
+              "E-mail encerrado ou encaminhado conforme política",
+            ],
+            true,
+          ),
+        ],
+      },
+      {
+        id: "involuntario-encerramento",
+        title: "Orientar e registrar",
+        activities: [
+          task(
+            "involuntario-orientacoes",
+            "Explicar benefícios, pagamentos e apoio",
+            "People explica individualmente documentos, benefícios, eventuais comissões e apoio de outplacement conforme a política vigente. Adicione canais e materiais atuais aos links desta atividade.",
+            "rh",
+            0,
+            "employee",
+            ["Orientações e contatos entregues"],
+          ),
+          task(
+            "involuntario-registro",
+            "Registrar desligamento no sistema",
+            "People conclui o registro formal e confere a documentação exigida pela política interna.",
+            "rh",
+            0,
+            "hr",
+            ["Registro formal concluído"],
+            true,
+          ),
+          task(
+            "involuntario-escuta",
+            "Oferecer espaço de escuta",
+            "People se mantém disponível para dúvidas e, quando apropriado, para ouvir feedback. Registre conteúdo sensível apenas no ambiente autorizado.",
+            "rh",
+            1,
+            "hr",
+            [],
+            false,
+            false,
+          ),
+        ],
+      },
+    ],
+  },
+];
