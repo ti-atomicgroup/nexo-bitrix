@@ -27,5 +27,10 @@ describe("modelos iniciais de offboarding", () => {
     }
     const voluntary = starterTemplates.find((template) => template.id === "nexo-offboarding-voluntario");
     expect(voluntary?.stages.flatMap((stage) => stage.activities).find((item) => item.id === "voluntario-entrevista")?.visibility).toBe("hr");
+    const faq = voluntary?.stages.flatMap((stage) => stage.activities).find((item) => item.id === "voluntario-faq");
+    expect(faq?.description).toContain("Como falar com a Koopere?");
+    expect(faq?.description).toContain("Como falar com a Atomic Group?");
+    expect(faq?.description).toContain("saída voluntária");
+    expect(faq?.description).toContain("saída involuntária");
   });
 });

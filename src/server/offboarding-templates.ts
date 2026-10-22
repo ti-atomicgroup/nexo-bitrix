@@ -141,7 +141,7 @@ export const offboardingTemplates: StarterTemplate[] = [
           task(
             "voluntario-faq",
             "Consultar orientações pós-saída",
-            "Consulte os canais da empresa e da parceira, as regras vigentes de pagamento e as orientações de outplacement disponibilizadas por People. Se algo não estiver claro, peça apoio na tarefa.",
+            "Perguntas frequentes após a saída:\n\nComo falar com a Koopere? People informa o WhatsApp vigente nos links desta atividade.\n\nComo falar com a Atomic Group? People informa os contatos autorizados nos links desta atividade.\n\nO que preciso saber sobre a saída voluntária? Confirme com People o pagamento das horas, a documentação e o apoio de outplacement previstos para o seu caso.\n\nE sobre a saída involuntária? People explicará produção adicional, comissões e outplacement conforme a política aplicável.\n\nSe algo não estiver claro, peça apoio nesta tarefa.",
             "colaborador",
             0,
             "employee",
