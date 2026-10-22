@@ -21,7 +21,7 @@ describe("modelos iniciais de offboarding", () => {
         expect(activity?.required).toBe(true);
         expect(activity?.checklist.every((item) => item.required)).toBe(true);
       }
-      expect(activities.find((item) => item.id.endsWith("acessos"))?.visibility).toBe("hr");
+      expect(activities.find((item) => item.id.endsWith("acessos"))?.visibility).toBe("team");
       expect(activities.find((item) => item.id.endsWith("orientacoes"))?.visibility).toBe("employee");
       expect(activities.find((item) => item.id.endsWith("registro"))?.visibility).toBe("hr");
     }

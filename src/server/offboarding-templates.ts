@@ -106,7 +106,7 @@ export const offboardingTemplates: StarterTemplate[] = [
             "Programe a revogação para o momento acordado com People. Confirme a execução sem antecipar o bloqueio da pessoa.",
             "ti",
             0,
-            "hr",
+            "team",
             [
               "Acessos aos sistemas revogados",
               "E-mail corporativo encerrado ou encaminhado conforme política",
@@ -213,7 +213,7 @@ export const offboardingTemplates: StarterTemplate[] = [
             "Execute a revogação no momento autorizado por People e confirme cada sistema e o e-mail corporativo.",
             "ti",
             0,
-            "hr",
+            "team",
             [
               "Acessos revogados",
               "E-mail encerrado ou encaminhado conforme política",
