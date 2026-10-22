@@ -34,12 +34,13 @@ import {
   TypeBadge,
 } from "./ui";
 import { ReadinessQueue } from "./readiness-queue";
+import { RhDailyAgenda } from "./rh-daily-agenda";
 
 export type View =
   "overview" | "journeys" | "tasks" | "templates" | "automations" | "settings";
 type Shared = {
   workspace: Workspace;
-  onJourney: (journey: Journey) => void;
+  onJourney: (journey: Journey, task?: JourneyTask) => void;
   onCreate: () => void;
   query: string;
 };
@@ -276,6 +277,13 @@ export function Overview({
           </small>
         </div>
       </div>
+      {workspace.session.canManage && (
+        <RhDailyAgenda
+          workspace={workspace}
+          onTask={onJourney}
+          onView={() => onView("journeys")}
+        />
+      )}
       {workspace.session.role !== "colaborador" && (
         <ReadinessQueue workspace={workspace} onJourney={onJourney} />
       )}
