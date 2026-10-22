@@ -1,0 +1,17 @@
+node_modules/
+.next/
+data/
+.env
+.env.*
+!.env.example
+output/
+test-results/
+playwright-report/
+*.tsbuildinfo
+*.log
+.superpowers/
+.cache/
+docs/backend-*.md
+docs/implementation.md
+docs/progress.md
+docs/review-*.md
