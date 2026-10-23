@@ -2,7 +2,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes, scryptSync, 
 import { existsSync } from "node:fs";
 import { AppError } from "./errors";
 
-export interface Environment { encryptionKey: string; setupToken: string; appUrl: string; portalUrl: string; portalDomain: string; dataDir: string; aiBaseUrl: string | null; aiModel: string | null; aiApiKey: string | null; aiConfigured: boolean }
+export interface Environment { encryptionKey: string; setupToken: string; appUrl: string; portalUrl: string; portalDomain: string; dataDir: string; aiBaseUrl: string | null; aiModel: string | null; aiApiKey: string | null; aiConfigured: boolean; chatApiKey: string | null }
 const required = ["NEXO_ENCRYPTION_KEY", "NEXO_SETUP_TOKEN", "NEXO_APP_URL", "BITRIX_PORTAL_URL"];
 export function missingEnvironment(env: Record<string, string | undefined> = process.env): string[] {
   return required.filter(key => !env[key]);
@@ -18,6 +18,8 @@ export function validateEnvironment(env: Record<string, string | undefined> = pr
   const app = new URL(env.NEXO_APP_URL ?? "");
   if (app.username || app.password || app.search || app.hash || (app.protocol !== "https:" && !(app.protocol === "http:" && ["localhost", "127.0.0.1"].includes(app.hostname)))) throw new AppError("APP_URL_INVALID", "NEXO_APP_URL deve ser HTTPS; localhost HTTP é permitido no desenvolvimento.", 503);
   const rawAiUrl = env.NEXO_AI_BASE_URL?.trim() || "", aiModel = env.NEXO_AI_MODEL?.trim() || "", aiApiKey = env.NEXO_AI_API_KEY?.trim() || "";
+  const chatApiKey = env.NEXO_CHAT_API_KEY?.trim() || null;
+  if (chatApiKey && chatApiKey.length < 32) throw new AppError("ENVIRONMENT", "NEXO_CHAT_API_KEY deve ter pelo menos 32 caracteres aleatórios.", 503);
   let aiBaseUrl: string | null = null;
   if (rawAiUrl) {
     try {
@@ -27,7 +29,7 @@ export function validateEnvironment(env: Record<string, string | undefined> = pr
     } catch { /* optional integration stays disabled on invalid configuration */ }
   }
   const aiConfigured = Boolean(aiBaseUrl && aiModel && aiApiKey);
-  return { encryptionKey, setupToken, appUrl: app.origin, portalUrl: portal.origin, portalDomain: portal.hostname, dataDir: env.NEXO_DATA_DIR || (existsSync("/app/.data") ? "/app/.data" : "./data"), aiBaseUrl: aiConfigured ? aiBaseUrl : null, aiModel: aiConfigured ? aiModel : null, aiApiKey: aiConfigured ? aiApiKey : null, aiConfigured };
+  return { encryptionKey, setupToken, appUrl: app.origin, portalUrl: portal.origin, portalDomain: portal.hostname, dataDir: env.NEXO_DATA_DIR || (existsSync("/app/.data") ? "/app/.data" : "./data"), aiBaseUrl: aiConfigured ? aiBaseUrl : null, aiModel: aiConfigured ? aiModel : null, aiApiKey: aiConfigured ? aiApiKey : null, aiConfigured, chatApiKey };
 }
 export function portalFromDomain(domain: string, env: Environment): string {
   if (domain.toLowerCase() !== env.portalDomain) throw new AppError("PORTAL_MISMATCH", "Portal não autorizado.", 403);

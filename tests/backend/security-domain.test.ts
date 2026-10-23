@@ -21,6 +21,12 @@ describe("configuração e fronteira de confiança", () => {
     expect(portalFromDomain("acme.bitrix24.com", config)).toBe("https://acme.bitrix24.com");
     expect(() => portalFromDomain("evil.bitrix24.com", config)).toThrow();
   });
+  it("aceita uma chave de chat opcional apenas com comprimento seguro", () => {
+    const key = "chat-key-".padEnd(40, "a");
+    expect(validateEnvironment({ ...env, NEXO_CHAT_API_KEY: key }).chatApiKey).toBe(key);
+    expect(validateEnvironment(env).chatApiKey).toBeNull();
+    expect(() => validateEnvironment({ ...env, NEXO_CHAT_API_KEY: "short" })).toThrow(/32 caracteres/);
+  });
   it("cifra credenciais com integridade e rejeita chave diferente", () => {
     const encrypted = encrypt("oauth-private", env.NEXO_ENCRYPTION_KEY);
     expect(encrypted).not.toContain("oauth-private");

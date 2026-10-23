@@ -35,6 +35,7 @@ Na configuração da aplicação, abra **Variáveis de ambiente** (ou **Environm
 | `BITRIX_PORTAL_URL` | `https://helpbr24.bitrix24.com.br` |
 | `NEXO_ENCRYPTION_KEY` | Chave secreta aleatória com 64 caracteres hexadecimais |
 | `NEXO_SETUP_TOKEN` | Segredo aleatório forte para proteger a configuração inicial |
+| `NEXO_CHAT_API_KEY` | (Opcional) chave aleatória para o conector do chat Onnira |
 | `NEXO_DATA_DIR` | `/app/.data` |
 | `PORT` | `3000` |
 
@@ -46,6 +47,8 @@ node -e "console.log('NEXO_ENCRYPTION_KEY=' + require('crypto').randomBytes(32).
 
 Copie cada valor diretamente para a variável correspondente na Onnira. Trate-os como senhas: não os envie no chat, não os coloque no Git e não os compartilhe em capturas de tela. Guarde uma cópia segura da chave de criptografia; sem ela, os webhooks armazenados não podem ser decifrados depois de uma restauração.
 
+Para habilitar comandos pelo chat Onnira, gere também uma chave separada para `NEXO_CHAT_API_KEY` (pelo menos 32 caracteres aleatórios). No PowerShell, use `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"` e cole o resultado apenas na variável de ambiente do servidor Onnira e no campo de segredo do conector. Nunca reutilize `NEXO_SETUP_TOKEN` ou o webhook Bitrix.
+
 Ative o volume persistente da Onnira no caminho `/app/.data`. Salve as variáveis e mande a Onnira republicar/reiniciar a aplicação. A página deve abrir na URL publicada e mostrar o assistente de instalação.
 
 ### Ativar sugestões opcionais por IA
@@ -53,6 +56,16 @@ Ative o volume persistente da Onnira no caminho `/app/.data`. Salve as variávei
 Para habilitar a trilha guiada, adicione também `NEXO_AI_BASE_URL` (endpoint HTTPS compatível com OpenAI Chat Completions, sem `/chat/completions`), `NEXO_AI_MODEL` e `NEXO_AI_API_KEY`. Os três valores ficam somente como segredos/variáveis no servidor da Onnira. Sem qualquer um deles, a abertura manual continua disponível e a tela informa que a sugestão está desabilitada. Não cole a chave no Nexo ou no Git.
 
 Ao pedir uma sugestão, o RH cola a descrição da vaga. O Nexo envia essa descrição e o catálogo do modelo escolhido ao provedor configurado; não envia nome, e-mail ou identificador do colaborador. O texto da vaga é mantido apenas durante a solicitação e não é salvo pelo Nexo. Antes de usar com dados internos, confirme a política de retenção e uso de dados do provedor contratado pela empresa. O RH revisa e aprova as tarefas e prazos antes de iniciar a jornada. Competências sem atividade correspondente são mostradas como lacunas para decisão humana.
+
+### Conectar o chat Onnira à API do Nexo
+
+1. Configure `NEXO_CHAT_API_KEY` como variável secreta no ambiente da aplicação e reinicie/republique o Nexo.
+2. Confirme que a conta Bitrix que criou o webhook está associada a uma conta Nexo ativa com papel `admin` ou `rh`.
+3. No recurso de conectores da Onnira, cadastre a API externa usando `https://<url-publicada-do-nexo>/api/chat/openapi.json` e autenticação Bearer com a mesma chave secreta. Os nomes dos menus dependem da versão/plano da Onnira.
+4. Teste primeiro `GET /api/chat/v1/workspace` para consultar o trabalho de hoje. Depois, habilite as ações de início/conclusão de tarefas conforme a política interna de RH.
+5. Se a Onnira não aceitar uma URL OpenAPI externa ou um segredo Bearer no conector, peça à equipe Onnira para habilitar esse recurso no plano da conta; a API do Nexo estará pronta, mas o chat ainda não poderá chamá-la.
+
+O chat pode consultar tarefas de hoje, buscar colaboradores ativos, listar jornadas e modelos, iniciar uma jornada com modelo existente, iniciar/concluir/reabrir tarefas e marcar itens do checklist. O Nexo valida a conta RH, repassa alterações ao Bitrix e registra auditoria. O modelo de IA não recebe a URL nem a chave do webhook Bitrix.
 
 ## 3. Crie o webhook de entrada no Bitrix
 

@@ -1,6 +1,6 @@
 # API interna e integração
 
-Respostas JSON usam `{ "data": ... }` ou `{ "error": { "code": "...", "message": "..." } }`. Mensagens são apresentadas em português. Rotas privadas exigem o cookie `nexo_session`, emitido após login local; o navegador mantém o cookie HttpOnly e envia-o automaticamente. Tokens Bitrix nunca são usados como sessão Nexo.
+Respostas JSON usam `{ "data": ... }` ou `{ "error": { "code": "...", "message": "..." } }`. Mensagens são apresentadas em português. Rotas da interface exigem o cookie `nexo_session`; as rotas `/api/chat/v1/*` exigem `Authorization: Bearer` com a chave independente do chat. Tokens Bitrix nunca são usados como sessão Nexo.
 
 ## Rotas
 
@@ -21,8 +21,26 @@ Respostas JSON usam `{ "data": ... }` ou `{ "error": { "code": "...", "message":
 | POST   | `/api/sync`                   | Solicitar conciliação persistida.                                                       |
 | GET    | `/api/discovery`              | Seleções de `processes`, `categories`, `fields` e `stages`.                             |
 | POST   | `/api/setup`                  | Ações administrativas `bootstrap`, `discover`, `provision`, `configure`, `finish`.      |
+| GET    | `/api/chat/openapi.json`       | Contrato OpenAPI público para cadastrar o Nexo como conector de chat.                  |
+| GET    | `/api/chat/v1/workspace`       | Trabalho de hoje/atrasados e resumo das jornadas ativas (Bearer API key + RH).         |
+| GET    | `/api/chat/v1/journeys`        | Lista filtrável de jornadas (`status`, `type`, `limit`).                                |
+| POST   | `/api/chat/v1/journeys`        | Inicia jornada com `requestId`, tipo, modelo, pessoa, data e responsáveis.              |
+| GET    | `/api/chat/v1/templates`       | Lista de modelos disponíveis ao RH.                                                    |
+| GET    | `/api/chat/v1/users?query=...`  | Busca pessoas ativas do Bitrix por nome, cargo ou área.                                |
+| GET    | `/api/chat/v1/journeys/{id}`   | Detalhe visível de uma jornada.                                                        |
+| POST   | `/api/chat/v1/journeys/{id}/complete` | Conclusão controlada após validar tarefas e checklists.                         |
+| POST   | `/api/chat/v1/journeys/{id}/pause` | Pausa/retomada da liberação de etapas (`{ "paused": true|false }`).                |
+| POST   | `/api/chat/v1/tasks/{id}/action` | Ação Bitrix `start`, `complete`, `reopen`, `check`, `uncheck`.                       |
 
 Os DTOs completos ficam em `src/shared/contracts.ts`. A API limita pedidos a 1 MB, valida dados e rejeita origens diferentes da instalação. O lançamento permite o portal configurado.
+
+### API do chat Onnira
+
+A API do chat fica desabilitada até definir `NEXO_CHAT_API_KEY` no ambiente do servidor. Gere um valor aleatório de pelo menos 32 caracteres e guarde o mesmo valor como segredo Bearer no conector HTTP/OpenAPI da Onnira. A URL do contrato é `https://<domínio-publicado-do-nexo>/api/chat/openapi.json`; o servidor OpenAPI usa a URL pública configurada em `NEXO_APP_URL`. Não use a URL ou o segredo do webhook Bitrix como chave do chat.
+
+As operações autenticadas executam com a conta RH local associada à conta proprietária do webhook Bitrix. Essa conta precisa estar ativa e com papel RH ou administrador. A API só permite as operações listadas; não permite alterar modelos, usuários, permissões ou credenciais. Iniciar uma jornada exige um modelo e usa `requestId` único para deduplicação. Ações de tarefa passam pelas validações de checklist, aprovação, visibilidade e sincronização já aplicadas pelo Nexo.
+
+O chat pode consultar trabalho do dia, listar modelos/jornadas e iniciar ou atualizar atividades. A publicação do Nexo sozinha não conecta o chat. É necessário que o plano/conta Onnira ofereça um conector que aceite URL externa OpenAPI e header Bearer secreto; a documentação pública consultada descreve a API Onnira para consumo de modelos, mas não confirma se o conector customizado está habilitado na conta. Faça um teste de leitura antes de liberar ações de escrita.
 
 ## Instalação
 

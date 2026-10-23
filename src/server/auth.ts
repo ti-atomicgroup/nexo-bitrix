@@ -95,6 +95,17 @@ export class Auth {
     }
     throw new AppError("SESSION_EXPIRED", "Esta sessão não usa uma conta local do Nexo. Entre novamente.", 401);
   }
+  chatSession(): SessionInfo {
+    const webhook = this.store.get("webhook", "incoming", webhookConfigurationSchema);
+    if (!webhook) throw new AppError("WEBHOOK_NOT_CONFIGURED", "Conecte o webhook Bitrix antes de usar o chat.", 503);
+    const account = this.localUsers().find(item => item.active && item.bitrixUserId === webhook.serviceUserId);
+    if (!account) throw new AppError("CHAT_IDENTITY_REQUIRED", "Vincule uma conta RH ativa à conta autorizada do webhook.", 403);
+    const settings = this.settings();
+    const roles: AppRole[] = ["admin", "rh", "gestor", "executor", "colaborador"];
+    const role = roles.find(candidate => candidate === account.role && settings.roleAssignments[candidate].includes(account.bitrixUserId)) ?? "colaborador";
+    if (role !== "admin" && role !== "rh") throw new AppError("CHAT_RH_REQUIRED", "A API do chat exige uma conta Bitrix vinculada ao papel RH ou administrador.", 403);
+    return { user: { ...account.user, name: `${account.user.name} (Onnira Chat)` }, role, portalDomain: this.env.portalDomain, memberId: this.env.portalDomain, expiresAt: new Date(Date.now() + 60000).toISOString(), canManage: true, canConfigure: role === "admin" };
+  }
   requireManage(session: SessionInfo) { if (!session.canManage) throw new AppError("FORBIDDEN", "Esta ação exige papel de RH ou administrador.", 403); }
   async requireAdmin(session: SessionInfo) {
     if (!session.canConfigure) throw new AppError("FORBIDDEN", "Esta ação exige administrador autorizado.", 403);

@@ -30,6 +30,10 @@ it("allows an RH admin to disable a local account and immediately revokes its se
   client.configureWebhook("https://acme.bitrix24.com/rest/1/secret-code/", "1");
   const auth = new Auth(store, env, client);
   const admin = await auth.bootstrapLocalAdmin(env.setupToken, "admin@example.com", "Senha-forte-de-admin-2026", "1");
+  expect(auth.chatSession()).toMatchObject({ user: { id: "1" }, role: "admin", canManage: true });
+  store.put("settings", "current", { ...auth.settings(), roleAssignments: { ...auth.settings().roleAssignments, admin: [] } });
+  expect(() => auth.chatSession()).toThrowError(expect.objectContaining({ code: "CHAT_RH_REQUIRED" }));
+  store.put("settings", "current", auth.settings());
   const person = await auth.createLocalUser(admin.session, { email: "pessoa@example.com", password: "Senha-forte-da-pessoa-2026", bitrixUserId: "2", role: "executor" });
   const login = await auth.loginLocal("pessoa@example.com", "Senha-forte-da-pessoa-2026");
   expect(auth.session(login.token).role).toBe("executor");
