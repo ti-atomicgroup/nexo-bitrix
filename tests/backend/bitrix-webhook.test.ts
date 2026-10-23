@@ -45,3 +45,28 @@ it("rejeita URL de webhook fora do portal ou com query", async () => {
   await expect(client.testWebhook("https://acme.bitrix24.com/rest/42/token/?x=1")).rejects.toMatchObject({ code: "WEBHOOK_URL_INVALID" });
   await expect(client.testWebhook("http://acme.bitrix24.com/rest/42/token/")).rejects.toMatchObject({ code: "WEBHOOK_URL_INVALID" });
 });
+it("descobre leads, negócios e processos inteligentes com campos e etapas", async () => {
+  const requestedStages: string[] = [];
+  const { client } = setup(async (input, init) => {
+    const method = new URL(String(input)).pathname.split("/").pop()?.replace(".json", "");
+    const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+    if (method === "crm.type.list") return Response.json({ result: { types: [{ entityTypeId: 1098, title: "Movimentações de Pessoas" }] } });
+    if (method === "crm.category.list") return Response.json({ result: { categories: [{ id: 0, name: "Geral" }, { id: 4, name: "Comercial" }] } });
+    if (method === "crm.item.fields") return Response.json({ result: { fields: { TITLE: { title: "Nome", type: "string" }, DATE: { title: "Data", type: "date" } } } });
+    if (method === "crm.status.list") {
+      const entityId = String((body.filter as Record<string, unknown>).ENTITY_ID);
+      requestedStages.push(entityId);
+      return Response.json({ result: [{ STATUS_ID: `${entityId}:WON`, NAME: "Aprovado" }] });
+    }
+    throw new Error(`unexpected method ${method}`);
+  });
+  client.configureWebhook("https://acme.bitrix24.com/rest/42/secret-code/", "42");
+
+  const sources = await client.discoverTriggerSources("42");
+
+  expect(sources.map((source) => source.kind)).toEqual(["crm_lead", "crm_deal", "smart_process"]);
+  expect(sources.find((source) => source.kind === "crm_lead")?.categories[0]).toMatchObject({ id: null, stages: [{ id: "STATUS:WON", name: "Aprovado" }] });
+  expect(sources.find((source) => source.kind === "crm_deal")?.categories).toEqual(expect.arrayContaining([expect.objectContaining({ id: "0" }), expect.objectContaining({ id: "4" })]));
+  expect(sources.find((source) => source.kind === "smart_process")?.fields).toEqual(expect.arrayContaining([expect.objectContaining({ id: "TITLE" }), expect.objectContaining({ id: "DATE" })]));
+  expect(requestedStages).toContain("DYNAMIC_1098_STAGE_4");
+});

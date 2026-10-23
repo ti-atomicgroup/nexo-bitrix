@@ -30,9 +30,13 @@ Use um portal Bitrix24 de teste autorizado. Os itens abaixo permanecem pendentes
 
 ## Jornada automática
 
-- [ ] Aprovar uma movimentação de admissão e outra de desligamento no Bitrix.
-- [ ] Confirmar seleção de modelo e responsáveis e atualização para execução.
+- [ ] Configurar um gatilho de cada tipo suportado: Lead, Negócio ou Processo Inteligente; selecionar quadro, funil, etapa, modelo e campos do nome/data.
+- [ ] Mover um candidato fictício para a etapa de contratação e confirmar que a origem aparece na jornada com os dados mapeados.
+- [ ] Testar candidato sem usuário Bitrix: tarefas de RH/TI são criadas, atividades pessoais aguardam vínculo e passam a ser criadas depois que RH associa uma conta ativa.
+- [ ] Confirmar seleção de modelo e responsáveis e atualização da movimentação de RH para execução.
 - [ ] Reenviar evento ou entrar novamente na aprovação; não criar nova jornada para o mesmo registro.
+- [ ] Concluir as tarefas obrigatórias da primeira etapa no Bitrix e confirmar que só então as tarefas da etapa seguinte aparecem no Kanban.
+- [ ] Testar etapa por data relativa, incluindo uma data já vencida, e confirmar liberação na conciliação sem alterar prazos originais.
 - [ ] Aprovar registro incompleto; verificar pendência clara e ausência de tarefas incompletas.
 - [ ] Corrigir o registro; confirmar recuperação sem bloquear outras aprovações válidas.
 - [ ] Pausar uma regra e confirmar que o restante da instalação continua funcionando.

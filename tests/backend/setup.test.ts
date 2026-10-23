@@ -52,6 +52,7 @@ it("provisiona IDs dinâmicos e usa CRM_<id interno>, preservando categoria zero
   const { session } = await auth.bootstrapLocalAdmin(env.setupToken, "rh@example.com", "Senha-de-teste-segura-2026", "1");
   const mapping = await setup.provision(session);
   expect(mapping).toMatchObject({ entityTypeId: 1098, categoryId: 0, employeeField: "ufCrm23NexoEmployee", dateField: "ufCrm23NexoDate", onboardingStageId: "DT1098_0:NEXO_ONBOARD" });
+  expect(await setup.triggerSources(session)).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "crm_lead", entityTypeId: 1 }), expect.objectContaining({ kind: "crm_deal", entityTypeId: 2 }), expect.objectContaining({ kind: "smart_process", entityTypeId: 1098 })]));
   expect(auth.settings().rhProject).toMatchObject({ id: "52", name: "Nexo · RH" });
   expect(await setup.discovery(session, "categories", 1098)).toEqual([{ id: "0", name: "Geral", type: "category" }]);
   expect(await setup.provision(session)).toEqual(mapping);
@@ -60,4 +61,8 @@ it("provisiona IDs dinâmicos e usa CRM_<id interno>, preservando categoria zero
   store.put("settings", "current", { ...auth.settings(), setupComplete: true, automationUserId: "1" });
   const configured = await setup.configure(session, auth.settings(), [{ id: "r1", name: "Aprovação", type: "onboarding", templateId: "model-on", stageId: mapping.onboardingStageId, enabled: false }]);
   expect(configured.setupComplete).toBe(true);
+  const sourceRule = { id: "deal-rule", name: "Contratação no funil", type: "onboarding" as const, templateId: "model-on", stageId: "C2:WON", enabled: true, source: { kind: "crm_deal" as const, entityTypeId: 2, categoryId: 0, stageId: "C2:WON" }, fieldMapping: { nameField: "title", dateField: "startDate", bitrixUserField: null, positionField: null, departmentField: null } };
+  bitrix.discoverTriggerSources = async () => [{ kind: "crm_deal", entityTypeId: 2, name: "Negócios", categories: [{ id: "0", name: "Vendas", stages: [{ id: "C2:WON", name: "Contratado" }] }], fields: [{ id: "title", name: "Nome", type: "string" }, { id: "startDate", name: "Data de início", type: "date" }] }];
+  await setup.configure(session, auth.settings(), [sourceRule]);
+  expect(store.get("rules", "current", z.array(z.object({ id: z.string() })))?.[0]?.id).toBe("deal-rule");
 });

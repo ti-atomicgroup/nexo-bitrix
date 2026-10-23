@@ -9,6 +9,7 @@ export const localSessionSchema = z.object({ userId: z.string(), tokenHash: z.st
 export const storedSessionSchema = z.object({ user: userSchema, admin: z.boolean(), memberId: z.string(), localUserId: z.string().optional(), expiresAt: z.number() });
 export const auditSchema = z.object({ id: z.string(), action: z.string(), message: z.string(), actorName: z.string(), createdAt: z.string(), journeyId: z.string().optional() });
 export const issueSchema = z.object({ id: z.string(), title: z.string(), message: z.string(), createdAt: z.string(), sourceItemId: z.number().optional(), retryable: z.boolean() });
+export const automationRunSchema = z.object({ ruleId: z.string(), sourceKey: z.string(), outcome: z.enum(["started", "pending_data", "ignored", "failed"]), message: z.string(), journeyId: z.string().nullable(), occurredAt: z.string() });
 export const metadataSchema = z.object({ lastSyncAt: z.string().nullable(), syncRunning: z.boolean(), syncStartedAt: z.number().optional() });
 export const operationSchema = z.object({ state: z.enum(["sending", "confirmed", "uncertain"]), remoteId: z.string().optional() });
 export const journeyOwnerSchema = z.object({ userId: z.string(), managerId: z.string().nullable(), source: z.string() });

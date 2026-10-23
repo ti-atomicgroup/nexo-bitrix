@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { addRhTask, fixtureWorkspace, mockWorkspaceApi } from "./fixtures";
 
 test("configuração pública mostra os pré-requisitos sem inventar conexão", async ({
@@ -140,6 +140,42 @@ test("iniciar jornada envia pessoa, modelo e responsáveis selecionados", async 
     employeeId: "22",
     referenceDate: "2026-10-29",
     assignees: { ti: "44", gestor: "11", colaborador: "22" },
+  });
+});
+
+test("RH inicia um offboarding usando o modelo de saída selecionado", async ({
+  page,
+}) => {
+  const workspace = fixtureWorkspace();
+  let received: Record<string, unknown> | undefined;
+  await mockWorkspaceApi(page, workspace);
+  await page.route("**/api/journeys", async (route) => {
+    received = route.request().postDataJSON();
+    await route.fulfill({ json: { data: workspace.journeys[1] } });
+  });
+  await page.getByRole("button", { name: "Nova jornada", exact: true }).click();
+  const modal = page.getByRole("dialog");
+  await modal.getByRole("button", { name: /Offboarding/ }).click();
+  await modal
+    .getByRole("combobox", { name: /^Colaborador/ })
+    .selectOption("33");
+  await modal
+    .getByLabel("Data de desligamento", { exact: false })
+    .fill("2026-10-29");
+  await modal.getByLabel("Modelo da jornada").selectOption("template-off");
+  await modal.getByRole("button", { name: "Revisar atividades" }).click();
+  await expect(
+    modal.getByRole("heading", { name: "Revise o plano de trabalho" }),
+  ).toBeVisible();
+  await modal.getByRole("button", { name: "Iniciar jornada" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Detalhes da jornada" }),
+  ).toBeVisible();
+  expect(received).toMatchObject({
+    type: "offboarding",
+    templateId: "template-off",
+    employeeId: "33",
+    referenceDate: "2026-10-29",
   });
 });
 
@@ -518,6 +554,133 @@ test("capturas da interface usam apenas dados fictícios de testes", async ({
     path: "output/playwright/nexo-automacoes.png",
     fullPage: true,
   });
+});
+
+test("gera uma coleção de telas do Nexo com dados fictícios", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const workspace = fixtureWorkspace();
+  addRhTask(workspace);
+  await mockWorkspaceApi(page, workspace, [], true);
+  await page.route("**/api/ai/onboarding-trail", async (route) => {
+    await route.fulfill({
+      json: {
+        data: {
+          templateId: "template-on",
+          templateVersion: 1,
+          profile: "Vendedor",
+          competencies: [
+            {
+              name: "Colaboração",
+              importance: "important",
+              activityIds: ["activity-2"],
+            },
+          ],
+          gaps: ["Conhecimento do produto"],
+          activities: [
+            {
+              activityId: "activity-1",
+              stageId: "stage-1",
+              order: 0,
+              offsetDays: -2,
+              offsetUnit: "calendar_days",
+              assigneeRole: "ti",
+              reason: "Preparar o ambiente antes da chegada.",
+            },
+            {
+              activityId: "activity-2",
+              stageId: "stage-2",
+              order: 1,
+              offsetDays: 7,
+              offsetUnit: "business_days",
+              assigneeRole: "gestor",
+              reason: "A conversa apoia a integração no time.",
+            },
+          ],
+        },
+      },
+    });
+  });
+  mkdirSync("output/playwright/nexo-demo", { recursive: true });
+  const captured: string[] = [];
+  const capture = async (name: string) => {
+    await page.screenshot({
+      path: `output/playwright/nexo-demo/${name}`,
+      fullPage: true,
+    });
+    captured.push(name);
+  };
+
+  await capture("01-central-rh.png");
+  await page
+    .getByRole("region", { name: "Trabalho de hoje" })
+    .getByRole("button", { name: "Abrir atividade", exact: true })
+    .first()
+    .click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await capture("02-atividade-rh.png");
+  await page.getByRole("button", { name: "Fechar janela" }).click();
+
+  await page.getByRole("button", { name: "Jornadas", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Radar de prontidão" }),
+  ).toBeVisible();
+  await capture("03-radar-e-jornadas.png");
+  await page.getByRole("button", { name: /Bruno Almeida/ }).first().click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await capture("04-detalhe-offboarding.png");
+  await page.getByRole("button", { name: "Fechar janela" }).click();
+
+  await page.getByRole("button", { name: "Modelos", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Modelos de jornada" }),
+  ).toBeVisible();
+  await capture("05-modelos-por-perfil.png");
+  await page.getByRole("button", { name: "Editar modelo" }).first().click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await capture("06-editor-de-modelo.png");
+  await page.keyboard.press("Escape");
+
+  await page.getByRole("button", { name: "Automações", exact: false }).click();
+  await capture("07-regras-de-automacao.png");
+  await page
+    .getByRole("button", { name: "Configurações", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Configurações", exact: true }),
+  ).toBeVisible();
+  await capture("08-configuracoes-bitrix.png");
+
+  await page.getByRole("button", { name: "Visão geral", exact: true }).click();
+  await page.getByRole("button", { name: "Nova jornada", exact: true }).click();
+  const modal = page.getByRole("dialog");
+  await expect(modal).toBeVisible();
+  await capture("09-nova-jornada.png");
+  await modal
+    .getByRole("combobox", { name: /^Colaborador/ })
+    .selectOption("22");
+  await modal.getByLabel("Data de admissão", { exact: false }).fill("2026-10-29");
+  await modal.getByLabel("Modelo da jornada").selectOption("template-on");
+  await modal
+    .getByLabel("Descrição da vaga")
+    .fill("Relacionamento com clientes B2B e colaboração com o time comercial.");
+  await modal.getByRole("button", { name: "Montar trilha com IA" }).click();
+  await expect(
+    modal.getByRole("button", { name: "Gerar nova sugestão" }),
+  ).toBeDisabled();
+  await modal.getByRole("button", { name: "Revisar atividades" }).click();
+  await expect(modal.getByText("Proposta pronta para revisão")).toBeVisible();
+  await capture("10-revisao-da-trilha-ia.png");
+
+  await page.getByRole("button", { name: "Fechar janela" }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("button", { name: "Abrir menu", exact: true }).click();
+  await page.getByRole("button", { name: "Visão geral", exact: true }).click();
+  await capture("11-central-rh-mobile.png");
+  expect(captured).toHaveLength(11);
+  expect(captured.every((name) => existsSync(`output/playwright/nexo-demo/${name}`))).toBe(true);
 });
 
 test("interface principal atende verificações automáticas de acessibilidade", async ({

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { BitrixUser } from "../shared/contracts";
+import type { BitrixUser, DiscoveryOption, TriggerSource, TriggerSourceDiscovery } from "../shared/contracts";
 import { AppError, BitrixError } from "./errors";
 import { record, text, webhookConfigurationSchema } from "./models";
 import { decrypt, encrypt, parseIncomingWebhookUrl, type Environment } from "./security";
@@ -77,6 +77,48 @@ export class BitrixClient {
     const raw = result[0];
     if (!raw) throw new AppError("USER_UNAVAILABLE", "Usuário não está disponível para esta conta.", 403);
     return parseUser(raw);
+  }
+
+  async discoverTriggerSources(userId: string): Promise<TriggerSourceDiscovery[]> {
+    const readFields = async (entityTypeId: number): Promise<DiscoveryOption[]> => {
+      const response = record(await this.call(userId, "crm.item.fields", { entityTypeId, useOriginalUfNames: "N" }));
+      return Object.entries(record(response.fields)).map(([id, value]) => {
+        const field = record(value);
+        return { id, name: typeof field.title === "string" ? field.title : id, type: typeof field.type === "string" ? field.type : "unknown" };
+      });
+    };
+    const readStages = async (entityId: string): Promise<DiscoveryOption[]> =>
+      (await this.list(userId, "crm.status.list", { filter: { ENTITY_ID: entityId } })).map(value => {
+        const stage = record(value);
+        return { id: text(stage.STATUS_ID), name: text(stage.NAME), type: "stage" };
+      });
+    const readCategories = async (entityTypeId: number) =>
+      (await this.list(userId, "crm.category.list", { entityTypeId }, "categories")).map(value => {
+        const category = record(value);
+        return { id: text(category.id), name: text(category.name) };
+      });
+
+    const results: TriggerSourceDiscovery[] = [];
+    for (const standard of [{ kind: "crm_lead" as const, entityTypeId: 1, name: "Leads", stageEntityId: "STATUS" }, { kind: "crm_deal" as const, entityTypeId: 2, name: "Negócios", stageEntityId: "DEAL_STAGE" }]) {
+      const categories = standard.kind === "crm_lead" ? [{ id: null, name: "Leads", stages: await readStages(standard.stageEntityId) }] : await Promise.all((await readCategories(standard.entityTypeId)).map(async category => ({ ...category, stages: await readStages(category.id === "0" ? standard.stageEntityId : `${standard.stageEntityId}_${category.id}`) })));
+      results.push({ ...standard, fields: await readFields(standard.entityTypeId), categories });
+    }
+    const types = (await this.list(userId, "crm.type.list", {}, "types")).map(record);
+    for (const type of types) {
+      const entityTypeId = Number(type.entityTypeId);
+      if (!Number.isSafeInteger(entityTypeId) || entityTypeId <= 0) continue;
+      const categories = await readCategories(entityTypeId);
+      results.push({ kind: "smart_process", entityTypeId, name: text(type.title), fields: await readFields(entityTypeId), categories: await Promise.all(categories.map(async category => ({ ...category, stages: await readStages(`DYNAMIC_${entityTypeId}_STAGE_${category.id}`) }))) });
+    }
+    return results;
+  }
+
+  async getTriggerSource(_userId: string, source: TriggerSource, itemId: number): Promise<Record<string, unknown>> {
+    const response = record(await this.call("service", "crm.item.get", { entityTypeId: source.entityTypeId, id: itemId }));
+    const item = record(response.item);
+    if (text(item.id) !== String(itemId)) throw new AppError("SOURCE_MISMATCH", "O Bitrix24 não confirmou o registro de origem solicitado.", 403);
+    if (source.categoryId !== null && Number(item.categoryId) !== source.categoryId) throw new AppError("SOURCE_CATEGORY", "O registro não pertence ao funil configurado.", 409);
+    return item;
   }
 
   async createRhProject(name: string, userId: string): Promise<{ id: string; name: string; url: string }> {

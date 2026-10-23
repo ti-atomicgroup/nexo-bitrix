@@ -22,6 +22,7 @@ const files = [
   "README.md",
   "docs/api.md",
   "docs/homologacao.md",
+  "docs/manual-instalacao.md",
   "docs/marketplace.md",
   "docs/pitch.md",
   "docs/seguranca.md",

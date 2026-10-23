@@ -47,6 +47,7 @@ function newStage(): StageDefinition {
   return {
     id: crypto.randomUUID(),
     title: "Nova etapa",
+    release: { mode: "immediate", offsetDays: 0, offsetUnit: "calendar_days" },
     activities: [newActivity()],
   };
 }
@@ -412,6 +413,18 @@ export function TemplateEditor({
                         <Trash2 size={15} />
                       </button>
                     </div>
+                  </div>
+                  <div className="form-grid stage-release-controls">
+                    <label className="field">
+                      <span>Quando liberar esta etapa</span>
+                      <select value={(stage.release ?? { mode: "immediate" }).mode} onChange={(event) => updateStage(stage.id, (old) => ({ ...old, release: { ...(old.release ?? { mode: "immediate" as const, offsetDays: 0, offsetUnit: "calendar_days" as const }), mode: event.target.value as "immediate" | "date" | "previous_stage_completed" } }))}>
+                        <option value="immediate">Assim que a jornada começar</option>
+                        <option value="date">Na data relativa à entrada/saída</option>
+                        <option value="previous_stage_completed">Após concluir a etapa anterior</option>
+                      </select>
+                      <small>As tarefas desta etapa só aparecem no Kanban do Bitrix quando ela for liberada.</small>
+                    </label>
+                    {stage.release?.mode === "date" && <label className="field"><span>Diferença da data principal</span><div className="form-grid"><input aria-label="Dias até liberar a etapa" type="number" min={-365} max={365} value={stage.release.offsetDays} onChange={(event) => updateStage(stage.id, (old) => ({ ...old, release: { ...(old.release ?? { mode: "date" as const, offsetDays: 0, offsetUnit: "calendar_days" as const }), offsetDays: Number(event.target.value) } }))} /><select aria-label="Unidade do prazo da etapa" value={stage.release.offsetUnit} onChange={(event) => updateStage(stage.id, (old) => ({ ...old, release: { ...(old.release ?? { mode: "date" as const, offsetDays: 0, offsetUnit: "calendar_days" as const }), offsetUnit: event.target.value as "calendar_days" | "business_days" } }))}><option value="calendar_days">Dias corridos</option><option value="business_days">Dias úteis</option></select></div></label>}
                   </div>
                   {stage.activities.map((activity) => (
                     <details

@@ -41,6 +41,14 @@ export class Journeys {
   sourceKey(entityTypeId: number, itemId: number): string {
     return `approval:${this.auth.env.portalDomain}:${entityTypeId}:${itemId}`;
   }
+  originKey(entityTypeId: number, itemId: number): string {
+    return `trigger:${this.auth.env.portalDomain}:${entityTypeId}:${itemId}`;
+  }
+  findByOrigin(entityTypeId: number, itemId: number): Journey | null {
+    const matches = this.store.list("journey", journeySchema).filter(journey => journey.origin?.entityTypeId === entityTypeId && journey.origin.itemId === itemId);
+    if (matches.length > 1) throw new AppError("SOURCE_DUPLICATE", "Há mais de uma jornada vinculada ao registro de origem. Consulte o suporte.", 409);
+    return matches[0] ?? null;
+  }
   sourceJourney(entityTypeId: number, itemId: number, marker?: unknown): Journey | null {
     const reserved = this.store.reservationId(this.sourceKey(entityTypeId, itemId));
     if (reserved) return this.get(reserved);
@@ -103,6 +111,24 @@ export class Journeys {
     if (!process) throw new AppError("PROCESS_REQUIRED", "Vínculo de processo ausente.");
     return process;
   }
+  private releaseReadyStages(journey: Journey): Journey {
+    let previousCompleted = true;
+    const now = new Date();
+    const stages = journey.stages.map(stage => {
+      const stageTasks = journey.tasks.filter(task => task.stageId === stage.id);
+      const blockingTasks = stageTasks.filter(task => task.required || task.critical);
+      const completed = blockingTasks.every(taskDone);
+      const due = stage.release.mode === "date" && Date.parse(deadlineAt(journey.referenceDate, stage.release.offsetDays, this.auth.settings().timezone, stage.release.offsetUnit)) <= now.getTime();
+      const ready = stage.release.mode === "immediate" || due || (stage.release.mode === "previous_stage_completed" && previousCompleted);
+      const state = stage.state === "waiting" && ready ? "released" as const : stage.state === "released" && completed ? "completed" as const : stage.state;
+      const next = { ...stage, state, releasedAt: stage.releasedAt ?? (state !== "waiting" ? now.toISOString() : null) };
+      previousCompleted = state === "completed";
+      return next;
+    });
+    const released = new Set(stages.filter(stage => stage.state !== "waiting").map(stage => stage.id));
+    const tasks = journey.tasks.map(task => ({ ...task, releaseState: released.has(task.stageId) ? "released" as const : "waiting" as const }));
+    return this.save({ ...journey, stages, tasks });
+  }
   async reconcileJourney(id: string, userId: string): Promise<Journey> {
     const owner = randomUUID();
     if (!this.store.lease(`journey:${id}`, owner, 120000)) throw new BitrixError("JOURNEY_BUSY", true);
@@ -111,11 +137,13 @@ export class Journeys {
       const journey = this.get(id);
       if (journey.status === "cancelled" || journey.status === "completed") return journey;
       if (await this.sourceCancelled(userId, journey, this.process(id))) return this.get(id);
-      journey.tasks = await Promise.all(journey.tasks.map(task => this.refreshTask(userId, task)));
-      return this.save(journey);
+      const refreshed = await Promise.all(journey.tasks.filter(task => task.bitrixTaskId).map(task => this.refreshTask(userId, task)));
+      journey.tasks = journey.tasks.map(task => refreshed.find(item => item.id === task.id) ?? task);
+      if (journey.status === "paused") return this.save(journey);
+      return this.releaseReadyStages(journey);
     } finally { clearInterval(heartbeat); this.store.release(`journey:${id}`, owner); }
   }
-  async create(session: SessionInfo, body: unknown, approval?: { source: string; itemId: number }): Promise<Journey> {
+  async create(session: SessionInfo, body: unknown, approval?: { source: string; itemId?: number; origin?: Journey["origin"]; trigger?: boolean }): Promise<Journey> {
     this.auth.requireManage(session);
     const input: CreateJourneyInput = createJourneySchema.parse(body), settings = this.auth.settings();
     if (!settings.setupComplete || !settings.process) throw new AppError("SETUP_REQUIRED", "Conclua a configuração antes de criar jornadas.", 409);
@@ -152,16 +180,55 @@ export class Journeys {
       const reservation = this.store.reserve(source, approval ? source : fingerprint, randomUUID());
       if (!reservation.fresh) return this.get(reservation.id);
       const id = reservation.id;
-      const tasks: JourneyTask[] = templateActivities.filter(({ activity }) => !approved || recommendationById.has(activity.id)).map(({ stage, stageOrder, activity }) => { const recommendation = recommendationById.get(activity.id); return { id: randomUUID(), journeyId: id, title: activity.title, description: activity.description, stageTitle: stage.title, stageOrder: recommendation?.order ?? stageOrder, assigneeRole: activity.assigneeRole, assignee: users.get(assigned[activity.assigneeRole] ?? "") ?? null, dueAt: deadlineAt(input.referenceDate, recommendation?.offsetDays ?? activity.offsetDays, settings.timezone, recommendation?.offsetUnit ?? activity.offsetUnit), required: activity.required, critical: activity.critical, visibility: activity.visibility, bitrixTaskId: null, bitrixUrl: null, bitrixStageId: null, bitrixStageTitle: null, remoteDeleted: false, status: "pending", syncState: "queued", checklist: activity.checklist.map(item => ({ ...item, completed: false })), documents: activity.documents }; });
-      const journey: Journey = { id, type: input.type, employee, templateId: template.id, templateName: template.name, templateVersion: template.version, templateProfile: template.profile, approvedTrail: approved ? { ...approved, source: "ai", approvedAt: new Date().toISOString() } : null, referenceDate: input.referenceDate, status: "creating", source: approval ? "approval" : "manual", sourceItemId: approval?.itemId ?? null, sourceUrl: approval ? `${this.auth.env.portalUrl}/crm/type/${settings.process?.entityTypeId}/details/${approval.itemId}/` : null, createdAt: new Date().toISOString(), completedAt: null, progress: 0, taskCount: tasks.length, completedCount: 0, radar: "unknown", tasks };
+      const createdAt = new Date().toISOString();
+      const stages = template.stages.map((stage, order) => ({ id: stage.id, title: stage.title, order, release: stage.release ?? { mode: "immediate" as const, offsetDays: 0, offsetUnit: "calendar_days" as const }, state: "waiting" as const, releasedAt: null }));
+      const tasks: JourneyTask[] = templateActivities.filter(({ activity }) => !approved || recommendationById.has(activity.id)).map(({ stage, stageOrder, activity }) => { const recommendation = recommendationById.get(activity.id); return { id: randomUUID(), journeyId: id, title: activity.title, description: activity.description, stageTitle: stage.title, stageId: stage.id, stageOrder: recommendation?.order ?? stageOrder, releaseState: "waiting", assigneeRole: activity.assigneeRole, assignee: users.get(assigned[activity.assigneeRole] ?? "") ?? null, dueAt: deadlineAt(input.referenceDate, recommendation?.offsetDays ?? activity.offsetDays, settings.timezone, recommendation?.offsetUnit ?? activity.offsetUnit), required: activity.required, critical: activity.critical, visibility: activity.visibility, bitrixTaskId: null, bitrixUrl: null, bitrixStageId: null, bitrixStageTitle: null, remoteDeleted: false, status: "pending", syncState: "queued", checklist: activity.checklist.map(item => ({ ...item, completed: false })), documents: activity.documents }; });
+      const sourceUrl = approval?.itemId && settings.process ? `${this.auth.env.portalUrl}/crm/type/${settings.process.entityTypeId}/details/${approval.itemId}/` : null;
+      const journey: Journey = { id, type: input.type, employee, person: { bitrixUserId: employee.id, name: employee.name, position: employee.position, department: employee.department, active: employee.active }, origin: approval?.origin ?? null, stages, templateId: template.id, templateName: template.name, templateVersion: template.version, templateProfile: template.profile, approvedTrail: approved ? { ...approved, source: "ai", approvedAt: createdAt } : null, referenceDate: input.referenceDate, status: "creating", source: approval?.trigger ? "trigger" : approval ? "approval" : "manual", sourceItemId: approval?.itemId ?? null, sourceUrl, createdAt, completedAt: null, progress: 0, taskCount: tasks.length, completedCount: 0, radar: "unknown", tasks };
       this.store.put("snapshot", id, template);
       this.store.put("journey-owner", id, { userId: session.user.id, managerId: assigned.gestor ?? null, source });
       this.store.put("journey-process", id, settings.process);
-      this.save(journey);
+      const initial = this.releaseReadyStages(journey);
       this.store.enqueue(`journey:${id}`, "journey", { journeyId: id });
       this.audit("journey.created", `Jornada de ${employee.name} solicitada.`, session.user.name, id);
-      return journey;
+      return initial;
     });
+  }
+  async linkPerson(session: SessionInfo, id: string, bitrixUserId: string): Promise<Journey> {
+    this.auth.requireManage(session);
+    const owner = randomUUID();
+    if (!this.store.lease(`journey:${id}`, owner, 120000)) throw new BitrixError("JOURNEY_BUSY", true);
+    const heartbeat = setInterval(() => this.store.lease(`journey:${id}`, owner, 120000), 30000);
+    try {
+    const journey = this.get(id);
+    if (journey.status === "cancelled" || journey.status === "completed") throw new AppError("JOURNEY_CLOSED", "A jornada está encerrada.", 409);
+    if (journey.person.bitrixUserId && journey.person.bitrixUserId !== bitrixUserId) throw new AppError("PERSON_ALREADY_LINKED", "Esta jornada já está vinculada a outro usuário Bitrix.", 409);
+    const user = await this.bitrix.user(session.user.id, z.string().regex(/^[1-9]\d{0,15}$/).parse(bitrixUserId));
+    if (!user.active) throw new AppError("EMPLOYEE_INACTIVE", "Selecione um usuário Bitrix ativo.", 409);
+    const employee = { ...user, name: journey.person.name || user.name, position: journey.person.position || user.position, department: journey.person.department || user.department };
+    journey.employee = employee;
+    journey.person = { ...journey.person, bitrixUserId: user.id, active: true };
+    journey.tasks = journey.tasks.map(task => task.assigneeRole === "colaborador" && !task.assignee ? { ...task, assignee: user, syncState: "queued" } : task);
+    this.save(journey);
+    this.store.enqueue(`journey:${id}`, "journey", { journeyId: id });
+    this.audit("journey.person_linked", `Conta Bitrix vinculada a ${journey.person.name}.`, session.user.name, id);
+    return this.get(id);
+    } finally { clearInterval(heartbeat); this.store.release(`journey:${id}`, owner); }
+  }
+  async setPaused(session: SessionInfo, id: string, paused: boolean): Promise<Journey> {
+    this.auth.requireManage(session);
+    const owner = randomUUID();
+    if (!this.store.lease(`journey:${id}`, owner, 120000)) throw new BitrixError("JOURNEY_BUSY", true);
+    try {
+    const journey = this.get(id);
+    if (["cancelled", "completed"].includes(journey.status)) throw new AppError("JOURNEY_CLOSED", "A jornada está encerrada.", 409);
+    if (paused && journey.status === "paused") return journey;
+    if (!paused && journey.status !== "paused") return journey;
+    const updated = this.save({ ...journey, status: paused ? "paused" : "active" });
+    if (!paused) this.store.enqueue(`journey:${id}`, "journey", { journeyId: id });
+    this.audit(paused ? "journey.paused" : "journey.resumed", paused ? "Novas etapas pausadas pelo RH; tarefas já liberadas continuam ativas." : "Jornada retomada pelo RH.", session.user.name, id);
+    return updated;
+    } finally { this.store.release(`journey:${id}`, owner); }
   }
   async creation(id: string, find: () => Promise<string | null>, send: () => Promise<string>): Promise<string> {
     const previous = this.store.get("operation", id, operationSchema);
@@ -189,10 +256,11 @@ export class Journeys {
     const heartbeat = setInterval(() => this.store.lease(`journey:${id}`, owner, 120000), 30000);
     try {
       let journey = this.get(id);
-      if (journey.status === "cancelled" || journey.status === "completed") return journey;
+      if (journey.status === "cancelled" || journey.status === "completed" || journey.status === "paused") return journey;
       const settings = this.auth.settings(), userId = settings.automationUserId;
       if (!userId) throw new AppError("AUTOMATION_REQUIRED", "A conta de automação precisa autorizar o aplicativo.");
       const process = this.process(id);
+      journey = this.releaseReadyStages(journey);
       if (!journey.sourceItemId) {
         const xmlId = `nexo:${id}`;
         const remoteId = await this.creation(`spa:${id}`, async () => {
@@ -201,7 +269,9 @@ export class Journeys {
           if (matches.length > 1) throw new AppError("DUPLICATE_REMOTE", "Mais de uma movimentação possui o marcador Nexo.", 409);
           return matches[0] ? text(matches[0].id) : null;
         }, async () => {
-          const response = record(await this.bitrix.call(userId, "crm.item.add", { entityTypeId: process.entityTypeId, fields: { title: `${journey.type === "onboarding" ? "Onboarding" : "Offboarding"} · ${journey.employee.name}`, xmlId, categoryId: process.categoryId, stageId: process.inProgressStageId, assignedById: userId, opened: "N", [process.employeeField]: journey.employee.id, [process.dateField]: journey.referenceDate } }));
+          const fields: Record<string, unknown> = { title: `${journey.type === "onboarding" ? "Onboarding" : "Offboarding"} · ${journey.person.name}`, xmlId, categoryId: process.categoryId, stageId: process.inProgressStageId, assignedById: userId, opened: "N", [process.dateField]: journey.referenceDate };
+          if (journey.person.bitrixUserId) fields[process.employeeField] = journey.person.bitrixUserId;
+          const response = record(await this.bitrix.call(userId, "crm.item.add", { entityTypeId: process.entityTypeId, fields }));
           return text(record(response.item).id);
         });
         journey = this.linkSource(journey, process.entityTypeId, Number(remoteId));
@@ -211,9 +281,11 @@ export class Journeys {
       for (let index = 0; index < journey.tasks.length; index++) {
         let task = journey.tasks[index];
         if (!task) continue;
+        if (task.releaseState === "waiting") continue;
         if (task.remoteDeleted) continue;
         try {
           if (await this.sourceCancelled(userId, journey, process)) return this.get(id);
+          if (!task.assignee && task.assigneeRole === "colaborador" && !journey.person.bitrixUserId) continue;
           if (!task.assignee) throw new AppError("ASSIGNEE_REQUIRED", "Responsável da atividade não está definido.");
           const taskId = task.id, remoteTitle = `${task.title} [Nexo:${taskId}]`;
           const remoteId = task.bitrixTaskId ?? await this.creation(`task:${taskId}`, async () => {
@@ -320,6 +392,11 @@ export class Journeys {
         catch (error) { if (error instanceof AppError && ["ACCESS_DENIED", "ERROR_NOT_FOUND", "NOT_FOUND"].includes(error.code)) return null; throw error; }
       }
     }
+    let origin: Journey["origin"] = null;
+    if (journey.origin && (session.canManage || manager)) {
+      try { await this.remoteSource(session.user.id, journey.origin.entityTypeId, journey.origin.itemId); origin = journey.origin; }
+      catch (error) { if (!(error instanceof AppError) || !["ACCESS_DENIED", "ERROR_NOT_FOUND", "NOT_FOUND"].includes(error.code)) throw error; }
+    }
     const tasks: JourneyTask[] = [];
     for (const task of candidates) {
       if (!task.bitrixTaskId) { if (session.canManage && owner?.userId === session.user.id) tasks.push(task); continue; }
@@ -327,7 +404,7 @@ export class Journeys {
       catch (error) { if (!(error instanceof AppError) || !["ACCESS_DENIED", "ERROR_NOT_FOUND", "NOT_FOUND"].includes(error.code)) throw error; }
     }
     if (!tasks.length) return null;
-    return summarizeJourney({ ...journey, approvedTrail: session.canManage ? journey.approvedTrail ?? null : null, tasks, sourceItemId: session.canManage || manager ? journey.sourceItemId : null, sourceUrl: session.canManage || manager ? journey.sourceUrl : null });
+    return summarizeJourney({ ...journey, origin, approvedTrail: session.canManage ? journey.approvedTrail ?? null : null, tasks, sourceItemId: session.canManage || manager ? journey.sourceItemId : null, sourceUrl: session.canManage || manager ? journey.sourceUrl : null });
   }
   async action(session: SessionInfo, taskId: string, body: unknown): Promise<JourneyTask> {
     const action = taskActionSchema.parse(body);
@@ -358,6 +435,8 @@ export class Journeys {
     }
     const latest = await this.refreshTask(session.user.id, task);
     journey.tasks = journey.tasks.map(item => item.id === taskId ? latest : item); this.save(journey);
+    if (journey.status !== "paused") this.releaseReadyStages(journey);
+    if (action.action === "complete") this.store.enqueue(`journey:${journey.id}`, "journey", { journeyId: journey.id });
     this.audit(`task.${action.action}`, `Atividade ${task.title} atualizada no Bitrix24.`, session.user.name, journey.id);
     return latest;
     } finally { clearInterval(heartbeat); this.store.release(`journey:${journeyId}`, owner); }
@@ -388,7 +467,7 @@ export class Journeys {
     } finally { clearInterval(heartbeat); this.store.release(`journey:${id}`, owner); }
   }
   alerts(journeys: Journey[]): RadarAlert[] {
-    return journeys.filter(journey => journey.status === "active" || journey.status === "creating").flatMap(journey => journey.tasks.filter(task => !taskDone(task) && Date.parse(task.dueAt) < Date.now()).map(task => ({ id: task.id, journeyId: journey.id, taskId: task.id, title: task.title, employeeName: journey.employee.name, reason: task.syncState !== "synced" ? "Integração requer atenção" : task.status === "awaiting_review" ? "Aguardando revisão no Bitrix24" : "Prazo ultrapassado", severity: task.critical ? "critical" : "attention", dueAt: task.dueAt })));
+    return journeys.filter(journey => journey.status === "active" || journey.status === "creating").flatMap(journey => journey.tasks.filter(task => task.releaseState !== "waiting" && !taskDone(task) && Date.parse(task.dueAt) < Date.now()).map(task => ({ id: task.id, journeyId: journey.id, taskId: task.id, title: task.title, employeeName: journey.employee.name, reason: task.syncState !== "synced" ? "Integração requer atenção" : task.status === "awaiting_review" ? "Aguardando revisão no Bitrix24" : "Prazo ultrapassado", severity: task.critical ? "critical" : "attention", dueAt: task.dueAt })));
   }
   audits() { return this.store.list("audit", auditSchema); }
   issues() { return this.store.list("issue", issueSchema); }

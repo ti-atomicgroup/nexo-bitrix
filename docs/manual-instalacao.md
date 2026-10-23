@@ -71,7 +71,7 @@ Se a validação indicar escopos ausentes, edite ou crie novamente o webhook com
 
 No assistente do Nexo, configure o processo **Movimentações de Pessoas** ou selecione um processo que já exista. O app consulta campos e etapas disponíveis no Bitrix; nenhum ID precisa ser copiado para o código. A preparação também cria uma vez o projeto privado **Nexo · RH** para as tarefas e o Kanban.
 
-Depois, adicione os profissionais de RH como participantes do projeto no Bitrix24, escolha os responsáveis de RH e TI, revise os modelos iniciais de onboarding e offboarding e ajuste atividades, prazos, instruções e obrigatoriedade. Crie modelos por perfil, como RH, Vendedor ou Liderança. Na abertura, o RH escolhe explicitamente o modelo e revisa as etapas antes de iniciar. A tarefa de preparação para TI é calculada para três dias úteis antes da entrada e um dia útil antes da saída. Feriados não são descontados até haver calendário configurado.
+Depois, adicione os profissionais de RH como participantes do projeto no Bitrix24, escolha os responsáveis de RH e TI, revise os modelos iniciais de onboarding e offboarding e ajuste atividades, prazos, instruções e obrigatoriedade. Crie modelos por perfil, como RH, Vendedor ou Liderança. Na abertura, o RH escolhe explicitamente o modelo e revisa as etapas antes de iniciar. Na edição do modelo, configure cada etapa para liberar no início, em uma data relativa à data principal, ou após a conclusão das atividades obrigatórias da etapa anterior. O Nexo só cria no Kanban as tarefas da etapa liberada. A tarefa de preparação para TI é calculada para três dias úteis antes da entrada e um dia útil antes da saída. Feriados não são descontados até haver calendário configurado.
 
 Faça o primeiro teste com dados fictícios: inicie uma jornada manual, abra a tarefa criada no Bitrix, confira responsável, prazo e checklist e marque uma atividade concluída. O teste de offboarding também deve ser feito com uma pessoa fictícia; o Nexo registra solicitações para revogar acessos, enquanto a equipe responsável realiza e confirma as ações nos outros sistemas.
 
@@ -79,11 +79,13 @@ Faça o primeiro teste com dados fictícios: inicie uma jornada manual, abra a t
 
 O início manual funciona sem este passo. Para iniciar jornadas quando uma aprovação muda de etapa no Bitrix, crie um webhook de saída:
 
-1. No Bitrix, abra a área de webhooks de saída/eventos e assine `ONCRMDYNAMICITEMUPDATE` para aprovações e `ONTASKUPDATE` para sincronizar movimentações no Kanban. `ONTASKDELETE` pode ser usado para sinalizar tarefas removidas.
+1. No Bitrix, abra a área de webhooks de saída/eventos e assine `ONCRMDYNAMICITEMUPDATE`, `ONCRMDEALUPDATE` ou `ONCRMLEADUPDATE` para aprovações e `ONTASKUPDATE` para sincronizar movimentações no Kanban. `ONTASKDELETE` pode ser usado para sinalizar tarefas removidas.
 2. No Nexo, abra **Configurações → Conexão** e copie a URL do handler de eventos, terminada em `/api/bitrix/events`.
 3. Cole essa URL no Bitrix e salve a configuração do evento.
 4. Copie o token emitido/configurado para proteger o envio e registre-o nas configurações de conexão do Nexo.
-5. Mude um registro fictício para a etapa de aprovação configurada e confira se uma única jornada foi criada. Depois mova uma tarefa fictícia entre colunas do Kanban e confirme a atualização no Nexo.
+5. Em **Configurações → Processo de RH**, descubra os Kanbans, selecione quadro, funil, etapa, modelo e campos do nome e da data. Mude um registro fictício para a etapa escolhida e confira se uma única jornada foi criada. Se o candidato ainda não tiver conta Bitrix, tarefas de RH e TI seguem; vincule o usuário quando a conta existir para liberar as tarefas pessoais. Depois mova uma tarefa fictícia entre colunas do Kanban e confirme a atualização no Nexo.
+
+O Nexo também consulta as etapas configuradas a cada 60 segundos. Se um evento se perder, a conciliação recupera o registro aprovado. Eventos repetidos e conciliação não criam uma segunda jornada para a mesma origem.
 
 Webhook de entrada significa **Nexo chama o Bitrix**. Webhook de saída significa **Bitrix avisa o Nexo** quando o registro muda. Não use o endereço do webhook de entrada como endereço do evento.
 

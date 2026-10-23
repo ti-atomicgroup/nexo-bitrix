@@ -35,6 +35,19 @@ it("aceita formato form e rejeita segredo ou portal divergentes", () => {
   expect(() => events.receive({ ...form, "auth[application_token]": "wrong-secret" })).toThrow();
   expect(() => events.receive({ ...form, "auth[domain]": "evil.bitrix24.com" })).toThrow();
 });
+it("extrai IDs de evento de lead e negócio e mantém a origem do CRM", () => {
+  const { env, store, events } = setup();
+  events.configureOutgoingToken("outgoing-secret-123456789");
+  const auth = { application_token: "outgoing-secret-123456789", domain: env.portalDomain };
+  events.receive({ event: "ONCRMDEALUPDATE", ts: "deal-1", auth, data: { FIELDS: { ID: "202" } } });
+  events.receive({ event: "ONCRMLEADUPDATE", ts: "lead-1", auth, "data[FIELDS][ID]": "101" });
+  const jobs = store.nextJobs().map((job) => JSON.parse(job.body));
+  expect(jobs).toEqual(expect.arrayContaining([
+    { event: "ONCRMDEALUPDATE", sourceKind: "crm_deal", itemId: 202 },
+    { event: "ONCRMLEADUPDATE", sourceKind: "crm_lead", itemId: 101 },
+  ]));
+  expect(() => events.receive({ event: "ONCRMDEALUPDATE", ts: "missing", auth, data: { FIELDS: {} } })).toThrow();
+});
 it("extrai ID da tarefa de atualizações e rejeita evento de tarefa sem ID", () => {
   const { env, store, events } = setup();
   events.configureOutgoingToken("outgoing-secret-123456789");

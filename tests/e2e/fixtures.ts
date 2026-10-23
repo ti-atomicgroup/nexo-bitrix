@@ -86,7 +86,9 @@ export function fixtureJourney(
       description:
         "Prepare o equipamento e valide os acessos necessários ao primeiro dia.",
       stageTitle: "Antes da chegada",
+      stageId: "before-arrival",
       stageOrder: 0,
+      releaseState: "released",
       assigneeRole: "ti",
       assignee: people[0],
       dueAt: due,
@@ -119,7 +121,9 @@ export function fixtureJourney(
       description:
         "Uma conversa para conhecer as pessoas e os canais de trabalho.",
       stageTitle: "Primeiro dia",
+      stageId: "first-day",
       stageOrder: 1,
+      releaseState: "released",
       assigneeRole: "gestor",
       assignee: people[0],
       dueAt: new Date(Date.now() + 86400000).toISOString(),
@@ -142,6 +146,12 @@ export function fixtureJourney(
     id,
     type: "onboarding",
     employee,
+    person: { bitrixUserId: employee.id, name: employee.name, position: employee.position, department: employee.department, active: employee.active },
+    origin: null,
+    stages: [
+      { id: "before-arrival", title: "Antes da chegada", order: 0, release: { mode: "immediate", offsetDays: 0, offsetUnit: "calendar_days" }, state: "released", releasedAt: new Date().toISOString() },
+      { id: "first-day", title: "Primeiro dia", order: 1, release: { mode: "previous_stage_completed", offsetDays: 0, offsetUnit: "calendar_days" }, state: "released", releasedAt: new Date().toISOString() },
+    ],
     templateId: "template-on",
     templateName: "Integração de novos colaboradores",
     templateVersion: 1,
@@ -237,6 +247,8 @@ export function fixtureWorkspace(): Workspace {
         type: "onboarding",
         templateId: "template-on",
         stageId: "D1032_0:ON",
+        source: null,
+        fieldMapping: null,
         enabled: true,
       },
       {
@@ -245,9 +257,12 @@ export function fixtureWorkspace(): Workspace {
         type: "offboarding",
         templateId: "template-off",
         stageId: "D1032_0:OFF",
+        source: null,
+        fieldMapping: null,
         enabled: true,
       },
     ],
+    automationRuns: [],
     alerts: [
       {
         id: "alert-1",

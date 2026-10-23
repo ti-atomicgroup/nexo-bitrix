@@ -5,7 +5,7 @@ import { AppError } from "./errors";
 import { integer, record, outgoingWebhookSchema } from "./models";
 import { decrypt, encrypt, portalFromDomain, safeEqual } from "./security";
 import { Store } from "./store";
-export const eventJobSchema = z.object({ event: z.string(), entityTypeId: z.number().int().nonnegative().optional(), itemId: z.number().int().positive().optional(), taskId: z.string().regex(/^[1-9]\d{0,15}$/).optional() });
+export const eventJobSchema = z.object({ event: z.string(), sourceKind: z.enum(["crm_lead", "crm_deal"]).optional(), entityTypeId: z.number().int().nonnegative().optional(), itemId: z.number().int().positive().optional(), taskId: z.string().regex(/^[1-9]\d{0,15}$/).optional() });
 export type EventJob = z.infer<typeof eventJobSchema>;
 export class Events {
   constructor(readonly store: Store, readonly auth: Auth) {}
@@ -20,9 +20,14 @@ export class Events {
     const token = z.string().max(2000).parse(authentication.application_token), domain = z.string().max(200).parse(authentication.domain);
     if (!safeEqual(token, decrypt(config.tokenEncrypted, this.auth.env.encryptionKey))) throw new AppError("EVENT_AUTH", "Evento não autorizado.", 403);
     portalFromDomain(domain, this.auth.env);
-    const event = z.enum(["ONTASKADD", "ONTASKUPDATE", "ONTASKDELETE", "ONCRMDYNAMICITEMADD", "ONCRMDYNAMICITEMUPDATE"]).parse(String(body.event).toUpperCase());
+    const event = z.enum(["ONTASKADD", "ONTASKUPDATE", "ONTASKDELETE", "ONCRMDYNAMICITEMADD", "ONCRMDYNAMICITEMUPDATE", "ONCRMDEALUPDATE", "ONCRMLEADUPDATE"]).parse(String(body.event).toUpperCase());
     let job: EventJob = { event };
-    if (event.startsWith("ONCRMDYNAMIC")) {
+    if (event === "ONCRMDEALUPDATE" || event === "ONCRMLEADUPDATE") {
+      const data = body.data === undefined ? null : record(body.data), fields = data?.FIELDS === undefined ? undefined : record(data.FIELDS), fieldsAfter = data?.FIELDS_AFTER === undefined ? undefined : record(data.FIELDS_AFTER);
+      const itemIdValue = fields?.ID ?? fieldsAfter?.ID ?? body["data[FIELDS][ID]"] ?? body["data[FIELDS_AFTER][ID]"];
+      if (itemIdValue === undefined || itemIdValue === null) throw new AppError("CRM_EVENT_ID", "O evento de CRM não contém um ID válido.", 400);
+      job = { event, sourceKind: event === "ONCRMDEALUPDATE" ? "crm_deal" : "crm_lead", itemId: integer(itemIdValue) };
+    } else if (event.startsWith("ONCRMDYNAMIC")) {
       const fields = body.data === undefined ? { ID: body["data[FIELDS][ID]"], ENTITY_TYPE_ID: body["data[FIELDS][ENTITY_TYPE_ID]"] } : record(record(body.data).FIELDS);
       job = { event, itemId: integer(fields.ID), entityTypeId: integer(fields.ENTITY_TYPE_ID) };
     } else {

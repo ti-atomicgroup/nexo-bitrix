@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { templateSchema } from "../../src/server/validation";
+import { rulesSchema, templateSchema } from "../../src/server/validation";
 import { starterTemplates } from "../../src/server/seeds";
 import { deadlineAt } from "../../src/server/domain";
 import { journeySchema, settingsSchema, taskSchema, templateSchema as sharedTemplateSchema } from "../../src/shared/validation";
@@ -8,17 +8,21 @@ describe("modelos iniciais de offboarding", () => {
   it("lê registros antigos com defaults e preserva perfil e coluna Kanban quando presentes", () => {
     const oldTemplate = { id: "legacy", name: "Geral", description: "", type: "onboarding", version: 1, stages: [{ id: "s", title: "Entrada", activities: [{ id: "a", title: "Boas-vindas", description: "", assigneeRole: "rh", offsetDays: 0, required: true, critical: false, visibility: "hr", checklist: [], documents: [] }] }], updatedAt: "2026-10-23" };
     expect(sharedTemplateSchema.parse(oldTemplate).profile).toBe("Geral");
+    expect(sharedTemplateSchema.parse(oldTemplate).stages[0]?.release).toEqual({ mode: "immediate", offsetDays: 0, offsetUnit: "calendar_days" });
     expect(sharedTemplateSchema.parse(oldTemplate).stages[0]?.activities[0]?.competencies).toEqual([]);
     expect(templateSchema.parse({ ...oldTemplate, profile: "Vendedor" }).profile).toBe("Vendedor");
     expect(templateSchema.parse({ ...oldTemplate, stages: [{ ...oldTemplate.stages[0], activities: [{ ...oldTemplate.stages[0]?.activities[0], competencies: ["Negociação", "CRM"] }] }] }).stages[0]?.activities[0]?.competencies).toEqual(["Negociação", "CRM"]);
 
     const oldTask = { id: "t", journeyId: "j", title: "Tarefa", description: "", stageTitle: "Entrada", stageOrder: 0, assigneeRole: "rh", assignee: null, dueAt: "2026-10-23", required: true, critical: false, visibility: "hr", bitrixTaskId: "9", bitrixUrl: null, status: "pending", syncState: "synced", checklist: [], documents: [] };
-    expect(taskSchema.parse(oldTask)).toMatchObject({ bitrixStageId: null, bitrixStageTitle: null });
-    expect(taskSchema.parse({ ...oldTask, bitrixStageId: "2", bitrixStageTitle: "Em andamento" })).toMatchObject({ bitrixStageId: "2", bitrixStageTitle: "Em andamento" });
+    expect(taskSchema.parse(oldTask)).toMatchObject({ bitrixStageId: null, bitrixStageTitle: null, stageId: "legacy", releaseState: "released" });
+    expect(taskSchema.parse({ ...oldTask, bitrixStageId: "2", bitrixStageTitle: "Em andamento", stageId: "day-one", releaseState: "waiting" })).toMatchObject({ bitrixStageId: "2", bitrixStageTitle: "Em andamento", stageId: "day-one", releaseState: "waiting" });
 
     const user = { id: "3", name: "Ana", position: "Vendedora", department: "Comercial", active: true };
     const oldJourney = { id: "j", type: "onboarding", employee: user, templateId: "legacy", templateName: "Geral", templateVersion: 1, referenceDate: "2026-10-23", status: "active", source: "manual", sourceItemId: null, sourceUrl: null, createdAt: "2026-10-23", completedAt: null, progress: 0, taskCount: 1, completedCount: 0, radar: "ok", tasks: [oldTask] };
-    expect(journeySchema.parse(oldJourney)).toMatchObject({ templateProfile: "Geral", approvedTrail: null, tasks: [{ bitrixStageId: null }] });
+    expect(journeySchema.parse(oldJourney)).toMatchObject({ templateProfile: "Geral", approvedTrail: null, origin: null, person: { bitrixUserId: "3", name: "Ana" }, stages: [{ id: "legacy", state: "released" }], tasks: [{ bitrixStageId: null, stageId: "legacy", releaseState: "released" }] });
+    const sourceRule = { id: "crm-hire", name: "Contratado", type: "onboarding", templateId: "legacy", stageId: "C2:WON", enabled: true, source: { kind: "crm_deal", entityTypeId: 2, categoryId: 2, stageId: "C2:WON" }, fieldMapping: { nameField: "TITLE", dateField: "UF_CRM_DATE", bitrixUserField: null, positionField: null, departmentField: null } };
+    expect(rulesSchema.parse([sourceRule])[0]).toMatchObject({ source: { kind: "crm_deal", entityTypeId: 2 }, fieldMapping: { nameField: "TITLE" } });
+    expect(rulesSchema.parse([{ id: "legacy-rule", name: "Aprovado", type: "onboarding", templateId: "legacy", stageId: "APPROVED", enabled: true }])[0]).toMatchObject({ source: null, fieldMapping: null });
     const settings = { companyName: "Atomic", timezone: "America/Sao_Paulo", portalDomain: "helpbr24.bitrix24.com.br", applicationClientId: "", automationUserId: null, roleAssignments: { admin: [], rh: [], gestor: [], executor: [], colaborador: [] }, defaultAssignees: {}, process: null, setupComplete: false };
     expect(settingsSchema.parse(settings).rhProject).toBeNull();
   });

@@ -5379,6 +5379,13 @@ button, a, input, select, textarea { accent-color: #17785c; }
 .stage-filter small { color: #536158; }
 .detail-origin { color: #385f49; }
 .detail-origin > p, .detail-origin a { color: #465d4d; }
+.person-link-panel, .trigger-rule-card { margin: 16px 0; padding: 18px; border: 1px solid #dce7df; border-radius: 10px; background: #f7faf7; }
+.person-link-panel { display: grid; gap: 12px; }
+.person-link-panel strong { color: #244a37; }
+.person-link-panel p, .trigger-rule-card .field-help { color: #536158; }
+.button-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 12px 0; }
+.stage-release-controls { padding: 12px 14px; margin: 12px 0 16px; border-radius: 8px; background: #f6f9f6; }
+.trigger-rule-card { padding: 20px; }
 .detail-activity-row strong { color: #2c3d33; }
 .detail-activity-row small { color: #536158; }
 .task-inspector > h3 { color: #24372d; font-weight: 650; letter-spacing: -0.02em; }

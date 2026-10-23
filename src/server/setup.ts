@@ -12,6 +12,10 @@ import { rulesSchema, settingsSchema, userId } from "./validation";
 import { outgoingWebhookSchema, webhookConfigurationSchema } from "./models";
 export class Setup {
   constructor(readonly store: Store, readonly auth: Auth, readonly bitrix: BitrixClient, readonly journeys: Journeys) {}
+  async triggerSources(session: SessionInfo) {
+    this.auth.requireManage(session);
+    return this.bitrix.discoverTriggerSources(session.user.id);
+  }
   async discover(session: SessionInfo) {
     this.auth.requireManage(session);
     const scopes = z.array(z.string()).parse(await this.bitrix.call(session.user.id, "scope", {}));
@@ -61,7 +65,21 @@ export class Setup {
       const stages = await this.discovery(session, "stages", next.process.entityTypeId, next.process.categoryId);
       if (!fields.some(field => field.id === next.process?.employeeField && ["employee", "user"].includes(field.type ?? "")) || !fields.some(field => field.id === next.process?.dateField && ["date", "datetime"].includes(field.type ?? ""))) throw new AppError("FIELD_MAPPING", "Selecione um campo de usuário e um campo de data existentes no processo.");
       for (const id of [next.process.onboardingStageId, next.process.offboardingStageId, next.process.inProgressStageId, next.process.completedStageId, next.process.cancelledStageId]) if (!stages.some(stage => stage.id === id)) throw new AppError("STAGE_MAPPING", "Há etapas não encontradas na categoria selecionada.");
-      for (const rule of rules.filter(rule => rule.enabled)) if (!stages.some(stage => stage.id === rule.stageId)) throw new AppError("RULE_STAGE", `A etapa da regra ${rule.name} não está na categoria selecionada.`);
+      for (const rule of rules.filter(rule => rule.enabled && !rule.source)) if (!stages.some(stage => stage.id === rule.stageId)) throw new AppError("RULE_STAGE", `A etapa da regra ${rule.name} não está na categoria selecionada.`);
+    }
+    const triggeredRules = rules.filter(rule => rule.enabled && rule.source);
+    if (triggeredRules.length) {
+      const triggerKeys = triggeredRules.map(rule => `${rule.source!.kind}:${rule.source!.entityTypeId}:${rule.source!.categoryId ?? "default"}:${rule.source!.stageId}`);
+      if (new Set(triggerKeys).size !== triggerKeys.length) throw new AppError("RULE_DUPLICATE", "Há mais de um gatilho para a mesma etapa de origem.", 409);
+      const sources = await this.bitrix.discoverTriggerSources(session.user.id);
+      for (const rule of triggeredRules) {
+        const source = rule.source!, definition = sources.find(item => item.kind === source.kind && item.entityTypeId === source.entityTypeId);
+        const category = definition?.categories.find(item => item.id === (source.categoryId === null ? null : String(source.categoryId)));
+        if (!definition || !category || !category.stages.some(stage => stage.id === source.stageId) || rule.stageId !== source.stageId) throw new AppError("RULE_SOURCE", `Revise o quadro, o funil e a etapa do gatilho ${rule.name}.`);
+        const mapping = rule.fieldMapping, nameField = definition.fields.find(field => field.id === mapping?.nameField), dateField = definition.fields.find(field => field.id === mapping?.dateField);
+        if (!mapping || !nameField || !dateField || !["date", "datetime"].includes(dateField.type ?? "")) throw new AppError("RULE_FIELDS", `Mapeie o nome e a data principal do gatilho ${rule.name}.`);
+        if (mapping.bitrixUserField && !definition.fields.some(field => field.id === mapping.bitrixUserField && ["employee", "user"].includes(field.type ?? ""))) throw new AppError("RULE_USER_FIELD", `O campo de usuário Bitrix do gatilho ${rule.name} não é válido.`);
+      }
     }
     const hasAssignees = templates.every(template => template.stages.every(stage => stage.activities.every(activity => activity.assigneeRole === "colaborador" || Boolean(next.defaultAssignees[activity.assigneeRole]))));
     const sameProcess = JSON.stringify(current.process) === JSON.stringify(next.process);
@@ -115,7 +133,7 @@ export class Setup {
         if (existingFields.some(field => field.fieldName === definition.fieldName)) continue;
         await this.journeys.creation(`provision:field:${definition.fieldName}`, async () => {
           const fields = (await this.bitrix.list(user, "userfieldconfig.list", { moduleId: "crm", filter: { entityId } }, "fields")).map(record); const found = fields.find(field => field.fieldName === definition.fieldName); return found ? text(found.id) : null;
-        }, async () => text(record(record(await this.bitrix.call(user, "userfieldconfig.add", { moduleId: "crm", field: { entityId, fieldName: definition.fieldName, userTypeId: definition.userTypeId, mandatory: "Y", multiple: "N", editFormLabel: { br: definition.title, en: definition.title } } })).field).id));
+        }, async () => text(record(record(await this.bitrix.call(user, "userfieldconfig.add", { moduleId: "crm", field: { entityId, fieldName: definition.fieldName, userTypeId: definition.userTypeId, mandatory: definition.userTypeId === "date" ? "Y" : "N", multiple: "N", editFormLabel: { br: definition.title, en: definition.title } } })).field).id));
       }
       const fields = record(record(await this.bitrix.call(user, "crm.item.fields", { entityTypeId, useOriginalUfNames: "N" })).fields);
       const employeeField = Object.keys(fields).find(key => record(fields[key]).upperName === fieldNames.employee);

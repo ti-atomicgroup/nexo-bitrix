@@ -11,6 +11,7 @@ import { Journeys } from "../../src/server/journeys";
 import { Setup } from "../../src/server/setup";
 import { Worker } from "../../src/server/worker";
 import { Events } from "../../src/server/events";
+import { journeySchema } from "../../src/shared/validation";
 import type { SessionInfo } from "../../src/shared/contracts";
 const resources: { store: Store; dir: string }[] = [];
 afterEach(() => {
@@ -95,7 +96,7 @@ async function setup() {
           {
             ID: String(body.ID),
             NAME: `Pessoa ${String(body.ID)}`,
-            ACTIVE: true,
+            ACTIVE: String(body.ID) !== "99",
           },
         ],
       });
@@ -583,6 +584,68 @@ it("evento autenticado sem access_token é durável e aprovação repetida cria 
   expect(store.nextJobs().filter((job) => job.kind === "journey")).toHaveLength(
     1,
   );
+});
+it("gatilho de negócio CRM cria uma jornada ligada à origem sem duplicar", async () => {
+  const { service, store, auth, bitrix, remoteItem } = await setup();
+  remoteItem.stageId = "C2:WON";
+  Object.assign(remoteItem, { title: "Ana candidata" });
+  store.put("rules", "current", [{
+    id: "deal-hired", name: "Contratada", type: "onboarding", templateId: "model1", stageId: "C2:WON", enabled: true,
+    source: { kind: "crm_deal", entityTypeId: 2, categoryId: 0, stageId: "C2:WON" },
+    fieldMapping: { nameField: "title", dateField: "ufCrmDate", bitrixUserField: "ufCrmEmployee", positionField: null, departmentField: null },
+  }]);
+  const worker = new Worker(store, auth, bitrix, service);
+  const job = { event: "ONCRMDEALUPDATE", sourceKind: "crm_deal" as const, itemId: 50 };
+
+  const first = await worker.processSourceEvent(job);
+  const replay = await worker.processSourceEvent(job);
+
+  expect(first?.id).toBe(replay?.id);
+  expect(first).toMatchObject({ source: "trigger", origin: { entityTypeId: 2, itemId: 50 }, person: { bitrixUserId: "2", name: "Ana candidata" }, sourceItemId: null });
+  expect(store.list("journey", journeySchema)).toHaveLength(1);
+});
+it("inicia candidato sem usuário Bitrix e aguarda o vínculo antes de tarefa do colaborador", async () => {
+  const { service, store, auth, bitrix, remoteItem, tasks, session } = await setup();
+  remoteItem.stageId = "C2:WON";
+  Object.assign(remoteItem, { title: "Ana candidata" });
+  store.put("rules", "current", [{ id: "deal-hired", name: "Contratada", type: "onboarding", templateId: "model1", stageId: "C2:WON", enabled: true, source: { kind: "crm_deal", entityTypeId: 2, categoryId: 0, stageId: "C2:WON" }, fieldMapping: { nameField: "title", dateField: "ufCrmDate", bitrixUserField: null, positionField: null, departmentField: null } }]);
+  const worker = new Worker(store, auth, bitrix, service);
+  const created = await worker.processSourceEvent({ event: "ONCRMDEALUPDATE", sourceKind: "crm_deal", itemId: 50 });
+  expect(created?.person).toMatchObject({ bitrixUserId: null, name: "Ana candidata" });
+  expect(created?.tasks.find(task => task.assigneeRole === "colaborador")?.assignee).toBeNull();
+  if (!created) throw new Error("missing candidate journey");
+  await service.runJourney(created.id);
+  expect([...tasks.values()]).toHaveLength(1);
+  await expect(service.linkPerson({ ...session, role: "executor", canManage: false }, created.id, "2")).rejects.toThrow();
+  await expect(service.linkPerson(session, created.id, "99")).rejects.toMatchObject({ code: "EMPLOYEE_INACTIVE" });
+  const linked = await service.linkPerson(session, created.id, "2");
+  expect(linked.person.bitrixUserId).toBe("2");
+  await service.runJourney(created.id);
+  expect([...tasks.values()]).toHaveLength(2);
+});
+it("libera o Kanban do Bitrix por etapa após concluir as atividades obrigatórias", async () => {
+  const { service, session, template, tasks } = await setup();
+  const secondActivity = { ...template.stages[0]!.activities[0]!, id: "activity-stage-2", title: "Entrevista de acompanhamento" };
+  service.saveTemplate(session, { ...template, stages: [...template.stages, { id: "stage2", title: "Acompanhamento", release: { mode: "previous_stage_completed", offsetDays: 0, offsetUnit: "calendar_days" }, activities: [secondActivity] }] }, template.id);
+  const created = await service.create(session, input);
+  expect([...tasks.values()]).toHaveLength(0);
+  expect(created.stages.map(stage => stage.state)).toEqual(["released", "waiting"]);
+  await service.runJourney(created.id);
+  expect([...tasks.values()]).toHaveLength(2);
+  expect(service.get(created.id).tasks.filter(task => task.stageId === "stage2").every(task => task.releaseState === "waiting" && !task.bitrixTaskId)).toBe(true);
+
+  await service.setPaused(session, created.id, true);
+  for (const remote of tasks.values()) remote.status = "5";
+  await service.reconcileJourney(created.id, "1");
+  await service.runJourney(created.id);
+  expect([...tasks.values()]).toHaveLength(2);
+  expect(service.get(created.id).status).toBe("paused");
+  expect(service.get(created.id).tasks.find(task => task.stageId === "stage2")?.releaseState).toBe("waiting");
+  await service.setPaused(session, created.id, false);
+  await service.runJourney(created.id);
+
+  expect([...tasks.values()]).toHaveLength(3);
+  expect(service.get(created.id).tasks.find(task => task.stageId === "stage2")).toMatchObject({ releaseState: "released", bitrixTaskId: expect.any(String) });
 });
 it("mutação de usuário respeita o lease da jornada mantido pelo worker", async () => {
   const { service, store, session } = await setup();

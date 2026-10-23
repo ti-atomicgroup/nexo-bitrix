@@ -40,7 +40,13 @@ export interface ActivityDefinition {
 export interface StageDefinition {
   id: string;
   title: string;
+  release?: StageRelease;
   activities: ActivityDefinition[];
+}
+export interface StageRelease {
+  mode: "immediate" | "date" | "previous_stage_completed";
+  offsetDays: number;
+  offsetUnit: "calendar_days" | "business_days";
 }
 export interface JourneyTemplate {
   id: string;
@@ -58,7 +64,9 @@ export interface JourneyTask {
   title: string;
   description: string;
   stageTitle: string;
+  stageId: string;
   stageOrder: number;
+  releaseState: "waiting" | "released";
   assigneeRole: AssigneeRole;
   assignee: BitrixUser | null;
   dueAt: string;
@@ -93,14 +101,17 @@ export interface Journey {
   id: string;
   type: JourneyType;
   employee: BitrixUser;
+  person: JourneyPerson;
+  origin: JourneyOrigin | null;
+  stages: JourneyStageSnapshot[];
   templateId: string;
   templateName: string;
   templateVersion: number;
   templateProfile: string;
   approvedTrail?: ApprovedTrailSnapshot | null;
   referenceDate: string;
-  status: "creating" | "active" | "completed" | "cancelled";
-  source: "manual" | "approval";
+  status: "creating" | "active" | "paused" | "completed" | "cancelled";
+  source: "manual" | "approval" | "trigger";
   sourceItemId: number | null;
   sourceUrl: string | null;
   createdAt: string;
@@ -110,6 +121,27 @@ export interface Journey {
   completedCount: number;
   radar: "ok" | "attention" | "critical" | "unknown";
   tasks: JourneyTask[];
+}
+export interface JourneyPerson {
+  bitrixUserId: string | null;
+  name: string;
+  position: string;
+  department: string;
+  active: boolean;
+}
+export interface JourneyOrigin {
+  entityTypeId: number;
+  itemId: number;
+  categoryId: number | null;
+  url: string;
+}
+export interface JourneyStageSnapshot {
+  id: string;
+  title: string;
+  order: number;
+  release: StageRelease;
+  state: "waiting" | "released" | "completed";
+  releasedAt: string | null;
 }
 export interface TrailCompetency {
   name: string;
@@ -154,7 +186,30 @@ export interface AutomationRule {
   type: JourneyType;
   templateId: string;
   stageId: string;
+  source: TriggerSource | null;
+  fieldMapping: TriggerFieldMapping | null;
   enabled: boolean;
+}
+export interface TriggerSource {
+  kind: "crm_lead" | "crm_deal" | "smart_process";
+  entityTypeId: number;
+  categoryId: number | null;
+  stageId: string;
+}
+export interface TriggerFieldMapping {
+  nameField: string;
+  dateField: string;
+  bitrixUserField: string | null;
+  positionField: string | null;
+  departmentField: string | null;
+}
+export interface AutomationRun {
+  ruleId: string;
+  sourceKey: string;
+  outcome: "started" | "pending_data" | "ignored" | "failed";
+  message: string;
+  journeyId: string | null;
+  occurredAt: string;
 }
 export interface Settings {
   companyName: string;
@@ -200,6 +255,7 @@ export interface Workspace {
   templates: JourneyTemplate[];
   users: BitrixUser[];
   rules: AutomationRule[];
+  automationRuns: AutomationRun[];
   alerts: RadarAlert[];
   audit: AuditEntry[];
   issues: OperationIssue[];
@@ -222,6 +278,18 @@ export interface DiscoveryOption {
   id: string;
   name: string;
   type?: string;
+}
+export interface TriggerCategoryOption {
+  id: string | null;
+  name: string;
+  stages: DiscoveryOption[];
+}
+export interface TriggerSourceDiscovery {
+  kind: "crm_lead" | "crm_deal" | "smart_process";
+  entityTypeId: number;
+  name: string;
+  categories: TriggerCategoryOption[];
+  fields: DiscoveryOption[];
 }
 export interface CreateJourneyInput {
   requestId: string;

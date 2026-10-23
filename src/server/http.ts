@@ -111,10 +111,12 @@ export async function api(request: Request, resource: string, id?: string) {
     if (resource === "workspace" && request.method === "GET") return json(await workspace(runtime, session));
     if (resource === "templates" && (request.method === "POST" || request.method === "PUT")) return json(runtime.journeys.saveTemplate(session, await body(request), id));
     if (resource === "journeys" && request.method === "POST") return json(await runtime.journeys.create(session, await body(request)));
+    if (resource === "link-person" && request.method === "POST" && id) { const input = z.object({ bitrixUserId: z.string().regex(/^[1-9]\d{0,15}$/) }).parse(await body(request)); return json(await runtime.journeys.linkPerson(session, id, input.bitrixUserId)); }
+    if (resource === "pause" && request.method === "POST" && id) { const input = z.object({ paused: z.boolean() }).parse(await body(request)); return json(await runtime.journeys.setPaused(session, id, input.paused)); }
     if (resource === "complete" && request.method === "POST" && id) return json(await runtime.journeys.complete(session, id));
     if (resource === "task" && request.method === "POST" && id) return json(await runtime.journeys.action(session, id, await body(request)));
     if (resource === "sync" && request.method === "POST") { runtime.auth.requireManage(session); runtime.store.enqueue(`manual-sync:${Date.now()}:${session.user.id}`, "sync", {}); return json({ queued: true }); }
-    if (resource === "discovery" && request.method === "GET") { const url = new URL(request.url), entity = url.searchParams.get("entityTypeId"), category = url.searchParams.get("categoryId"); return json(await runtime.setup.discovery(session, url.searchParams.get("kind") ?? "", entity === null ? undefined : z.coerce.number().int().positive().parse(entity), category === null ? undefined : z.coerce.number().int().nonnegative().parse(category))); }
+    if (resource === "discovery" && request.method === "GET") { const url = new URL(request.url), kind = url.searchParams.get("kind") ?? "", entity = url.searchParams.get("entityTypeId"), category = url.searchParams.get("categoryId"); if (kind === "trigger-sources") return json(await runtime.setup.triggerSources(session)); return json(await runtime.setup.discovery(session, kind, entity === null ? undefined : z.coerce.number().int().positive().parse(entity), category === null ? undefined : z.coerce.number().int().nonnegative().parse(category))); }
     throw new AppError("NOT_FOUND", "Rota não encontrada.", 404);
   } catch (error) { return errorResponse(error); }
 }

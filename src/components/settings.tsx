@@ -26,12 +26,14 @@ import type {
   DiscoveryOption,
   ProcessMapping,
   Settings,
+  TriggerSourceDiscovery,
   Workspace,
 } from "@/shared/contracts";
 import {
   discoverySchema,
   processSchema,
   settingsSchema,
+  triggerSourceDiscoverySchema,
 } from "@/shared/validation";
 import { ApiClient, errorMessage } from "@/lib/client";
 import { appRoleLabels, roleLabels, timeAgo } from "@/lib/format";
@@ -82,6 +84,7 @@ export function SettingsView({
   const [categories, setCategories] = useState<DiscoveryOption[]>([]);
   const [fields, setFields] = useState<DiscoveryOption[]>([]);
   const [stages, setStages] = useState<DiscoveryOption[]>([]);
+  const [triggerSources, setTriggerSources] = useState<TriggerSourceDiscovery[]>([]);
   const [provisionOpen, setProvisionOpen] = useState(false);
   const [capabilities, setCapabilities] = useState(false);
   const [outgoingToken, setOutgoingToken] = useState("");
@@ -138,11 +141,35 @@ export function SettingsView({
     setStages(nextStages);
     setCategories(nextCategories);
   }
+  async function loadTriggerSources() {
+    await perform(async () => {
+      const sources = await api.request("/api/discovery?kind=trigger-sources", triggerSourceDiscoverySchema);
+      setTriggerSources(sources);
+    });
+  }
+  function updateTriggerRule(ruleId: string, patch: Partial<AutomationRule>) {
+    setRules((current) => current.map((rule) => rule.id === ruleId ? { ...rule, ...patch } : rule));
+  }
+  function addTriggerRule(type: "onboarding" | "offboarding") {
+    const template = workspace.templates.find((item) => item.type === type);
+    setRules((current) => [...current, { id: crypto.randomUUID(), name: type === "onboarding" ? "Contratação pelo Kanban" : "Desligamento pelo Kanban", type, templateId: template?.id ?? "", stageId: "", source: null, fieldMapping: null, enabled: true }]);
+  }
+  function selectTriggerSource(ruleId: string, sourceId: string) {
+    const [, rawEntityId] = sourceId.split(":");
+    const source = triggerSources.find((item) => `${item.kind}:${item.entityTypeId}` === sourceId);
+    const category = source?.categories[0];
+    const stage = category?.stages[0];
+    if (!source || !category || !stage) return;
+    const name = source.fields.find((field) => ["string", "text"].includes(field.type ?? ""));
+    const date = source.fields.find((field) => ["date", "datetime"].includes(field.type ?? ""));
+    const person = source.fields.find((field) => ["employee", "user"].includes(field.type ?? ""));
+    updateTriggerRule(ruleId, { stageId: stage.id, source: { kind: source.kind, entityTypeId: Number(rawEntityId), categoryId: category.id === null ? null : Number(category.id), stageId: stage.id }, fieldMapping: name && date ? { nameField: name.id, dateField: date.id, bitrixUserField: person?.id ?? null, positionField: null, departmentField: null } : null });
+  }
   function prepareRules(): AutomationRule[] {
     const mapping = draft.process;
     if (!mapping) return rules;
-    return (["onboarding", "offboarding"] as const).map((type) => {
-      const existing = rules.find((r) => r.type === type);
+    const defaults = (["onboarding", "offboarding"] as const).map((type) => {
+      const existing = rules.find((r) => r.type === type && r.source === null);
       return {
         id: existing?.id || crypto.randomUUID(),
         name:
@@ -156,9 +183,12 @@ export function SettingsView({
           type === "onboarding"
             ? mapping.onboardingStageId
             : mapping.offboardingStageId,
+        source: existing?.source ?? null,
+        fieldMapping: existing?.fieldMapping ?? null,
         enabled: existing?.enabled ?? true,
       };
     });
+    return [...rules.filter((rule) => rule.source !== null), ...defaults];
   }
   async function save() {
     const nextRules = prepareRules();
@@ -610,7 +640,7 @@ export function SettingsView({
                           <span>Modelo a aplicar</span>
                           <select
                             value={
-                              rules.find((r) => r.type === item.type)
+                              rules.find((r) => r.type === item.type && r.source === null)
                                 ?.templateId ||
                               workspace.templates.find(
                                 (t) => t.type === item.type,
@@ -620,7 +650,7 @@ export function SettingsView({
                             onChange={(e) =>
                               setRules((old) => {
                                 const existing = old.find(
-                                  (r) => r.type === item.type,
+                                  (r) => r.type === item.type && r.source === null,
                                 );
                                 const value = {
                                   id: existing?.id || crypto.randomUUID(),
@@ -628,10 +658,12 @@ export function SettingsView({
                                   type: item.type,
                                   templateId: e.target.value,
                                   stageId: process[item.key],
+                                  source: existing?.source ?? null,
+                                  fieldMapping: existing?.fieldMapping ?? null,
                                   enabled: existing?.enabled ?? true,
                                 };
                                 return [
-                                  ...old.filter((r) => r.type !== item.type),
+                                  ...old.filter((r) => !(r.type === item.type && r.source === null)),
                                   value,
                                 ];
                               })
@@ -687,6 +719,22 @@ export function SettingsView({
                   </div>
                 </>
               )}
+              <div className="form-section-heading"><Zap size={17} /><h3>Gatilhos de outros Kanbans</h3></div>
+              <p className="field-help">Conecte uma etapa de Leads, Negócios ou Processo Inteligente. Ao chegar nela, o Nexo inicia a jornada e libera cada tarefa conforme o modelo.</p>
+              <div className="button-row"><Button type="button" variant="secondary" loading={busy} onClick={loadTriggerSources}><RefreshCw size={15} />Descobrir Kanbans do Bitrix</Button><Button type="button" variant="secondary" onClick={() => addTriggerRule("onboarding")}><Plus size={15} />Novo gatilho de onboarding</Button><Button type="button" variant="secondary" onClick={() => addTriggerRule("offboarding")}><Plus size={15} />Novo gatilho de offboarding</Button></div>
+              {rules.filter((rule) => rule.source !== null || rule.fieldMapping === null && rule.stageId === "").map((rule) => {
+                const source = rule.source ? triggerSources.find((item) => item.kind === rule.source?.kind && item.entityTypeId === rule.source.entityTypeId) : undefined;
+                const selectedCategory = source?.categories.find((item) => item.id === (rule.source?.categoryId === null ? null : String(rule.source?.categoryId)));
+                const fieldsForSource = source?.fields ?? [];
+                const updateMapping = (patch: Partial<NonNullable<AutomationRule["fieldMapping"]>>) => updateTriggerRule(rule.id, { fieldMapping: { nameField: rule.fieldMapping?.nameField ?? "", dateField: rule.fieldMapping?.dateField ?? "", bitrixUserField: rule.fieldMapping?.bitrixUserField ?? null, positionField: rule.fieldMapping?.positionField ?? null, departmentField: rule.fieldMapping?.departmentField ?? null, ...patch } });
+                return <div className="trigger-rule-card" key={rule.id}>
+                  <div className="form-grid"><label className="field"><span>Tipo de jornada</span><select value={rule.type} onChange={(event) => updateTriggerRule(rule.id, { type: event.target.value as "onboarding" | "offboarding" })}><option value="onboarding">Onboarding</option><option value="offboarding">Offboarding</option></select></label><label className="field"><span>Modelo de jornada</span><select value={rule.templateId} onChange={(event) => updateTriggerRule(rule.id, { templateId: event.target.value })}><option value="">Selecione um modelo</option>{workspace.templates.filter((template) => template.type === rule.type).map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}</select></label></div>
+                  <label className="field"><span>Quadro de origem</span><select value={source ? `${source.kind}:${source.entityTypeId}` : ""} onChange={(event) => selectTriggerSource(rule.id, event.target.value)}><option value="">Selecione o Kanban</option>{triggerSources.map((item) => <option key={`${item.kind}:${item.entityTypeId}`} value={`${item.kind}:${item.entityTypeId}`}>{item.name}</option>)}</select></label>
+                  {source && <div className="form-grid"><label className="field"><span>Funil / categoria</span><select value={rule.source?.categoryId === null ? "" : String(rule.source?.categoryId ?? "")} onChange={(event) => { const category = source.categories.find((item) => item.id === (event.target.value || null)); const stage = category?.stages[0]; if (category && stage) updateTriggerRule(rule.id, { stageId: stage.id, source: { ...rule.source!, categoryId: category.id === null ? null : Number(category.id), stageId: stage.id } }); }}><option value="">Padrão</option>{source.categories.map((category) => <option key={category.id ?? "default"} value={category.id ?? ""}>{category.name}</option>)}</select></label><label className="field"><span>Etapa que inicia</span><select value={rule.source?.stageId ?? ""} onChange={(event) => updateTriggerRule(rule.id, { stageId: event.target.value, source: { ...rule.source!, stageId: event.target.value } })}><option value="">Selecione a etapa</option>{(selectedCategory?.stages ?? source.categories.flatMap((item) => item.stages)).map((stage) => <option key={stage.id} value={stage.id}>{stage.name}</option>)}</select></label></div>}
+                  {source && <div className="form-grid"><label className="field"><span>Campo com nome da pessoa</span><select value={rule.fieldMapping?.nameField ?? ""} onChange={(event) => updateMapping({ nameField: event.target.value })}><option value="">Selecione</option>{fieldsForSource.map((field) => <option key={field.id} value={field.id}>{field.name}</option>)}</select></label><label className="field"><span>Campo da data principal</span><select value={rule.fieldMapping?.dateField ?? ""} onChange={(event) => updateMapping({ dateField: event.target.value })}><option value="">Selecione</option>{fieldsForSource.filter((field) => ["date", "datetime"].includes(field.type ?? "")).map((field) => <option key={field.id} value={field.id}>{field.name}</option>)}</select></label><label className="field"><span>Usuário Bitrix (se já existir)</span><select value={rule.fieldMapping?.bitrixUserField ?? ""} onChange={(event) => updateMapping({ bitrixUserField: event.target.value || null })}><option value="">Vincular depois no Nexo</option>{fieldsForSource.filter((field) => ["employee", "user"].includes(field.type ?? "")).map((field) => <option key={field.id} value={field.id}>{field.name}</option>)}</select></label></div>}
+                  <div className="button-row"><label className="settings-check"><input type="checkbox" checked={rule.enabled} onChange={(event) => updateTriggerRule(rule.id, { enabled: event.target.checked })} />Ativo</label><Button type="button" variant="ghost" onClick={() => setRules((old) => old.filter((item) => item.id !== rule.id))}>Remover gatilho</Button></div>
+                </div>;
+              })}
             </>
           )}
           {tab === "team" && (

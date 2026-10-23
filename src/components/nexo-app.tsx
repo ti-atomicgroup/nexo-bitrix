@@ -243,6 +243,18 @@ export function NexoApp() {
     await reload();
     notify("Jornada concluída e movimentação atualizada no Bitrix24.");
   }
+  async function linkJourneyPerson(bitrixUserId: string) {
+    if (!journeyId) return;
+    await api.request(`/api/journeys/${encodeURIComponent(journeyId)}/link-person`, journeySchema, { bitrixUserId });
+    await reload();
+    notify("Conta Bitrix vinculada. As tarefas do colaborador serão liberadas.");
+  }
+  async function setJourneyPaused(paused: boolean) {
+    if (!journeyId) return;
+    await api.request(`/api/journeys/${encodeURIComponent(journeyId)}/pause`, journeySchema, { paused });
+    await reload();
+    notify(paused ? "Novas etapas pausadas. Tarefas já liberadas continuam ativas." : "Jornada retomada; o Nexo vai liberar as etapas elegíveis.");
+  }
   async function sync() {
     setSyncBusy(true);
     try {
@@ -588,6 +600,7 @@ export function NexoApp() {
           key={selectedJourney.id}
           journey={selectedJourney}
           session={workspace.session}
+          users={workspace.users}
           timezone={workspace.settings.timezone}
           initialTaskId={taskId}
           onClose={() => {
@@ -596,6 +609,8 @@ export function NexoApp() {
           }}
           onTaskAction={taskAction}
           onComplete={complete}
+          onLinkPerson={linkJourneyPerson}
+          onSetPaused={setJourneyPaused}
         />
       )}
       {editor && (

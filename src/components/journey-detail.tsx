@@ -12,11 +12,12 @@ import {
   FileText,
   LockKeyhole,
   Play,
+  Pause,
   RotateCcw,
   ShieldCheck,
   TriangleAlert,
 } from "lucide-react";
-import type { Journey, JourneyTask, SessionInfo } from "@/shared/contracts";
+import type { BitrixUser, Journey, JourneyTask, SessionInfo } from "@/shared/contracts";
 import { fullDate, roleLabels, shortDate } from "@/lib/format";
 import {
   Avatar,
@@ -38,6 +39,9 @@ export function JourneyDetail({
   onClose,
   onTaskAction,
   onComplete,
+  users,
+  onLinkPerson,
+  onSetPaused,
 }: {
   journey: Journey;
   session: SessionInfo;
@@ -50,6 +54,9 @@ export function JourneyDetail({
     checklistId?: string,
   ) => Promise<void>;
   onComplete: () => Promise<void>;
+  users: BitrixUser[];
+  onLinkPerson: (userId: string) => Promise<void>;
+  onSetPaused: (paused: boolean) => Promise<void>;
 }) {
   const [taskId, setTaskId] = useState(
     initialTaskId ||
@@ -60,6 +67,7 @@ export function JourneyDetail({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [stageFilter, setStageFilter] = useState<number | null>(null);
+  const [personUserId, setPersonUserId] = useState("");
   const task = journey.tasks.find((t) => t.id === taskId);
   const stages = [
     ...new Map(
@@ -120,10 +128,14 @@ export function JourneyDetail({
           <small>
             {journey.source === "approval"
               ? "Iniciada por aprovação no Bitrix"
+              : journey.source === "trigger"
+                ? "Iniciada por um gatilho do Bitrix"
               : "Iniciada pelo RH"}
           </small>
+          {session.canManage && !["completed", "cancelled"].includes(journey.status) && <Button variant="secondary" loading={busy} onClick={() => act(() => onSetPaused(journey.status !== "paused"))}>{journey.status === "paused" ? <Play size={14} /> : <Pause size={14} />}{journey.status === "paused" ? "Retomar etapas" : "Pausar novas etapas"}</Button>}
         </div>
       </div>
+      {session.canManage && !journey.person.bitrixUserId && <div className="person-link-panel"><div><strong>Conta Bitrix pendente</strong><p>As tarefas de RH e TI podem seguir. As tarefas do colaborador serão criadas quando você vincular a conta dele.</p></div><div className="form-grid"><label className="field"><span>Usuário Bitrix do colaborador</span><select value={personUserId} onChange={(event) => setPersonUserId(event.target.value)}><option value="">Selecione uma conta ativa</option>{users.filter((user) => user.active).map((user) => <option key={user.id} value={user.id}>{user.name}{user.department ? ` · ${user.department}` : ""}</option>)}</select></label><Button disabled={!personUserId} loading={busy} onClick={() => act(() => onLinkPerson(personUserId))}>Vincular conta</Button></div>{error && <p className="form-error">{error}</p>}</div>}
       <div className="journey-progress-summary">
         <span>
           {journey.completedCount} de {journey.taskCount} atividades concluídas
@@ -182,10 +194,11 @@ export function JourneyDetail({
             <p>As atividades estão vinculadas às tarefas do seu Bitrix24.</p>
             {journey.sourceUrl && (
               <a href={journey.sourceUrl} target="_blank" rel="noreferrer">
-                Ver movimentação
+                Ver movimentação de RH
                 <ExternalLink size={12} />
               </a>
             )}
+            {journey.origin?.url && <a href={journey.origin.url} target="_blank" rel="noreferrer">Ver registro que iniciou a jornada <ExternalLink size={12} /></a>}
           </div>
         </aside>
         <div className="detail-activities">
@@ -208,8 +221,7 @@ export function JourneyDetail({
                   <span>
                     <strong>{t.title}</strong>
                     <small>
-                      {t.assignee?.name || "Responsável não definido"} ·{" "}
-                      {shortDate(t.dueAt, timezone)}
+                      {t.releaseState === "waiting" ? "Aguardando liberação da etapa" : t.assignee?.name || "Responsável não definido"} · {shortDate(t.dueAt, timezone)}
                     </small>
                   </span>
                   {t.critical && (
@@ -322,7 +334,7 @@ export function JourneyDetail({
                   Visível apenas ao RH autorizado
                 </div>
               )}
-              {task.syncState !== "synced" && (
+              {!journey.person.bitrixUserId && task.assigneeRole === "colaborador" && !task.bitrixTaskId ? <div className="info-strip"><Clock3 size={17} /><p>Vincule a conta Bitrix da pessoa para criar esta tarefa no Kanban.</p></div> : task.releaseState === "waiting" ? <div className="info-strip"><Clock3 size={17} /><p>Esta atividade será criada no Kanban quando a etapa for liberada.</p></div> : task.syncState !== "synced" && (
                 <div
                   className={`info-strip ${["error", "uncertain"].includes(task.syncState) ? "warning" : ""}`}
                 >
