@@ -1,8 +1,19 @@
 # Manual fácil de instalação do Nexo
 
-Este guia leva você da publicação até o primeiro teste. Você vai hospedar o Nexo na Onnira e conectá-lo ao portal Bitrix24 `helpbr24.bitrix24.com.br` usando webhooks. Não precisa instalar o Nexo como aplicativo do Marketplace.
+O Nexo roda na Onnira Cloud IA. Cada cliente conecta seu próprio portal Bitrix24 por webhook. O fluxo de instalação pelo Marketplace depende da liberação de publicação pela Onnira; até lá, o responsável técnico pode publicar uma instância pela Cloud IA usando os passos de hospedagem abaixo.
 
-## O que você precisa
+## Se você vai usar o Nexo
+
+1. Abra o Nexo instalado na sua conta Onnira. Na primeira tela, escolha **Conecte seu Bitrix24**.
+2. Entre no seu portal Bitrix24 com a conta de RH que executará as tarefas. Crie um webhook REST **de entrada** em **Aplicativos → Recursos do desenvolvedor → Webhooks**, com os escopos `task`, `user_brief` (ou `user`), `crm`, `sonet` e `userfieldconfig`.
+3. Cole a URL completa do webhook no Nexo. Informe o código de instalação fornecido pelo responsável pela instância na Onnira e escolha **Validar conexão**. O Nexo identifica seu portal a partir desse endereço, testa a conta e verifica os escopos.
+4. Crie o primeiro acesso RH, configure o projeto de tarefas e revise os modelos. Para receber eventos e iniciar jornadas automaticamente, siga o passo 5 deste manual.
+
+O webhook dá ao Nexo as permissões da conta Bitrix que o criou. Use uma conta de serviço autorizada pelo RH e mantenha a URL em segredo. Clientes não precisam configurar `BITRIX_PORTAL_URL`, publicar Git ou criar chaves de criptografia.
+
+**Pendente para o Marketplace:** a Onnira ainda precisa fornecer o processo de publicação no catálogo e um mecanismo verificável para identificar quem instalou cada instância. Até essa integração, o código de instalação protege o primeiro acesso.
+
+## Se você vai publicar uma instância técnica na Cloud IA
 
 - Acesso de administrador à aplicação Onnira e ao portal Bitrix24.
 - Um usuário Bitrix de serviço para RH, com permissão para consultar colaboradores, criar tarefas e operar o processo de movimentações.
@@ -23,16 +34,15 @@ O Nexo é aberto pela URL da Onnira. O Bitrix fornece os dados e as tarefas por 
    | Inicialização | `npm start` |
    | Porta | `3000` |
 
-4. Publique a aplicação. Copie a URL HTTPS pública que a Onnira mostrar, por exemplo `https://seu-app.onnira.com.br`. Essa URL será o valor de `NEXO_APP_URL`.
+4. Publique a aplicação. Copie a URL HTTPS pública que a Onnira mostrar, por exemplo `https://seu-app.onnira.com.br`. Essa URL será o valor de `NEXO_APP_URL`. Este procedimento é do responsável técnico, não do cliente que instala pelo Marketplace.
 
 ## 2. Configure o serviço Onnira
 
-Abra a URL publicada do Nexo. A tela **Configure a hospedagem** mostra os mesmos passos deste manual. Na Onnira, entre nas configurações do serviço publicado e abra **Variáveis de ambiente** (ou **Environment Variables**). Crie estas quatro variáveis:
+Abra a URL publicada do Nexo. A tela **Configure a hospedagem** aparece apenas enquanto faltam dados técnicos da instância. Na Onnira, entre nas configurações do serviço publicado e abra **Variáveis de ambiente** (ou **Environment Variables**). Crie estas três variáveis:
 
 | Nome | Valor |
 | --- | --- |
 | `NEXO_APP_URL` | URL HTTPS pública copiada da Onnira, sem `/` no final |
-| `BITRIX_PORTAL_URL` | `https://helpbr24.bitrix24.com.br` (ou a URL base do portal que será conectado) |
 | `NEXO_ENCRYPTION_KEY` | Chave secreta aleatória com 64 caracteres hexadecimais |
 | `NEXO_SETUP_TOKEN` | Segredo aleatório forte para proteger a configuração inicial |
 | `NEXO_CHAT_API_KEY` | (Opcional) chave aleatória para o conector do chat Onnira |
@@ -49,7 +59,7 @@ O comando imprime uma linha por variável. Copie o texto depois do sinal `=` par
 
 Para habilitar comandos pelo chat Onnira, gere também uma chave separada para `NEXO_CHAT_API_KEY` (pelo menos 32 caracteres aleatórios). No PowerShell, use `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"` e cole o resultado apenas na variável de ambiente do servidor Onnira e no campo de segredo do conector. Nunca reutilize `NEXO_SETUP_TOKEN` ou o webhook Bitrix.
 
-Adicione também `NEXO_DATA_DIR` com o valor `/app/.data` e `PORT` com `3000`. Ative o volume persistente da Onnira no caminho `/app/.data`. Salve as variáveis e reinicie ou publique novamente a aplicação. Volte para a página do Nexo e clique em **Verificar novamente**. Quando os quatro valores forem válidos, o Nexo mostrará a etapa de conexão Bitrix. Se algum valor estiver ausente ou inválido, confira os nomes, copie novamente a URL pública sem `/` final e reinicie o serviço depois de salvar.
+Adicione também `NEXO_DATA_DIR` com o valor `/app/.data` e `PORT` com `3000`. Ative o volume persistente da Onnira no caminho `/app/.data`. Salve as variáveis e reinicie ou publique novamente a aplicação. Volte para a página do Nexo e clique em **Verificar novamente**. Quando os três valores forem válidos, o Nexo mostrará a etapa de conexão Bitrix. Se algum valor estiver ausente ou inválido, confira os nomes, copie novamente a URL pública sem `/` final e reinicie o serviço depois de salvar.
 
 ### Ativar sugestões opcionais por IA
 
@@ -71,7 +81,7 @@ O chat pode consultar tarefas de hoje, buscar colaboradores ativos, listar jorna
 
 O webhook de entrada permite que o Nexo consulte o Bitrix e crie tarefas em nome do usuário de serviço.
 
-1. Entre no portal [helpbr24.bitrix24.com.br](https://helpbr24.bitrix24.com.br) com o usuário de serviço de RH.
+1. Entre no portal Bitrix24 que será conectado com o usuário de serviço de RH. Para o teste deste projeto, o portal é [helpbr24.bitrix24.com.br](https://helpbr24.bitrix24.com.br).
 2. Abra **Aplicativos → Recursos do desenvolvedor → Webhooks → Webhook de entrada**. Os nomes dos menus podem variar um pouco conforme a interface do portal.
 3. Conceda os escopos `task`, `user_brief` (ou `user`), `crm`, `sonet` e `userfieldconfig`. `sonet` permite preparar o projeto RH; `userfieldconfig` permite criar campos do processo.
 4. Crie o webhook e copie a URL completa, inclusive a parte secreta. O Bitrix só mostra essa credencial durante a criação.
@@ -106,7 +116,7 @@ Webhook de entrada significa **Nexo chama o Bitrix**. Webhook de saída signific
 
 | O que você vê | O que conferir |
 | --- | --- |
-| Página informa que falta configuração | Confira as quatro variáveis principais (`NEXO_APP_URL`, `BITRIX_PORTAL_URL`, `NEXO_ENCRYPTION_KEY`, `NEXO_SETUP_TOKEN`), salve e reinicie na Onnira. |
+| Página informa que falta configuração | O responsável técnico deve conferir `NEXO_APP_URL`, `NEXO_ENCRYPTION_KEY` e `NEXO_SETUP_TOKEN`, salvar e reiniciar a instância na Onnira. |
 | `SCOPES_MISSING` | Recrie o webhook de entrada com `task`, `user_brief` ou `user`, `crm`, `sonet` e `userfieldconfig`; atualize a URL no Nexo. |
 | Bitrix retorna 403 ou acesso negado | Confira permissões do usuário que criou o webhook. O Bitrix aplica as permissões dessa conta às operações do Nexo. |
 | Início automático não acontece | Confira a URL `/api/bitrix/events`, assinatura do evento, token de saída e regra que associa a etapa de aprovação a um modelo. |

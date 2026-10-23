@@ -27,6 +27,18 @@ it("valida webhook, identifica a conta e guarda a URL cifrada", async () => {
   expect(calls).toEqual(["https://acme.bitrix24.com/rest/42/secret-code/profile.json", "https://acme.bitrix24.com/rest/42/secret-code/scope.json"]);
   expect(env.portalUrl).toBe("https://acme.bitrix24.com");
 });
+it("fixa o portal do cliente ao conectar e recupera esse portal após reinício", async () => {
+  const { store } = setup(async () => Response.json({ result: {} }));
+  const config = { NEXO_ENCRYPTION_KEY: "ab".repeat(32), NEXO_SETUP_TOKEN: "setup-secret-long-enough", NEXO_APP_URL: "https://nexo.example.com" };
+  const firstEnv = validateEnvironment(config);
+  const first = new BitrixClient(store, firstEnv, async () => Response.json({ result: {} }));
+  first.configureWebhook("https://cliente.bitrix24.com.br/rest/42/secret-code/", "42");
+  expect(firstEnv.portalDomain).toBe("cliente.bitrix24.com.br");
+  expect(() => first.configureWebhook("https://outro.bitrix24.com.br/rest/42/secret-code/", "42")).toThrow();
+  const restartedEnv = validateEnvironment(config);
+  new BitrixClient(store, restartedEnv, async () => Response.json({ result: {} }));
+  expect(restartedEnv.portalUrl).toBe("https://cliente.bitrix24.com.br");
+});
 it("usa webhook no caminho da API e nunca envia OAuth auth", async () => {
   let seen: { url: string; body: Record<string, unknown> } | undefined;
   const { env, client } = setup(async (input, init) => {

@@ -3704,6 +3704,27 @@ svg {
   color: #778b7c !important;
 }
 .environment-security-note svg { flex: none; margin-top: 2px; }
+.bitrix-connect-guide {
+  margin: -6px 0 23px;
+  padding: 15px 17px;
+  border: 1px solid #dfebe2;
+  border-radius: 8px;
+  background: #f6faf7;
+}
+.bitrix-connect-guide h3 {
+  color: #355c43;
+  font-size: 12px;
+  font-weight: 650;
+}
+.bitrix-connect-guide ol {
+  margin: 9px 0 0;
+  padding-left: 18px;
+  color: #617469;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.bitrix-connect-guide li + li { margin-top: 5px; }
+.bitrix-connect-guide strong { color: #365b44; }
 .handler-addresses {
   margin-top: 13px;
   border: 1px solid #e2ede6;

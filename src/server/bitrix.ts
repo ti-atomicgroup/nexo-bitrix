@@ -9,7 +9,14 @@ const envelope = z.object({ result: z.unknown().optional(), error: z.string().op
 const throttleSchema = z.object({ until: z.number(), attempts: z.number() });
 
 export class BitrixClient {
-  constructor(readonly store: Store, readonly env: Environment, private readonly transport: typeof fetch = fetch) {}
+  constructor(readonly store: Store, readonly env: Environment, private readonly transport: typeof fetch = fetch) {
+    const existing = store.get("webhook", "incoming", webhookConfigurationSchema);
+    if (existing) {
+      const portal = parseIncomingWebhookUrl(decrypt(existing.url, env.encryptionKey), env);
+      env.portalUrl = portal.portalUrl;
+      env.portalDomain = portal.portalDomain;
+    }
+  }
 
   async testWebhook(url: string): Promise<{ userId: string; userName: string; scopes: string[] }> {
     const parsed = parseIncomingWebhookUrl(url, this.env);
@@ -23,15 +30,17 @@ export class BitrixClient {
     const parsed = parseIncomingWebhookUrl(url, this.env);
     if (parsed.userId !== serviceUserId) throw new AppError("WEBHOOK_USER_MISMATCH", "O ID da conta não corresponde à URL do webhook.", 400);
     this.store.put("webhook", "incoming", { url: encrypt(url, this.env.encryptionKey), serviceUserId, verifiedAt: new Date().toISOString() });
+    this.env.portalUrl = parsed.portalUrl;
+    this.env.portalDomain = parsed.portalDomain;
   }
 
-  private async webhookRequest(webhook: { userId: string; secret: string }, method: string, params: Record<string, unknown>): Promise<{ result: unknown; next?: number }> {
+  private async webhookRequest(webhook: { userId: string; secret: string; portalUrl: string }, method: string, params: Record<string, unknown>): Promise<{ result: unknown; next?: number }> {
     if (!/^[a-z][a-z0-9._]*$/i.test(method)) throw new AppError("METHOD_INVALID", "Método Bitrix inválido.");
     const throttle = this.store.get("throttle", "portal", throttleSchema);
     if (throttle && throttle.until > Date.now()) throw new BitrixError("RATE_LIMIT", true);
     let response: Response;
     try {
-      response = await this.transport(`${this.env.portalUrl}/rest/${webhook.userId}/${webhook.secret}/${method}.json`, {
+      response = await this.transport(`${webhook.portalUrl}/rest/${webhook.userId}/${webhook.secret}/${method}.json`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(params), signal: AbortSignal.timeout(20000), redirect: "error",
       });
     } catch { throw new BitrixError("TRANSPORT_UNCERTAIN", true, true); }

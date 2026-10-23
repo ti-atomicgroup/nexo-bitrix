@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateEnvironment, portalFromDomain, encrypt, decrypt, safeEqual } from "../../src/server/security";
+import { validateEnvironment, portalFromDomain, parseIncomingWebhookUrl, encrypt, decrypt, safeEqual } from "../../src/server/security";
 import { deadlineAt, taskStatus, canCompleteJourney, summarizeJourney } from "../../src/server/domain";
 import { templateSchema, createJourneySchema } from "../../src/server/validation";
 import type { Journey, JourneyTask } from "../../src/shared/contracts";
@@ -12,6 +12,14 @@ export function journey(tasks: JourneyTask[]): Journey {
   return { id: "j1", type: "onboarding", employee: { id: "3", name: "Ana", position: "", department: "", active: true }, person: { bitrixUserId: "3", name: "Ana", position: "", department: "", active: true }, origin: null, stages: [{ id: "setup", title: "Preparar", order: 0, release: { mode: "immediate", offsetDays: 0, offsetUnit: "calendar_days" }, state: "released", releasedAt: "2026-10-22T00:00:00Z" }], templateId: "m1", templateName: "Modelo", templateVersion: 1, templateProfile: "Geral", referenceDate: "2026-10-22", status: "active", source: "manual", sourceItemId: 100, sourceUrl: null, createdAt: "2026-10-22T00:00:00Z", completedAt: null, progress: 0, taskCount: tasks.length, completedCount: 0, radar: "unknown", tasks };
 }
 describe("configuração e fronteira de confiança", () => {
+  it("aceita hospedagem sem portal definido e extrai apenas um domínio Bitrix cloud do webhook", () => {
+    const config = validateEnvironment({ ...env, BITRIX_PORTAL_URL: undefined });
+    expect(config.portalUrl).toBe("");
+    expect(parseIncomingWebhookUrl("https://cliente.bitrix24.com.br/rest/42/secret-code/", config)).toMatchObject({ portalUrl: "https://cliente.bitrix24.com.br", portalDomain: "cliente.bitrix24.com.br", userId: "42" });
+    for (const url of ["http://cliente.bitrix24.com.br/rest/42/secret-code/", "https://cliente.bitrix24.com.br.evil.test/rest/42/secret-code/", "https://127.0.0.1/rest/42/secret-code/", "https://cliente.bitrix24.com.br/rest/42/secret-code/?x=1"]) {
+      expect(() => parseIncomingWebhookUrl(url, config)).toThrow();
+    }
+  });
   it("não gera segredos nem aceita portal arbitrário/SSRF", () => {
     expect(() => validateEnvironment({})).toThrow();
     for (const url of ["http://acme.bitrix24.com", "https://localhost", "https://127.0.0.1", "https://acme.bitrix24.com@evil.test", "https://acme.bitrix24.com/rest/a"]) {

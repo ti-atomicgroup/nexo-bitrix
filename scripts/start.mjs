@@ -44,7 +44,6 @@ const required = [
   "NEXO_APP_URL",
   "NEXO_ENCRYPTION_KEY",
   "NEXO_SETUP_TOKEN",
-  "BITRIX_PORTAL_URL",
 ];
 const missing = required.filter((name) => !process.env[name]);
 if (missing.length)

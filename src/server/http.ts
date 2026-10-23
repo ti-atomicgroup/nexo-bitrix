@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { PublicStatus } from "../shared/contracts";
 import { AppError } from "./errors";
-import { missingEnvironment, validateEnvironment } from "./security";
+import { missingEnvironment } from "./security";
 import { getRuntime } from "./runtime";
 import { seedTemplates } from "./seeds";
 import { workspace } from "./workspace";
@@ -43,8 +43,8 @@ export async function status() {
   const result: PublicStatus = { installed: false, configured: false, portalDomain: null, appUrl: "", missingEnvironment: missing, version: "1.0.0", webhookConnected: false, firstAdminCreated: false, outgoingWebhookConfigured: false, aiConfigured: false };
   if (missing.length) return json(result);
   try {
-    const env = validateEnvironment(); result.appUrl = env.appUrl; result.portalDomain = env.portalDomain; result.aiConfigured = env.aiConfigured;
-    const runtime = getRuntime(), incoming = runtime.store.get("webhook", "incoming", webhookConfigurationSchema), outgoing = runtime.store.get("webhook", "outgoing", outgoingWebhookSchema), users = runtime.store.list("localUser", localUserSchema);
+    const runtime = getRuntime(), env = runtime.env; result.appUrl = env.appUrl; result.portalDomain = env.portalDomain || null; result.aiConfigured = env.aiConfigured;
+    const incoming = runtime.store.get("webhook", "incoming", webhookConfigurationSchema), outgoing = runtime.store.get("webhook", "outgoing", outgoingWebhookSchema), users = runtime.store.list("localUser", localUserSchema);
     result.webhookConnected = Boolean(incoming);
     result.firstAdminCreated = users.some(user => user.role === "admin" && user.active);
     result.outgoingWebhookConfigured = Boolean(outgoing);

@@ -17,9 +17,7 @@ test("configuração pública orienta a instalação Onnira e a geração segura
   await expect(
     page.getByText("NEXO_ENCRYPTION_KEY", { exact: true }).first(),
   ).toBeVisible();
-  await expect(
-    page.getByText("BITRIX_PORTAL_URL", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText("BITRIX_PORTAL_URL", { exact: true })).toHaveCount(0);
   await expect(
     page.getByRole("heading", { name: "Adicione as variáveis na Onnira" }),
   ).toBeVisible();
@@ -47,6 +45,20 @@ test("configuração pública orienta a instalação Onnira e a geração segura
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
   ).toBe(true);
+});
+
+test("primeira abertura solicita a conexão Bitrix ao cliente", async ({ page }) => {
+  await page.route("**/api/status", (route) => route.fulfill({ json: { data: {
+    installed: false, configured: false, portalDomain: null, appUrl: "https://nexo.example.com", missingEnvironment: [], version: "1.0.0", webhookConnected: false, firstAdminCreated: false,
+  } } }));
+  await page.route("**/api/workspace", (route) => route.fulfill({ status: 401, json: { error: { code: "SESSION_REQUIRED", message: "Entre no Nexo." } } }));
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Conecte seu Bitrix24" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Como conectar" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: /URL do webhook de entrada/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Validar conexão" })).toBeVisible();
+  await expect(page.getByText("BITRIX_PORTAL_URL", { exact: true })).toHaveCount(0);
+  await page.screenshot({ path: "output/playwright/nexo-conectar-bitrix.png", fullPage: true });
 });
 
 test("central filtra jornadas e mantém a sessão somente em memória", async ({

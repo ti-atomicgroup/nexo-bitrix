@@ -4,7 +4,7 @@ let shuttingDown = false;
 const runtime = createRuntime();
 let running: Promise<void> | null = null;
 function tick() {
-  if (running || shuttingDown) return;
+  if (running || shuttingDown || !runtime.env.portalUrl) return;
   running = runtime.worker.tick().catch((error: unknown) => { console.error(JSON.stringify({ event: "worker.tick.failed", code: error instanceof AppError ? error.code : "INTERNAL" })); }).finally(() => { running = null; });
 }
 const interval = setInterval(tick, 60000);

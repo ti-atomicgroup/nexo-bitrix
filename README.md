@@ -1,8 +1,8 @@
 # Nexo · Pessoas e processos
 
-Onboarding e offboarding dentro do Bitrix24, com modelos configuráveis, tarefas e checklists nativos, início manual ou por aprovação de RH e Radar de Prontidão.
+Onboarding e offboarding hospedados na Onnira Cloud IA e conectados ao Bitrix24 por webhooks, com modelos configuráveis, tarefas e checklists nativos, início manual ou por aprovação de RH e Radar de Prontidão.
 
-**Quer instalar?** Siga o [manual fácil de instalação](docs/manual-instalacao.md), que orienta a publicação na Onnira e a conexão por webhooks ao Bitrix24.
+**Quer usar?** Siga o [manual fácil de instalação](docs/manual-instalacao.md). O cliente conecta seu portal pelo assistente do Nexo. A publicação no Marketplace da Onnira depende de acesso de publicador; o repositório documenta também a publicação técnica de uma instância Cloud IA.
 
 ## Executar localmente
 
@@ -20,7 +20,7 @@ Abra http://localhost:3000. Sem credenciais, a aplicação apresenta o guia de i
 Copie `.env.example` para `.env` e configure os valores abaixo. Para gerar um arquivo novo com chaves aleatórias, use:
 
 ```sh
-npm run configure -- --portal https://sua-empresa.bitrix24.com.br --url https://seu-app-publicado
+npm run configure -- --url https://seu-app-publicado
 ```
 
 O comando não sobrescreve um `.env` existente nem imprime as chaves. No Windows, use `npm.cmd` se o PowerShell bloquear scripts npm.
@@ -28,7 +28,6 @@ O comando não sobrescreve um `.env` existente nem imprime as chaves. No Windows
 | Variável              | Uso                                                                                             |
 | --------------------- | ----------------------------------------------------------------------------------------------- |
 | `NEXO_APP_URL`        | Origem HTTPS pública do app na Onnira, sem caminho. HTTP localhost é aceito no desenvolvimento. |
-| `BITRIX_PORTAL_URL`   | Origem HTTPS do portal cloud autorizado, sem `/rest`, credenciais ou parâmetros.                |
 | `NEXO_ENCRYPTION_KEY` | Chave de 32 bytes em 64 caracteres hexadecimais. Preserve-a ao atualizar/restaurar o app.       |
 | `NEXO_SETUP_TOKEN`    | Segredo forte para autorizar a primeira instalação. O gerador usa 32 bytes aleatórios.          |
 | `NEXO_DATA_DIR`       | Diretório persistente. Padrão local: `./data`; na Onnira, o volume detectado em `/app/.data`.   |
@@ -41,9 +40,9 @@ Na abertura de um onboarding, RH pode solicitar uma trilha a partir da descriç�
 
 ## Conectar ao Bitrix24
 
-1. Publique o Nexo em HTTPS na Onnira, configure as quatro variáveis obrigatórias e habilite o volume persistente.
+1. O responsável técnico publica o Nexo em HTTPS na Onnira, configura as três variáveis da instância e habilita o volume persistente. Quando distribuído pelo Marketplace, essa etapa pertence à Onnira/publicador.
 2. No portal Bitrix24, entre com uma conta RH de serviço e crie um **webhook de entrada** em Aplicativos → Recursos do desenvolvedor → Webhooks. Conceda `task`, `user_brief` (ou `user`), `crm`, `sonet` e `userfieldconfig`. Dê à conta de serviço apenas as permissões necessárias para usuários, tarefas, projeto e processos de RH.
-3. Abra a URL do Nexo. Cole a URL completa do webhook e o `NEXO_SETUP_TOKEN`; o Nexo testa a conexão e os escopos.
+3. Abra o Nexo. Cole a URL completa do webhook e o código de instalação fornecido pelo responsável pela instância; o Nexo identifica o portal, testa a conexão e os escopos. O código inicial continua necessário até a Onnira oferecer identificação verificável de quem instalou o app pelo Marketplace.
 4. Crie o primeiro acesso local de administrador. O ID Bitrix vinculado precisa ser o mesmo da conta que criou o webhook, pois o Bitrix executa operações usando essa identidade.
 5. Configure empresa, responsáveis e processo **Movimentações de Pessoas** (novo ou existente). O assistente cria o projeto privado **Nexo · RH**; adicione nele os profissionais autorizados de RH. Os campos e etapas são descobertos pela API REST.
 6. Para inícios automáticos e sincronização do Kanban, cadastre webhooks de saída para `ONCRMDYNAMICITEMUPDATE` e `ONTASKUPDATE`. Use o handler mostrado em Configurações → Conexão e cole no Nexo o token emitido nos eventos.
@@ -58,7 +57,7 @@ npm run build
 npm run package:onnira
 ```
 
-Na Onnira Cloud AI, é possível informar a URL e a branch de um **repositório GitHub público**. A conexão direta com repositórios privados ainda aparece como indisponível na interface. Escolha a opção Next.js/React, diretório base `/`, e confira instalação `npm ci`, build `npm run build`, inicialização `npm start` e porta `3000`. Não publique segredos, bancos ou dados reais no Git.
+Para publicação técnica na Onnira Cloud IA, é possível informar a URL e a branch de um **repositório GitHub público**. A conexão direta com repositórios privados ainda aparece como indisponível na interface. Escolha a opção Next.js/React, diretório base `/`, e confira instalação `npm ci`, build `npm run build`, inicialização `npm start` e porta `3000`. Não publique segredos, bancos ou dados reais no Git. Publicar no Marketplace exige o processo de publicador da Onnira, que ainda não foi disponibilizado nesta conta.
 
 Como alternativa, envie `output/nexo-onnira.zip` à Onnira Cloud AI. Na API da plataforma, use runtime **next** e os mesmos comandos. O pacote exclui `.env`, banco, credenciais, dependências e artefatos locais.
 
