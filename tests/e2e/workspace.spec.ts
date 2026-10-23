@@ -2,61 +2,38 @@ import { expect, test } from "@playwright/test";
 import { existsSync, mkdirSync } from "node:fs";
 import { addRhTask, fixtureWorkspace, mockWorkspaceApi } from "./fixtures";
 
-test("configuração pública orienta a instalação Onnira e a geração segura das chaves", async ({
-  page,
-  context,
-}) => {
-  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-  await page.goto("/");
-  await expect(
-    page.getByRole("heading", { name: "Configure a hospedagem" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("navigation", { name: "Navegação principal" }),
-  ).toHaveCount(0);
-  await expect(
-    page.getByText("NEXO_ENCRYPTION_KEY", { exact: true }).first(),
-  ).toBeVisible();
-  await expect(page.getByText("BITRIX_PORTAL_URL", { exact: true })).toHaveCount(0);
-  await expect(
-    page.getByRole("heading", { name: "Adicione as variáveis na Onnira" }),
-  ).toBeVisible();
-  await expect(
-    page.getByText("NEXO_SETUP_TOKEN", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "Gere os dois segredos no seu computador" }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Copiar comando" }).click();
-  await expect(page.getByRole("status")).toHaveText("Comando copiado");
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(
-    "randomBytes(32)",
-  );
-  await expect(
-    page.getByRole("heading", { name: "Salve, reinicie e verifique" }),
-  ).toBeVisible();
-  mkdirSync("output/playwright", { recursive: true });
-  await page.screenshot({
-    path: "output/playwright/nexo-instalacao.png",
-    fullPage: true,
-  });
-  await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.getByRole("button", { name: "Copiar comando" })).toBeVisible();
-  expect(
-    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
-  ).toBe(true);
-});
-
-test("primeira abertura solicita a conexão Bitrix ao cliente", async ({ page }) => {
+test("primeira abertura da instância começa pelo webhook, sem configuração técnica", async ({ page }) => {
   await page.route("**/api/status", (route) => route.fulfill({ json: { data: {
     installed: false, configured: false, portalDomain: null, appUrl: "https://nexo.example.com", missingEnvironment: [], version: "1.0.0", webhookConnected: false, firstAdminCreated: false,
   } } }));
   await page.route("**/api/workspace", (route) => route.fulfill({ status: 401, json: { error: { code: "SESSION_REQUIRED", message: "Entre no Nexo." } } }));
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Conecte seu Bitrix24" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: /URL do webhook de entrada/ })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: /Código de instalação/ })).toHaveCount(0);
+  await expect(page.getByText("NEXO_ENCRYPTION_KEY", { exact: true })).toHaveCount(0);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("primeira abertura solicita a conexão Bitrix ao cliente", async ({ page }) => {
+  let connected = false;
+  await page.route("**/api/status", (route) => route.fulfill({ json: { data: {
+    installed: false, configured: false, portalDomain: connected ? "cliente.bitrix24.com.br" : null, appUrl: "https://nexo.example.com", missingEnvironment: [], version: "1.0.0", webhookConnected: connected, firstAdminCreated: false,
+  } } }));
+  await page.route("**/api/setup", async (route) => { connected = true; await route.fulfill({ json: { data: { connected: true, serviceUserName: "Ana RH", portalDomain: "cliente.bitrix24.com.br", scopes: ["task", "crm", "user_brief", "userfieldconfig"] } } }); });
+  await page.route("**/api/workspace", (route) => route.fulfill({ status: 401, json: { error: { code: "SESSION_REQUIRED", message: "Entre no Nexo." } } }));
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Conecte seu Bitrix24" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Como conectar" })).toBeVisible();
   await expect(page.getByRole("textbox", { name: /URL do webhook de entrada/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "Validar conexão" })).toBeVisible();
+  await page.getByRole("textbox", { name: /URL do webhook de entrada/ }).fill("https://cliente.bitrix24.com.br/rest/42/secret/");
+  await page.getByRole("button", { name: "Validar conexão" }).click();
+  await expect(page.getByRole("heading", { name: "Crie seu acesso de RH" })).toBeVisible();
+  await expect(page.getByLabel(/E-mail RH/)).toBeVisible();
+  await expect(page.getByLabel(/Senha/)).toBeVisible();
+  await expect(page.getByText("ID da conta que criou o webhook")).toHaveCount(0);
   await expect(page.getByText("BITRIX_PORTAL_URL", { exact: true })).toHaveCount(0);
   await page.screenshot({ path: "output/playwright/nexo-conectar-bitrix.png", fullPage: true });
 });

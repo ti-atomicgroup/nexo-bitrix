@@ -40,16 +40,6 @@ const web = run("node_modules/next/dist/bin/next", [
 web.on("exit", (code) => {
   if (!stopping) stop(code || 0);
 });
-const required = [
-  "NEXO_APP_URL",
-  "NEXO_ENCRYPTION_KEY",
-  "NEXO_SETUP_TOKEN",
-];
-const missing = required.filter((name) => !process.env[name]);
-if (missing.length)
-  console.info(
-    "Nexo: guia de instalação disponível. Configure as variáveis de ambiente para ativar o sincronizador.",
-  );
-else run("node_modules/tsx/dist/cli.mjs", ["src/server/worker-entry.ts"]);
+run("node_modules/tsx/dist/cli.mjs", ["src/server/worker-entry.ts"]);
 process.once("SIGTERM", () => stop());
 process.once("SIGINT", () => stop());

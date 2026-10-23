@@ -13,11 +13,11 @@ npm ci
 npm run dev
 ```
 
-Abra http://localhost:3000. Sem credenciais, a aplicação apresenta o guia de instalação. Não há login fictício, modo de demonstração autenticado ou integração simulada no produto.
+Abra http://localhost:3000. Na primeira visita, cole o webhook Bitrix e crie a senha do primeiro RH. Não há login fictício, modo de demonstração autenticado ou integração simulada no produto.
 
-## Configurar o ambiente
+## Configuração técnica opcional
 
-Copie `.env.example` para `.env` e configure os valores abaixo. Para gerar um arquivo novo com chaves aleatórias, use:
+O instalador do cliente não pede variáveis. O Nexo gera e guarda uma chave de criptografia no volume de dados da instância. O publicador pode usar `.env.example` para sobrescrever valores em ambientes administrados. Para gerar um arquivo com chaves aleatórias, use:
 
 ```sh
 npm run configure -- --url https://seu-app-publicado
@@ -27,9 +27,9 @@ O comando não sobrescreve um `.env` existente nem imprime as chaves. No Windows
 
 | Variável              | Uso                                                                                             |
 | --------------------- | ----------------------------------------------------------------------------------------------- |
-| `NEXO_APP_URL`        | Origem HTTPS pública do app na Onnira, sem caminho. HTTP localhost é aceito no desenvolvimento. |
-| `NEXO_ENCRYPTION_KEY` | Chave de 32 bytes em 64 caracteres hexadecimais. Preserve-a ao atualizar/restaurar o app.       |
-| `NEXO_SETUP_TOKEN`    | Segredo forte para autorizar a primeira instalação. O gerador usa 32 bytes aleatórios.          |
+| `NEXO_APP_URL`        | Sobrescrita opcional da origem HTTPS pública. Na Onnira, a origem é identificada na primeira abertura. |
+| `NEXO_ENCRYPTION_KEY` | Sobrescrita opcional da chave de 32 bytes. Sem ela, a chave é criada no volume de dados. Preserve o volume ao atualizar/restaurar. |
+| `NEXO_SETUP_TOKEN`    | Compatibilidade com instalações anteriores; o instalador novo não pede este valor. |
 | `NEXO_DATA_DIR`       | Diretório persistente. Padrão local: `./data`; na Onnira, o volume detectado em `/app/.data`.   |
 | `PORT`                | Porta HTTP. Padrão: `3000`.                                                                     |
 | `NEXO_AI_BASE_URL`, `NEXO_AI_MODEL`, `NEXO_AI_API_KEY` | Integração opcional para sugerir trilhas por competências; configure somente como segredo no servidor. |
@@ -40,10 +40,10 @@ Na abertura de um onboarding, RH pode solicitar uma trilha a partir da descriç�
 
 ## Conectar ao Bitrix24
 
-1. O responsável técnico publica o Nexo em HTTPS na Onnira, configura as três variáveis da instância e habilita o volume persistente. Quando distribuído pelo Marketplace, essa etapa pertence à Onnira/publicador.
+1. O responsável técnico publica o Nexo em HTTPS na Onnira e habilita o volume persistente em `/app/.data`. Quando distribuído pelo Marketplace, essa etapa pertence à Onnira/publicador.
 2. No portal Bitrix24, entre com uma conta RH de serviço e crie um **webhook de entrada** em Aplicativos → Recursos do desenvolvedor → Webhooks. Conceda `task`, `user_brief` (ou `user`), `crm`, `sonet` e `userfieldconfig`. Dê à conta de serviço apenas as permissões necessárias para usuários, tarefas, projeto e processos de RH.
-3. Abra o Nexo. Cole a URL completa do webhook e o código de instalação fornecido pelo responsável pela instância; o Nexo identifica o portal, testa a conexão e os escopos. O código inicial continua necessário até a Onnira oferecer identificação verificável de quem instalou o app pelo Marketplace.
-4. Crie o primeiro acesso local de administrador. O ID Bitrix vinculado precisa ser o mesmo da conta que criou o webhook, pois o Bitrix executa operações usando essa identidade.
+3. Abra o Nexo e cole a URL completa do webhook. O Nexo identifica o portal, testa a conexão e os escopos.
+4. No mesmo navegador, crie o primeiro acesso de RH com e-mail e senha de pelo menos 12 caracteres. A conta Bitrix vinculada é identificada pelo webhook. A autorização desta etapa expira em dez minutos.
 5. Configure empresa, responsáveis e processo **Movimentações de Pessoas** (novo ou existente). O assistente cria o projeto privado **Nexo · RH**; adicione nele os profissionais autorizados de RH. Os campos e etapas são descobertos pela API REST.
 6. Para inícios automáticos e sincronização do Kanban, cadastre webhooks de saída para `ONCRMDYNAMICITEMUPDATE` e `ONTASKUPDATE`. Use o handler mostrado em Configurações → Conexão e cole no Nexo o token emitido nos eventos.
 7. Revise modelos e regras de aprovação e conclua a configuração. A reconciliação periódica cobre eventos perdidos.
@@ -63,7 +63,7 @@ Como alternativa, envie `output/nexo-onnira.zip` à Onnira Cloud AI. Na API da p
 
 **Persistência:** a Onnira detectou o banco local e informou um volume isolado em `/app/.data`; o Nexo usa esse caminho quando ele está montado, ou o valor explícito de `NEXO_DATA_DIR`. Localmente usa `./data`. Execute apenas uma réplica da instalação SQLite. Antes da homologação, crie uma jornada fictícia, reinicie, publique uma atualização e confirme que os dados e vínculos permanecem. Preserve a mesma chave de criptografia.
 
-`npm start` inicia o servidor web e o sincronizador como processos filhos, encaminhando sinais de encerramento. Sem as variáveis obrigatórias, mantém o guia público disponível e não inicia o worker. Falha do sincronizador encerra o supervisor para que a plataforma registre/reinicie a instalação, evitando operação silenciosa sem sincronização.
+`npm start` inicia o servidor web e o sincronizador como processos filhos, encaminhando sinais de encerramento. O worker aguarda a conexão Bitrix antes de sincronizar. Falha do sincronizador encerra o supervisor para que a plataforma registre/reinicie a instalação, evitando operação silenciosa sem sincronização.
 
 ## Funcionamento
 

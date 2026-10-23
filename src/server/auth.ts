@@ -14,8 +14,26 @@ export class Auth {
     if (!session.canConfigure) throw new AppError("FORBIDDEN", "Esta ação exige administrador do Nexo.", 403);
     return this.localUsers().map(user => localUserSchema.omit({ passwordHash: true }).parse(user));
   }
+  issueInstallGrant(): string {
+    if (!this.store.get("webhook", "incoming", webhookConfigurationSchema)) throw new AppError("WEBHOOK_NOT_CONFIGURED", "Valide primeiro o webhook de entrada do Bitrix24.", 409);
+    if (this.localUsers().length) throw new AppError("BOOTSTRAP_CLOSED", "A conta inicial já foi criada.", 409);
+    const grant = newToken();
+    this.store.put("install", "grant", { hash: hashToken(grant), expiresAt: Date.now() + 10 * 60 * 1000 });
+    return grant;
+  }
+  async bootstrapWithGrant(grant: string, email: string, password: string) {
+    if (this.localUsers().length) throw new AppError("BOOTSTRAP_CLOSED", "A conta inicial já foi criada.", 409);
+    const saved = this.store.get("install", "grant", z.object({ hash: z.string(), expiresAt: z.number() }));
+    if (!saved || saved.expiresAt <= Date.now() || !safeEqual(saved.hash, hashToken(grant))) throw new AppError("INSTALL_GRANT_INVALID", "A validação do webhook expirou. Conecte-o novamente.", 403);
+    const serviceUserId = this.store.get("webhook", "incoming", webhookConfigurationSchema)?.serviceUserId;
+    if (!serviceUserId) throw new AppError("WEBHOOK_NOT_CONFIGURED", "Valide primeiro o webhook de entrada do Bitrix24.", 409);
+    return this.createLocalAdmin(email, password, serviceUserId, saved.hash);
+  }
   async bootstrapLocalAdmin(setupToken: string, email: string, password: string, bitrixUserId: string) {
-    if (!safeEqual(setupToken, this.env.setupToken)) throw new AppError("SETUP_TOKEN_INVALID", "Token de instalação inválido.", 403);
+    if (!this.env.setupToken || !safeEqual(setupToken, this.env.setupToken)) throw new AppError("SETUP_TOKEN_INVALID", "Token de instalação inválido.", 403);
+    return this.createLocalAdmin(email, password, bitrixUserId);
+  }
+  private async createLocalAdmin(email: string, password: string, bitrixUserId: string, grantHash?: string) {
     if (!this.store.get("webhook", "incoming", webhookConfigurationSchema)) throw new AppError("WEBHOOK_NOT_CONFIGURED", "Valide primeiro o webhook de entrada do Bitrix24.", 409);
     if (this.localUsers().length) throw new AppError("BOOTSTRAP_CLOSED", "A conta inicial já foi criada.", 409);
     const emailValue = z.string().email().max(254).parse(email.trim().toLowerCase());
@@ -28,6 +46,11 @@ export class Auth {
     const settings: Settings = { companyName: "Minha empresa", timezone: "America/Sao_Paulo", portalDomain: this.env.portalDomain, applicationClientId: "webhook-only", automationUserId: this.store.get("webhook", "incoming", webhookConfigurationSchema)?.serviceUserId ?? null, roleAssignments: { admin: [user.id], rh: [], gestor: [], executor: [], colaborador: [] }, defaultAssignees: {}, process: null, rhProject: null, setupComplete: false };
     this.store.transaction(() => {
       if (this.localUsers().length) throw new AppError("BOOTSTRAP_CLOSED", "A conta inicial já foi criada.", 409);
+      if (grantHash) {
+        const current = this.store.get("install", "grant", z.object({ hash: z.string(), expiresAt: z.number() }));
+        if (!current || current.expiresAt <= Date.now() || !safeEqual(current.hash, grantHash)) throw new AppError("INSTALL_GRANT_INVALID", "A validação do webhook expirou. Conecte-o novamente.", 403);
+        this.store.remove("install", "grant");
+      }
       this.store.put("localUser", account.id, account);
       this.store.put("settings", "current", settings);
       this.store.put("rules", "current", []);

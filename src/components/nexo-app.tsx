@@ -120,7 +120,7 @@ export function NexoApp() {
       const nextStatus = await api.request("/api/status", statusSchema);
       if (!active) return;
       setStatus(nextStatus);
-      try { const next = await reload(); if (!next.settings.setupComplete) setView("settings"); }
+      try { await reload(); }
       catch (error) { if (!(error instanceof RequestError && error.status === 401)) throw error; }
     }
     initialize()
@@ -169,15 +169,13 @@ export function NexoApp() {
     }
     setModal("journey");
   }
-  async function connectWebhook(url: string, setupToken: string) {
-    await api.request("/api/setup", z.object({ connected: z.boolean() }), { action: "connect-webhook", url, setupToken });
+  async function connectWebhook(url: string) {
+    await api.request("/api/setup", z.object({ connected: z.boolean() }), { action: "connect-webhook", url });
     const next = await api.request("/api/status", statusSchema); setStatus(next);
   }
   async function bootstrapInstall(values: {
-    setupToken: string;
     email: string;
     password: string;
-    bitrixUserId: string;
   }) {
     const result = await api.request(
       "/api/setup",
@@ -186,7 +184,7 @@ export function NexoApp() {
     );
     void result;
     await reload();
-    setView("settings");
+    setView("overview");
   }
   async function login(email: string, password: string) {
     await api.request("/api/auth", z.object({ session: sessionSchema }), { action: "login", email, password });

@@ -1,11 +1,10 @@
 import { z } from "zod";
 import type { PublicStatus } from "../shared/contracts";
 import { AppError } from "./errors";
-import { missingEnvironment } from "./security";
+import { pinAppOrigin } from "./security";
 import { getRuntime } from "./runtime";
 import { seedTemplates } from "./seeds";
 import { workspace } from "./workspace";
-import { safeEqual } from "./security";
 import { webhookConfigurationSchema, outgoingWebhookSchema, localUserSchema } from "./models";
 const noStore = { "Cache-Control": "no-store, private", Pragma: "no-cache", "X-Content-Type-Options": "nosniff" };
 export function json(data: unknown, headers: HeadersInit = {}) { return Response.json({ data }, { headers: { ...noStore, ...Object.fromEntries(new Headers(headers)) } }); }
@@ -34,16 +33,22 @@ function sessionToken(request: Request): string {
 function sessionCookie(token: string, maxAge = 1800): string {
   return `nexo_session=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
 }
+function installCookie(token: string, maxAge = 600): string {
+  return `nexo_install=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
+}
+function installGrant(request: Request): string {
+  const cookie = request.headers.get("Cookie")?.split(/;\s*/).find(value => value.startsWith("nexo_install="));
+  if (!cookie) throw new AppError("INSTALL_GRANT_INVALID", "A validação do webhook expirou. Conecte-o novamente.", 403);
+  return decodeURIComponent(cookie.slice("nexo_install=".length));
+}
 function checkOrigin(request: Request, allowPortal = false) {
   const origin = request.headers.get("Origin"), env = getRuntime().env;
   if (origin && origin !== env.appUrl && !(allowPortal && origin === env.portalUrl)) throw new AppError("ORIGIN_INVALID", "Origem do pedido não autorizada.", 403);
 }
-export async function status() {
-  const missing = missingEnvironment();
-  const result: PublicStatus = { installed: false, configured: false, portalDomain: null, appUrl: "", missingEnvironment: missing, version: "1.0.0", webhookConnected: false, firstAdminCreated: false, outgoingWebhookConfigured: false, aiConfigured: false };
-  if (missing.length) return json(result);
+export async function status(request?: Request) {
+  const result: PublicStatus = { installed: false, configured: false, portalDomain: null, appUrl: "", missingEnvironment: [], version: "1.0.0", webhookConnected: false, firstAdminCreated: false, outgoingWebhookConfigured: false, aiConfigured: false };
   try {
-    const runtime = getRuntime(), env = runtime.env; result.appUrl = env.appUrl; result.portalDomain = env.portalDomain || null; result.aiConfigured = env.aiConfigured;
+    const runtime = getRuntime(), env = runtime.env; if (request) pinAppOrigin(env, runtime.store, request.url); result.appUrl = env.appUrl; result.portalDomain = env.portalDomain || null; result.aiConfigured = env.aiConfigured;
     const incoming = runtime.store.get("webhook", "incoming", webhookConfigurationSchema), outgoing = runtime.store.get("webhook", "outgoing", outgoingWebhookSchema), users = runtime.store.list("localUser", localUserSchema);
     result.webhookConnected = Boolean(incoming);
     result.firstAdminCreated = users.some(user => user.role === "admin" && user.active);
@@ -64,6 +69,7 @@ export async function events(request: Request) {
 export async function api(request: Request, resource: string, id?: string) {
   try {
     const runtime = getRuntime();
+    pinAppOrigin(runtime.env, runtime.store, request.url);
     checkOrigin(request);
     if (resource === "auth" && request.method === "POST") {
       const input = z.record(z.string(), z.unknown()).parse(await body(request)), action = z.enum(["login", "logout"]).parse(input.action);
@@ -79,17 +85,20 @@ export async function api(request: Request, resource: string, id?: string) {
       const input = z.record(z.string(), z.unknown()).parse(await body(request));
       const action = z.enum(["connect-webhook", "bootstrap-admin", "set-outgoing-token", "discover", "provision", "configure", "finish"]).parse(input.action);
       if (action === "connect-webhook") {
-        if (!safeEqual(z.string().parse(input.setupToken), runtime.env.setupToken)) throw new AppError("SETUP_TOKEN_INVALID", "Token de instalação inválido.", 403);
+        if (runtime.store.list("localUser", localUserSchema).length) throw new AppError("BOOTSTRAP_CLOSED", "Esta instância já foi instalada.", 409);
         const url = z.string().max(2000).parse(input.url), verified = await runtime.bitrix.testWebhook(url);
-        const required = ["task", "crm", "userfieldconfig"], missingScopes = required.filter(scope => !verified.scopes.includes(scope)) .concat(!verified.scopes.includes("user_brief") && !verified.scopes.includes("user") ? ["user_brief"] : []);
+        const required = ["task", "crm", "sonet", "userfieldconfig"], missingScopes = required.filter(scope => !verified.scopes.includes(scope)).concat(!verified.scopes.includes("user_brief") && !verified.scopes.includes("user") ? ["user_brief"] : []);
         if (missingScopes.length) throw new AppError("SCOPES_MISSING", `Recrie o webhook com permissões: ${missingScopes.join(", ")}.`, 422);
         runtime.bitrix.configureWebhook(url, verified.userId);
-        return json({ connected: true, serviceUserId: verified.userId, serviceUserName: verified.userName, scopes: verified.scopes });
+        const grant = runtime.auth.issueInstallGrant();
+        return json({ connected: true, serviceUserName: verified.userName, portalDomain: runtime.env.portalDomain, scopes: verified.scopes }, { "Set-Cookie": installCookie(grant) });
       }
       if (action === "bootstrap-admin") {
-        const result = await runtime.auth.bootstrapLocalAdmin(z.string().max(1000).parse(input.setupToken), z.string().max(254).parse(input.email), z.string().max(200).parse(input.password), z.string().max(30).parse(input.bitrixUserId));
+        const result = await runtime.auth.bootstrapWithGrant(installGrant(request), z.string().max(254).parse(input.email), z.string().max(200).parse(input.password));
         seedTemplates(runtime.journeys, result.session);
-        return json({ session: result.session }, { "Set-Cookie": sessionCookie(result.token) });
+        const response = json({ session: result.session }, { "Set-Cookie": sessionCookie(result.token) });
+        response.headers.append("Set-Cookie", installCookie("", 0));
+        return response;
       }
       const session = runtime.auth.session(sessionToken(request));
       if (action === "set-outgoing-token") {

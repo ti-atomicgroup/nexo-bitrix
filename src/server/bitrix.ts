@@ -10,11 +10,14 @@ const throttleSchema = z.object({ until: z.number(), attempts: z.number() });
 
 export class BitrixClient {
   constructor(readonly store: Store, readonly env: Environment, private readonly transport: typeof fetch = fetch) {
-    const existing = store.get("webhook", "incoming", webhookConfigurationSchema);
+    this.refreshConfiguration();
+  }
+  refreshConfiguration(): void {
+    const existing = this.store.get("webhook", "incoming", webhookConfigurationSchema);
     if (existing) {
-      const portal = parseIncomingWebhookUrl(decrypt(existing.url, env.encryptionKey), env);
-      env.portalUrl = portal.portalUrl;
-      env.portalDomain = portal.portalDomain;
+      const portal = parseIncomingWebhookUrl(decrypt(existing.url, this.env.encryptionKey), this.env);
+      this.env.portalUrl = portal.portalUrl;
+      this.env.portalDomain = portal.portalDomain;
     }
   }
 

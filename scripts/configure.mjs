@@ -31,9 +31,9 @@ if (
 }
 writeFileSync(
   ".env",
-  `NEXO_APP_URL=${app.origin}\nNEXO_ENCRYPTION_KEY=${randomBytes(32).toString("hex")}\nNEXO_SETUP_TOKEN=${randomBytes(32).toString("hex")}\nNEXO_DATA_DIR=./data\nPORT=3000\n`,
+  `NEXO_APP_URL=${app.origin}\nNEXO_ENCRYPTION_KEY=${randomBytes(32).toString("hex")}\nNEXO_DATA_DIR=./data\nPORT=3000\n`,
   { flag: "wx", mode: 0o600 },
 );
 console.info(
-  "Arquivo .env criado. As chaves foram geradas localmente e não serão exibidas. Consulte esse arquivo para configurar a Onnira e autorizar a instalação. Preserve NEXO_ENCRYPTION_KEY ao atualizar a aplicação.",
+  "Arquivo .env criado. A chave foi gerada localmente e não será exibida. Preserve NEXO_ENCRYPTION_KEY ao atualizar a aplicação.",
 );

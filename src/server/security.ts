@@ -1,9 +1,12 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
-import { existsSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { z } from "zod";
 import { AppError } from "./errors";
+import type { Store } from "./store";
 
 export interface Environment { encryptionKey: string; setupToken: string; appUrl: string; portalUrl: string; portalDomain: string; dataDir: string; aiBaseUrl: string | null; aiModel: string | null; aiApiKey: string | null; aiConfigured: boolean; chatApiKey: string | null }
-const required = ["NEXO_ENCRYPTION_KEY", "NEXO_SETUP_TOKEN", "NEXO_APP_URL"];
+const required = ["NEXO_ENCRYPTION_KEY"];
 const bitrixCloudDomain = /^[a-z0-9][a-z0-9-]*\.(?:bitrix24\.(?:com|com\.br|es|eu|de|fr|it|pl|ru|cn|in|com\.tr)|bitrix24site\.com)$/i;
 export function missingEnvironment(env: Record<string, string | undefined> = process.env): string[] {
   return required.filter(key => !env[key]);
@@ -13,15 +16,15 @@ export function validateEnvironment(env: Record<string, string | undefined> = pr
   if (missing.length) throw new AppError("ENVIRONMENT", `Configure no servidor: ${missing.join(", ")}.`, 503);
   const encryptionKey = env.NEXO_ENCRYPTION_KEY ?? "";
   const setupToken = env.NEXO_SETUP_TOKEN ?? "";
-  if (!/^[a-f\d]{64}$/i.test(encryptionKey) || setupToken.length < 20) throw new AppError("ENVIRONMENT", "Configure chave AES de 64 hex e token de instalação com pelo menos 20 caracteres.", 503);
+  if (!/^[a-f\d]{64}$/i.test(encryptionKey) || (setupToken && setupToken.length < 20)) throw new AppError("ENVIRONMENT", "Configure chave AES de 64 hex e token de instalação com pelo menos 20 caracteres.", 503);
   let portal: URL | null = null;
   if (env.BITRIX_PORTAL_URL) {
     try { portal = new URL(env.BITRIX_PORTAL_URL); }
     catch { throw new AppError("PORTAL_INVALID", "BITRIX_PORTAL_URL deve ser a origem HTTPS de um portal Bitrix24 cloud.", 503); }
     if (portal.protocol !== "https:" || portal.username || portal.password || portal.port || portal.search || portal.hash || portal.pathname !== "/" || !bitrixCloudDomain.test(portal.hostname)) throw new AppError("PORTAL_INVALID", "BITRIX_PORTAL_URL deve ser a origem HTTPS de um portal Bitrix24 cloud.", 503);
   }
-  const app = new URL(env.NEXO_APP_URL ?? "");
-  if (app.username || app.password || app.search || app.hash || (app.protocol !== "https:" && !(app.protocol === "http:" && ["localhost", "127.0.0.1"].includes(app.hostname)))) throw new AppError("APP_URL_INVALID", "NEXO_APP_URL deve ser HTTPS; localhost HTTP é permitido no desenvolvimento.", 503);
+  const app = env.NEXO_APP_URL ? new URL(env.NEXO_APP_URL) : null;
+  if (app && (app.username || app.password || app.search || app.hash || (app.protocol !== "https:" && !(app.protocol === "http:" && ["localhost", "127.0.0.1"].includes(app.hostname))))) throw new AppError("APP_URL_INVALID", "NEXO_APP_URL deve ser HTTPS; localhost HTTP é permitido no desenvolvimento.", 503);
   const rawAiUrl = env.NEXO_AI_BASE_URL?.trim() || "", aiModel = env.NEXO_AI_MODEL?.trim() || "", aiApiKey = env.NEXO_AI_API_KEY?.trim() || "";
   const chatApiKey = env.NEXO_CHAT_API_KEY?.trim() || null;
   if (chatApiKey && chatApiKey.length < 32) throw new AppError("ENVIRONMENT", "NEXO_CHAT_API_KEY deve ter pelo menos 32 caracteres aleatórios.", 503);
@@ -29,12 +32,51 @@ export function validateEnvironment(env: Record<string, string | undefined> = pr
   if (rawAiUrl) {
     try {
       const aiUrl = new URL(rawAiUrl);
-      const localHttp = app.hostname === "localhost" || app.hostname === "127.0.0.1";
+      const localHttp = app?.hostname === "localhost" || app?.hostname === "127.0.0.1";
       if ((aiUrl.protocol === "https:" || (localHttp && aiUrl.protocol === "http:" && ["localhost", "127.0.0.1"].includes(aiUrl.hostname))) && !aiUrl.username && !aiUrl.password && !aiUrl.search && !aiUrl.hash) aiBaseUrl = aiUrl.origin + aiUrl.pathname.replace(/\/+$/, "");
     } catch { /* optional integration stays disabled on invalid configuration */ }
   }
   const aiConfigured = Boolean(aiBaseUrl && aiModel && aiApiKey);
-  return { encryptionKey, setupToken, appUrl: app.origin, portalUrl: portal?.origin ?? "", portalDomain: portal?.hostname ?? "", dataDir: env.NEXO_DATA_DIR || (existsSync("/app/.data") ? "/app/.data" : "./data"), aiBaseUrl: aiConfigured ? aiBaseUrl : null, aiModel: aiConfigured ? aiModel : null, aiApiKey: aiConfigured ? aiApiKey : null, aiConfigured, chatApiKey };
+  return { encryptionKey, setupToken, appUrl: app?.origin ?? "", portalUrl: portal?.origin ?? "", portalDomain: portal?.hostname ?? "", dataDir: env.NEXO_DATA_DIR || (existsSync("/app/.data") ? "/app/.data" : "./data"), aiBaseUrl: aiConfigured ? aiBaseUrl : null, aiModel: aiConfigured ? aiModel : null, aiApiKey: aiConfigured ? aiApiKey : null, aiConfigured, chatApiKey };
+}
+export function loadInstanceEnvironment(env: Record<string, string | undefined> = process.env): Environment {
+  const dataDir = resolve(env.NEXO_DATA_DIR || (existsSync("/app/.data") ? "/app/.data" : "./data"));
+  mkdirSync(dataDir, { recursive: true, mode: 0o700 });
+  const keyPath = join(dataDir, ".nexo-instance-key");
+  if (!existsSync(keyPath) && !env.NEXO_ENCRYPTION_KEY) {
+    try {
+      const file = openSync(keyPath, "wx", 0o600);
+      try { writeFileSync(file, randomBytes(32).toString("hex")); }
+      finally { closeSync(file); }
+    } catch (error) {
+      if (!(error instanceof Error && "code" in error && error.code === "EEXIST")) throw error;
+    }
+  }
+  let storedKey = existsSync(keyPath) ? readFileSync(keyPath, "utf8").trim() : undefined;
+  for (let attempt = 0; storedKey !== undefined && !/^[a-f\d]{64}$/i.test(storedKey) && attempt < 20; attempt++) {
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25);
+    storedKey = readFileSync(keyPath, "utf8").trim();
+  }
+  if (storedKey && env.NEXO_ENCRYPTION_KEY && storedKey !== env.NEXO_ENCRYPTION_KEY) throw new AppError("KEY_MISMATCH", "A chave da instância difere da chave configurada. Preserve a chave original.", 503);
+  return validateEnvironment({ ...env, NEXO_DATA_DIR: dataDir, NEXO_ENCRYPTION_KEY: env.NEXO_ENCRYPTION_KEY || storedKey });
+}
+export function pinAppOrigin(env: Environment, store: Store, requestUrl: string): string {
+  const url = new URL(requestUrl), origin = url.origin;
+  const local = url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname);
+  const onnira = url.protocol === "https:" && /^[a-z0-9-]+\.onnira\.com\.br$/i.test(url.hostname);
+  if (env.appUrl) {
+    if (env.appUrl !== origin) throw new AppError("APP_ORIGIN_MISMATCH", "A origem da aplicação não corresponde à instância configurada.", 403);
+    return env.appUrl;
+  }
+  if (!local && !onnira) throw new AppError("APP_ORIGIN_INVALID", "Abra o Nexo pela URL HTTPS da instância Onnira.", 403);
+  const pinned = store.transaction(() => {
+    const current = store.get("instance", "origin", z.string());
+    if (current && current !== origin) throw new AppError("APP_ORIGIN_MISMATCH", "Esta instância já está vinculada a outra origem.", 403);
+    if (!current) store.put("instance", "origin", origin);
+    return current ?? origin;
+  });
+  env.appUrl = pinned;
+  return pinned;
 }
 export function portalFromDomain(domain: string, env: Environment): string {
   if (domain.toLowerCase() !== env.portalDomain) throw new AppError("PORTAL_MISMATCH", "Portal não autorizado.", 403);

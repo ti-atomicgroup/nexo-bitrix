@@ -4,7 +4,9 @@ let shuttingDown = false;
 const runtime = createRuntime();
 let running: Promise<void> | null = null;
 function tick() {
-  if (running || shuttingDown || !runtime.env.portalUrl) return;
+  if (running || shuttingDown) return;
+  runtime.bitrix.refreshConfiguration();
+  if (!runtime.env.portalUrl) return;
   running = runtime.worker.tick().catch((error: unknown) => { console.error(JSON.stringify({ event: "worker.tick.failed", code: error instanceof AppError ? error.code : "INTERNAL" })); }).finally(() => { running = null; });
 }
 const interval = setInterval(tick, 60000);
