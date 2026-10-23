@@ -2,6 +2,8 @@
 
 Onboarding e offboarding dentro do Bitrix24, com modelos configuráveis, tarefas e checklists nativos, início manual ou por aprovação de RH e Radar de Prontidão.
 
+**Quer instalar?** Siga o [manual fácil de instalação](docs/manual-instalacao.md), que orienta a publicação na Onnira e a conexão por webhooks ao Bitrix24.
+
 ## Executar localmente
 
 Requisitos: Node.js 22.13 ou superior (validado com Node 24), npm e um portal Bitrix24 Cloud com API REST e processos personalizados disponíveis.
