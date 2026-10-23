@@ -1,12 +1,12 @@
 # Nexo RH — Central de exceções
 
-**Estado:** direção de produto e experiência aprovada por conversa em 23/10/2026; especificação pronta para revisão antes da implementação.
+**Estado:** direção simplificada aprovada pelo usuário em 23/10/2026; versão escrita atualizada e aguardando revisão final antes do plano.
 
 ## Problema e resultado
 
 A home atual resume jornadas com indicadores e blocos semelhantes a painéis SaaS genéricos. Para quem lidera RH, o trabalho começa por identificar onde uma pessoa, uma data ou um controle obrigatório corre risco e decidir qual intervenção destrava o processo.
 
-A home deve responder, numa olhada: **o que exige ação humana agora, por que entrou primeiro e qual é a próxima ação?** O produto continua sendo a superfície operacional do Nexo; Bitrix24 continua sendo a origem das movimentações, tarefas, checklists e pessoas.
+A home deve responder, numa olhada: **qual atividade devo fazer agora, para quem e até quando?** O produto continua sendo a superfície operacional do Nexo; Bitrix24 continua sendo a origem das movimentações, tarefas, checklists e pessoas. A pessoa que trabalha no processo não deve precisar interpretar vários painéis antes de agir.
 
 ## Usuários e contexto
 
@@ -17,25 +17,25 @@ A home deve responder, numa olhada: **o que exige ação humana agora, por que e
 
 ## Direção visual e tese
 
-**Nexo é uma lente de priorização:** uma fila viva de trabalho real ocupa a superfície principal e um inspetor lateral explica o contexto da tarefa selecionada. A sensação de uma LLM em trabalho aparece na sequência contexto → prioridade explicada → ação. O Nexo não afirma ter um modelo de IA nem inventa recomendações; as explicações são calculadas a partir dos dados e regras existentes.
+**Nexo é a lista de trabalho que orienta a próxima ação:** uma atividade em foco e uma fila compacta das próximas responsabilidades ocupam a home. A sensação de uma LLM em trabalho aparece numa sequência simples: contexto necessário → prioridade compreensível → ação. O Nexo não afirma ter um modelo de IA nem inventa recomendações; as explicações são calculadas a partir dos dados e regras existentes.
 
-Preservar as cores já aprovadas: superfícies claras, grafite, verde esmeralda e cores semânticas atuais para prazo e risco. A personalidade vem da composição e do ritmo, não de trocar a paleta. Uma trama de sinal/linhas pode visualizar grupos reais de trabalho e seus totais; cada marca precisa corresponder a uma atividade ou faixa de prazo e também ter uma representação textual acessível.
+Preservar as cores já aprovadas: superfícies claras, grafite, verde esmeralda e cores semânticas atuais para prazo e risco. A personalidade vem da leitura simples e do ritmo do trabalho. Cor só aparece para indicar localização, estado e urgência reais.
 
 ## Estrutura da home de RH
 
-1. **Orientação imediata:** título curto de trabalho, data no fuso do portal e estado/horário da última sincronização.
-2. **Próxima intervenção:** uma atividade prioritária real com pessoa, movimento (entrada/saída), prazo, responsável e a razão objetiva da prioridade. A ação principal abre a atividade no Nexo; o link secundário abre a tarefa original no Bitrix quando disponível.
-3. **Faixas de atenção:** tarefas de RH atrasadas e para hoje em primeiro plano, seguidas de itens críticos/próximos já identificados pelo Radar. Os totais são calculados dos registros presentes; não exibir números demonstrativos em produção.
-4. **Fila operacional:** agrupamento compacto e ordenado, com busca/filtros e estado de sincronização. Uma tarefa aguardando aprovação permanece pendente. Responsável ausente, falha de sincronização e estado desconhecido ficam explícitos.
-5. **Inspetor de contexto:** pessoa, modelo e versão, etapa, data principal, progresso, responsável, prazo, checklist e motivo para atenção, respeitando a visibilidade da atividade e as permissões atuais.
+1. **Título de trabalho:** “Trabalho de hoje”, data no fuso do portal e ação de sincronização discreta. Mostrar estado de erro ou dado desatualizado com texto claro quando houver algo a resolver.
+2. **Atividade em foco:** tarefa real que vem primeiro segundo as regras já existentes, com nome da pessoa, tipo de jornada, responsável e prazo. Mostrar o motivo apenas quando houver atraso, criticidade ou problema de sincronização. Uma ação principal abre a atividade; o link da tarefa Bitrix fica como ação secundária dentro do detalhe.
+3. **Próximas atividades:** lista compacta de tarefas vencidas ou para hoje. Cada linha contém tarefa, pessoa, prazo e responsável. Busca e filtros aparecem como controles compactos e só quando houver volume que os justifique.
+
+Radar, calendário de movimentações, histórico e tabela de jornadas completas ficam nas seções correspondentes, fora da home. O contexto completo da pessoa, etapa, modelo, checklist e movimentação aparece depois que o profissional abre a atividade. A home evita repetir os mesmos dados em painéis diferentes.
 
 O atalho de busca/comandos existente permanece como forma rápida de navegar ou encontrar pessoas. Não adicionar um campo de chat que sugira interação com uma IA real.
 
 ## Sistema visual entre telas
 
-Redesenhar o shell e aplicar a mesma linguagem às jornadas, tarefas, modelos, automações e configurações: navegação compacta; tipografia hierárquica e legível; linhas e espaços para separar grupos; módulos de alto contraste apenas para a ação em foco; estados semânticos consistentes. Remover a dependência de mosaicos de cartões para comunicar a hierarquia. Formulários, modais, links nativos e estados funcionais existentes permanecem reconhecíveis.
+Redesenhar o shell e aplicar a mesma linguagem às jornadas, tarefas, modelos, automações e configurações: navegação compacta; tipografia hierárquica e legível; linhas e espaços para separar grupos; uma ação principal por tela; estados semânticos consistentes. Remover a dependência de mosaicos de cartões e painéis simultâneos para comunicar a hierarquia. Mostrar primeiro os campos necessários ao trabalho e recolher configurações avançadas sob rótulos didáticos, com exemplos curtos. Formulários e detalhes devem conduzir uma tarefa por vez, com uma revisão clara antes de salvar ou iniciar. Links nativos e estados funcionais existentes permanecem reconhecíveis.
 
-No Bitrix estreito e em celular, a coluna de contexto passa abaixo da fila, a navegação recolhe pelo controle móvel existente e nenhuma ação crítica depende de hover. A tabela/lista preserva nome da pessoa, tarefa, prazo, responsável e estado sem exigir rolagem horizontal quando houver largura suficiente para reflow.
+No Bitrix estreito e em celular, a lista mantém a mesma ordem e prioridade; a navegação recolhe pelo controle móvel existente e nenhuma ação crítica depende de hover. A tarefa, pessoa, prazo e ação ficam acessíveis sem rolagem horizontal.
 
 ## Dados, prioridade e privacidade
 
@@ -47,19 +47,21 @@ No Bitrix estreito e em celular, a coluna de contexto passa abaixo da fila, a na
 
 ## Interações e movimento
 
-- Selecionar uma linha atualiza o contexto e mantém uma ação direta para abrir a tarefa existente.
-- Marcas de sinal, se usadas, são interativas somente quando levam ao grupo/tarefa correspondente; caso contrário, são removidas.
+- Selecionar uma linha abre o detalhe da atividade, onde o profissional encontra checklist, instruções e acesso à tarefa Bitrix.
+- Não adicionar gráficos ou marcas decorativas à home; cada elemento precisa ajudar a escolher ou avançar uma atividade.
 - Transições curtas organizam a troca de item e a abertura do inspetor. Respeitar `prefers-reduced-motion`; não usar estrobo, pulsação contínua ou animação para simular pensamento.
 - Loading mantém os títulos e mostra esqueleto discreto; lista vazia explica o estado e oferece a ação existente de criar jornada; falhas permitem atualizar e mantêm a última informação com seu estado de desatualização.
 
 ## Escopo e limites
 
-Esta entrega substitui a hierarquia visual genérica do app, começando pela home de RH e pela navegação compartilhada. Ela preserva fluxos, contratos, regras, modais, papéis e operações Bitrix existentes. Não adiciona IA generativa, novas regras de risco, integrações externas nem automações de negócio.
+Esta entrega simplifica a home de RH e a linguagem de jornadas, modelos e abertura de processo. Ela preserva contratos, regras, papéis e operações Bitrix existentes, enquanto torna os passos de configuração e abertura mais claros e recolhe opções avançadas. Não adiciona IA generativa, novas regras de risco nem automações de negócio.
 
 ## Validação da implementação
 
-- Comparar home de RH, jornadas, configurações e detalhe com dados de teste, em viewport desktop e estreito de Bitrix/mobile.
-- Confirmar que a primeira tela distingue ação prioritária, motivo, pessoa, prazo e próximo passo em poucos segundos.
+- Comparar home de RH, jornadas, configuração de modelos e detalhe com dados de teste, em viewport desktop e estreito de Bitrix/mobile.
+- Confirmar que um profissional identifica em poucos segundos a tarefa em foco, a pessoa, o prazo e como avançar.
+- Confirmar que Radar, calendário, histórico e tabela de jornadas completas não competem com as atividades na home e continuam acessíveis em suas seções próprias.
+- Confirmar que configurações avançadas estão recolhidas e que os formulários explicam cada passo em linguagem direta.
 - Confirmar que tarefas RH continuam incluindo todas as jornadas ativas, mesmo quando atribuídas a outra pessoa de RH.
 - Validar link Bitrix, abertura do detalhe, filtros, estados de sincronização e controle de visibilidade por papel.
 - Verificar foco de teclado, labels acessíveis, contraste, ausência de overflow e preferência de movimento reduzido.

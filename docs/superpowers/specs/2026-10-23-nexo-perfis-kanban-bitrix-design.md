@@ -1,12 +1,14 @@
 # Nexo — modelos por perfil e Kanban de tarefas Bitrix
 
-**Estado:** direção aprovada pelo usuário em 23/10/2026; aguardando revisão desta especificação antes do plano de implementação.
+**Estado:** direção aprovada pelo usuário em 23/10/2026; revisão do texto atualizada solicitada após feedback sobre a quantidade de informação na tela.
 
 ## Problema e resultado
 
 O Nexo já permite configurar etapas, atividades, prazos relativos, responsáveis, checklists e materiais, e cria tarefas nativas no Bitrix24. Também consulta novamente status, prazo, responsável e checklist das tarefas. Hoje, porém, os modelos não distinguem o perfil profissional de quem está entrando, as tarefas não são agrupadas num projeto RH com Kanban e eventos de tarefa não atualizam diretamente a atividade correspondente.
 
 O resultado desejado é permitir que People configure modelos diferentes por perfil — como RH, Vendas ou TI —, escolha o modelo adequado ao abrir uma jornada e acompanhe as atividades no Kanban nativo do projeto Bitrix. O Bitrix permanece a referência operacional das tarefas; o Nexo mantém o contexto da jornada e reflete as alterações dos dois lados.
+
+A interface do Nexo deve ser didática e sucinta para o profissional que executa o processo. Cada tela deve mostrar o próximo passo e as informações necessárias para realizá-lo, deixando detalhes secundários e controles avançados para quando forem solicitados.
 
 ## Decisões de produto
 
@@ -21,6 +23,18 @@ O resultado desejado é permitir que People configure modelos diferentes por per
 - Continuar no modo webhook-only. O evento `ONTASKUPDATE` será cadastrado no painel de webhook de saída do Bitrix e validado no handler Nexo. O webhook de entrada não pode chamar `event.bind`; essa limitação está documentada pelo Bitrix.
 
 ## Experiência de configuração
+
+### Trabalho do dia
+
+A home começa em **Trabalho de hoje** e organiza as atividades que a pessoa precisa executar. A primeira atividade em foco mostra apenas ação, colaborador, prazo e responsável, com um botão principal para abrir e avançar o trabalho. As demais atividades de hoje aparecem numa lista compacta. O motivo de atenção aparece somente quando existir atraso, criticidade ou falha real de sincronização.
+
+Radar, calendário, histórico e tabela completa de jornadas não ocupam a home. Eles continuam acessíveis nas seções próprias. A home não repete totais, gráficos, cronologia ou blocos de contexto sem ação imediata. Informações da jornada, explicações e ações secundárias aparecem ao abrir uma atividade. O estado de sincronização fica discreto quando está atualizado e ganha destaque quando exige intervenção.
+
+### Abertura e edição guiadas
+
+O início de jornada é um fluxo curto: selecionar pessoa, tipo/perfil do processo e data; revisar o modelo escolhido, as atividades e os responsáveis; iniciar. A tela exibe cargo e departamento do Bitrix como contexto, sem duplicar esses dados em vários painéis.
+
+A configuração de modelo também será guiada. Primeiro, RH informa tipo, nome e perfil. Depois, organiza etapas e atividades numa lista simples, onde prazo e responsável ficam à vista. Checklist, criticidade, visibilidade e materiais ficam sob **Mais detalhes** em cada atividade. Uma revisão final resume etapas, tarefas e prazos antes de salvar. O texto explica o significado dos campos com exemplos curtos, como “1:1 de 30 dias — 30 dias após a admissão”.
 
 ### Projeto RH e conexão
 
@@ -63,14 +77,16 @@ Os dados operacionais sensíveis, como justificativas internas de desligamento o
 
 ## Validação e aceite
 
-1. Criar, editar, duplicar e versionar modelos de perfis diferentes, incluindo várias entrevistas/1:1 com deslocamentos distintos e responsáveis configuráveis.
+1. Criar, editar, duplicar e versionar modelos de perfis diferentes, incluindo várias entrevistas/1:1 com deslocamentos distintos e responsáveis configuráveis, sem exibir todos os campos avançados de uma vez.
 2. Confirmar que RH escolhe o modelo na abertura manual e que a regra de aprovação automática seleciona seu modelo configurado.
 3. Confirmar a criação de tarefa real no projeto RH com link CRM, prazo, responsável e checklist corretos.
 4. Mover uma tarefa entre colunas do Kanban Bitrix e alterar status, prazo, responsável e checklist; confirmar que a jornada Nexo atualiza a mesma atividade.
 5. Alterar status ou checklist pelo Nexo e confirmar a gravação no Bitrix sem ciclo de eventos nem duplicação.
 6. Repetir evento e simular evento perdido, webhook indisponível, reinício do worker, projeto inacessível, exclusão de tarefa e permissão insuficiente.
 7. Verificar privacidade: RH visualiza e opera o Kanban; cada perfil não-RH acessa apenas tarefas que lhe foram atribuídas e permitidas, sem ser associado automaticamente ao projeto.
-8. Executar testes de domínio e API, validação de tipos, lint, build e testes de navegador nas telas de modelos, abertura de jornada, projeto e detalhe da tarefa.
+8. Confirmar que a home apresenta a próxima atividade com colaborador, prazo, responsável e uma ação principal; itens de referência e histórico ficam em suas seções próprias.
+9. Confirmar que início e configuração de modelos seguem passos curtos, linguagem simples, revisão antes de salvar e detalhes avançados recolhidos.
+10. Executar testes de domínio e API, validação de tipos, lint, build e testes de navegador nas telas de home, modelos, abertura de jornada, projeto e detalhe da tarefa.
 
 ## Delimitação
 
