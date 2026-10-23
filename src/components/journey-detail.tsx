@@ -130,7 +130,7 @@ export function JourneyDetail({
         </span>
         <Progress value={journey.progress} />
         <small>
-          {journey.templateName} · v{journey.templateVersion}
+          {journey.templateName} · {journey.templateProfile} · v{journey.templateVersion}
         </small>
       </div>
       <div className="journey-detail-layout">
@@ -225,6 +225,7 @@ export function JourneyDetail({
                 <span className="eyebrow">{task.stageTitle}</span>
                 <TaskBadge status={task.status} />
               </div>
+              {task.bitrixStageTitle && <p className="kanban-stage-label"><span>Coluna no Kanban</span><strong>{task.bitrixStageTitle}</strong></p>}
               <h3>{task.title}</h3>
               {task.description && (
                 <p className="task-description">{task.description}</p>

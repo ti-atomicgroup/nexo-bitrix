@@ -25,7 +25,7 @@ export class Auth {
     const user = await this.bitrix.user("service", z.string().regex(/^\d+$/).parse(bitrixUserId));
     if (!user.active) throw new AppError("USER_INACTIVE", "Vincule uma conta Bitrix24 ativa.", 403);
     const account: LocalUser = { id: randomUUID(), bitrixUserId: user.id, user, email: emailValue, role: "admin", passwordHash: hashPassword(passwordValue), active: true, createdAt: new Date().toISOString() };
-    const settings: Settings = { companyName: "Minha empresa", timezone: "America/Sao_Paulo", portalDomain: this.env.portalDomain, applicationClientId: "webhook-only", automationUserId: this.store.get("webhook", "incoming", webhookConfigurationSchema)?.serviceUserId ?? null, roleAssignments: { admin: [user.id], rh: [], gestor: [], executor: [], colaborador: [] }, defaultAssignees: {}, process: null, setupComplete: false };
+    const settings: Settings = { companyName: "Minha empresa", timezone: "America/Sao_Paulo", portalDomain: this.env.portalDomain, applicationClientId: "webhook-only", automationUserId: this.store.get("webhook", "incoming", webhookConfigurationSchema)?.serviceUserId ?? null, roleAssignments: { admin: [user.id], rh: [], gestor: [], executor: [], colaborador: [] }, defaultAssignees: {}, process: null, rhProject: null, setupComplete: false };
     this.store.transaction(() => {
       if (this.localUsers().length) throw new AppError("BOOTSTRAP_CLOSED", "A conta inicial já foi criada.", 409);
       this.store.put("localUser", account.id, account);

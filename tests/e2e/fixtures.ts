@@ -7,7 +7,6 @@ import type {
   Workspace,
 } from "../../src/shared/contracts";
 
-export const sessionToken = "test-session-" + "a".repeat(43);
 const user = (
   id: string,
   name: string,
@@ -27,6 +26,7 @@ export function fixtureTemplate(): JourneyTemplate {
     description:
       "Da preparação ao primeiro mês, uma experiência bem organizada.",
     type: "onboarding",
+    profile: "Vendedor",
     version: 1,
     updatedAt: "2026-10-22T12:00:00.000Z",
     stages: [
@@ -96,6 +96,9 @@ export function fixtureJourney(
       bitrixTaskId: "301",
       bitrixUrl:
         "https://nexo-teste.bitrix24.com.br/company/personal/user/11/tasks/task/view/301/",
+      bitrixStageId: "1",
+      bitrixStageTitle: "A fazer",
+      remoteDeleted: false,
       status: "in_progress",
       syncState: "synced",
       checklist: [
@@ -126,6 +129,9 @@ export function fixtureJourney(
       bitrixTaskId: "302",
       bitrixUrl:
         "https://nexo-teste.bitrix24.com.br/company/personal/user/11/tasks/task/view/302/",
+      bitrixStageId: null,
+      bitrixStageTitle: null,
+      remoteDeleted: false,
       status: "completed",
       syncState: "synced",
       checklist: [],
@@ -139,6 +145,7 @@ export function fixtureJourney(
     templateId: "template-on",
     templateName: "Integração de novos colaboradores",
     templateVersion: 1,
+    templateProfile: "Vendedor",
     referenceDate: new Intl.DateTimeFormat("en-CA", {
       timeZone: "America/Sao_Paulo",
       year: "numeric",
@@ -217,6 +224,7 @@ export function fixtureWorkspace(): Workspace {
         completedStageId: "D1032_0:DONE",
         cancelledStageId: "D1032_0:CANCEL",
       },
+      rhProject: null,
       setupComplete: true,
     },
     journeys: [journey, second],
@@ -277,10 +285,32 @@ export function fixtureWorkspace(): Workspace {
   };
 }
 
+export function addRhTask(workspace: Workspace) {
+  const journey = workspace.journeys[0];
+  const task: JourneyTask = {
+    ...journey.tasks[0],
+    id: "rh-interview",
+    title: "Conduzir conversa de boas-vindas",
+    description: "Alinhar os próximos passos com cuidado antes da chegada.",
+    stageTitle: "Antes da chegada",
+    assigneeRole: "rh",
+    assignee: workspace.session.user,
+    dueAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+    bitrixTaskId: "303",
+    bitrixUrl: "https://nexo-teste.bitrix24.com.br/tasks/task/view/303/",
+    critical: true,
+    checklist: [],
+    status: "in_progress",
+  };
+  journey.tasks.push(task);
+  return task;
+}
+
 export async function mockWorkspaceApi(
   page: Page,
   workspace: Workspace,
   calls: { path: string; body: unknown }[] = [],
+  aiConfigured = false,
 ) {
   await page.route("https://api.bitrix24.com/**", (route) =>
     route.fulfill({
@@ -288,7 +318,7 @@ export async function mockWorkspaceApi(
       body: "window.BX24={init:function(cb){cb()},fitWindow:function(){},installFinish:function(){}}",
     }),
   );
-  await page.route("http://127.0.0.1:3000/api/**", async (route) => {
+  await page.route("http://localhost:3000/api/**", async (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname,
       method = route.request().method();
@@ -303,9 +333,10 @@ export async function mockWorkspaceApi(
             installed: true,
             configured: true,
             portalDomain: workspace.session.portalDomain,
-            appUrl: "http://127.0.0.1:3000",
+            appUrl: "http://localhost:3000",
             missingEnvironment: [],
             version: "1.0.0",
+            aiConfigured,
           }
         : path === "/api/workspace"
           ? workspace
@@ -323,8 +354,6 @@ export async function mockWorkspaceApi(
       },
     });
   });
-  await page.goto(`/#session=${sessionToken}`);
-  await page
-    .getByRole("heading", { name: "Visão geral", exact: true })
-    .waitFor();
+  await page.goto("/");
+  await page.getByRole("heading", { name: "Trabalho de hoje", exact: true }).waitFor();
 }

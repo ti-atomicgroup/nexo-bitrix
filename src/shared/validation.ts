@@ -9,6 +9,8 @@ import type {
   Settings,
   ProcessMapping,
   DiscoveryOption,
+  ApprovedTrailSnapshot,
+  TrailSuggestion,
 } from "./contracts";
 
 const role = z.enum(["admin", "rh", "gestor", "executor", "colaborador"]);
@@ -44,12 +46,18 @@ const activity = z.object({
   visibility: z.enum(["team", "employee", "hr"]),
   checklist: z.array(checklist),
   documents: z.array(document),
+  competencies: z.array(z.string().trim().min(1).max(100)).max(40).default([]),
 });
+const trailCompetency = z.object({ name: z.string().trim().min(1).max(100), importance: z.enum(["essential", "important", "additional"]), activityIds: z.array(z.string()).max(100) });
+const trailActivityRecommendation = z.object({ activityId: z.string(), stageId: z.string(), order: z.number().int().nonnegative().max(1000), offsetDays: z.number().int().min(-365).max(365), offsetUnit: z.enum(["calendar_days", "business_days"]).optional(), assigneeRole, reason: z.string().trim().min(1).max(300) });
+export const trailSuggestionSchema: z.ZodType<TrailSuggestion> = z.object({ templateId: z.string(), templateVersion: z.number().int().positive(), profile: z.string().trim().min(1).max(100), competencies: z.array(trailCompetency).max(40), gaps: z.array(z.string().trim().min(1).max(100)).max(40), activities: z.array(trailActivityRecommendation).min(1).max(100) });
+export const approvedTrailSchema: z.ZodType<ApprovedTrailSnapshot> = z.object({ templateId: z.string(), templateVersion: z.number().int().positive(), profile: z.string().trim().min(1).max(100), competencies: z.array(trailCompetency).max(40), gaps: z.array(z.string().trim().min(1).max(100)).max(40), activities: z.array(trailActivityRecommendation).min(1).max(100), source: z.literal("ai"), approvedAt: z.string() });
 export const templateSchema: z.ZodType<JourneyTemplate> = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string(),
   type,
+  profile: z.string().trim().default("Geral"),
   version: z.number(),
   stages: z.array(
     z.object({
@@ -75,6 +83,9 @@ export const taskSchema: z.ZodType<JourneyTask> = z.object({
   visibility: z.enum(["team", "employee", "hr"]),
   bitrixTaskId: z.string().nullable(),
   bitrixUrl: z.string().nullable(),
+  bitrixStageId: z.string().nullable().default(null),
+  bitrixStageTitle: z.string().nullable().default(null),
+  remoteDeleted: z.boolean().default(false),
   status: z.enum([
     "pending",
     "in_progress",
@@ -99,6 +110,8 @@ export const journeySchema: z.ZodType<Journey> = z.object({
   templateId: z.string(),
   templateName: z.string(),
   templateVersion: z.number(),
+  templateProfile: z.string().default("Geral"),
+  approvedTrail: approvedTrailSchema.nullable().default(null),
   referenceDate: z.string(),
   status: z.enum(["creating", "active", "completed", "cancelled"]),
   source: z.enum(["manual", "approval"]),
@@ -138,6 +151,7 @@ export const settingsSchema: z.ZodType<Settings> = z.object({
   }),
   defaultAssignees: z.partialRecord(assigneeRole, z.string()),
   process: processSchema.nullable(),
+  rhProject: z.object({ id: z.string(), name: z.string(), url: z.string() }).nullable().default(null),
   setupComplete: z.boolean(),
 });
 export const sessionSchema: z.ZodType<SessionInfo> = z.object({
@@ -159,6 +173,7 @@ export const statusSchema: z.ZodType<PublicStatus> = z.object({
   webhookConnected: z.boolean().optional(),
   firstAdminCreated: z.boolean().optional(),
   outgoingWebhookConfigured: z.boolean().optional(),
+  aiConfigured: z.boolean().optional(),
 });
 export const discoverySchema: z.ZodType<DiscoveryOption[]> = z.array(
   z.object({ id: z.string(), name: z.string(), type: z.string().optional() }),

@@ -11,6 +11,7 @@ const onboardingTemplate: StarterTemplate = {
   description:
     "Modelo inicial editável. Ajuste responsáveis, prazos e checklists às políticas da sua empresa.",
   type: "onboarding",
+  profile: "Geral",
   stages: [
     {
       id: "onboarding-preparar",

@@ -1,9 +1,10 @@
 "use client";
 
-import { ArrowRight, CalendarCheck2, Clock3, TriangleAlert } from "lucide-react";
+import { ArrowRight, CalendarCheck2, Clock3, ExternalLink, TriangleAlert } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { shortDate } from "@/lib/format";
+import { priorityForRhItem, sortRhAgendaItems } from "@/lib/rh-priority";
 import type { Journey, JourneyTask, Workspace } from "@/shared/contracts";
-import { TaskBadge } from "./ui";
 
 type AgendaItem = { journey: Journey; task: JourneyTask; overdue: boolean };
 
@@ -18,22 +19,6 @@ function localDateKey(value: Date, timezone: string) {
   return `${values.year}-${values.month}-${values.day}`;
 }
 
-function deadlineLabel(value: string, timezone: string, overdue: boolean) {
-  const date = new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "short",
-    timeZone: timezone,
-  })
-    .format(new Date(value))
-    .replace(" de ", " ");
-  const time = new Intl.DateTimeFormat("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: timezone,
-  }).format(new Date(value));
-  return overdue ? `Vencida · ${date} · ${time}` : `Hoje · ${time}`;
-}
-
 function syncLabel(syncState: JourneyTask["syncState"]) {
   return {
     queued: "Aguardando envio ao Bitrix",
@@ -44,7 +29,7 @@ function syncLabel(syncState: JourneyTask["syncState"]) {
   }[syncState];
 }
 
-function collectItems(workspace: Workspace, now: number): AgendaItem[] {
+function collectItems(workspace: Workspace, now: number, query: string): AgendaItem[] {
   const today = localDateKey(new Date(now), workspace.settings.timezone);
   const items: AgendaItem[] = [];
 
@@ -53,6 +38,7 @@ function collectItems(workspace: Workspace, now: number): AgendaItem[] {
 
     for (const task of journey.tasks) {
       if (task.assigneeRole !== "rh" || task.status === "completed") continue;
+      if (query && !`${task.title} ${journey.employee.name} ${journey.employee.department}`.toLowerCase().includes(query.toLowerCase())) continue;
       const deadline = Date.parse(task.dueAt);
       if (!Number.isFinite(deadline)) continue;
       const overdue = deadline < now;
@@ -61,20 +47,17 @@ function collectItems(workspace: Workspace, now: number): AgendaItem[] {
     }
   }
 
-  return items.sort(
-    (a, b) =>
-      Number(b.overdue) - Number(a.overdue) ||
-      Number(b.task.critical) - Number(a.task.critical) ||
-      Date.parse(a.task.dueAt) - Date.parse(b.task.dueAt),
-  );
+  return sortRhAgendaItems(items);
 }
 
 export function RhDailyAgenda({
   workspace,
+  query,
   onTask,
   onView,
 }: {
   workspace: Workspace;
+  query: string;
   onTask: (journey: Journey, task: JourneyTask) => void;
   onView: () => void;
 }) {
@@ -88,103 +71,41 @@ export function RhDailyAgenda({
   }, []);
 
   const items = useMemo(
-    () => (now === null ? [] : collectItems(workspace, now)),
-    [workspace, now],
+    () => (now === null ? [] : collectItems(workspace, now, query)),
+    [workspace, now, query],
   );
   const overdue = items.filter((item) => item.overdue);
   const today = items.filter((item) => !item.overdue);
   const loading = now === null;
+  const focused = items[0];
 
   return (
     <section className="rh-daily-agenda" aria-labelledby="rh-agenda-title" aria-busy={loading}>
-      <header className="rh-agenda-header">
-        <div className="rh-agenda-title-block">
-          <span className="rh-agenda-icon" aria-hidden="true">
-            <CalendarCheck2 size={19} />
-          </span>
-          <div>
-            <h2 id="rh-agenda-title">Atividades de RH para hoje</h2>
-            <p>Acompanhe as etapas de RH nas jornadas em andamento.</p>
-          </div>
-        </div>
-        <div className="rh-agenda-header-side">
-          <div className="rh-agenda-counts" aria-live="polite">
-            {overdue.length > 0 && (
-              <span className="rh-agenda-count overdue">
-                <TriangleAlert size={14} />
-                {overdue.length} atrasada{overdue.length === 1 ? "" : "s"}
-              </span>
-            )}
-            {today.length > 0 && (
-              <span className="rh-agenda-count today">
-                <Clock3 size={14} />
-                {today.length} para hoje
-              </span>
-            )}
-            {!loading && items.length === 0 && (
-              <span className="rh-agenda-count clear">Tudo em dia</span>
-            )}
-          </div>
-          <button type="button" className="rh-agenda-view-all" onClick={onView}>
-            Ver jornadas <ArrowRight size={14} />
-          </button>
+      <header className="rh-agenda-simple-heading">
+        <div><h2 id="rh-agenda-title">Trabalho de hoje</h2><p>Atividades de RH nas jornadas ativas.</p></div>
+        <div className="rh-agenda-counts" aria-live="polite">
+          {overdue.length > 0 && <span className="rh-agenda-count overdue"><TriangleAlert size={14} />{overdue.length} atrasada{overdue.length === 1 ? "" : "s"}</span>}
+          {today.length > 0 && <span className="rh-agenda-count today"><Clock3 size={14} />{today.length} para hoje</span>}
+          {!loading && items.length === 0 && <span className="rh-agenda-count clear">Tudo em dia</span>}
         </div>
       </header>
-
-      {loading ? (
-        <p className="rh-agenda-empty" role="status">Carregando atividades de hoje…</p>
-      ) : items.length === 0 ? (
-        <p className="rh-agenda-empty">Nenhuma atividade de RH atrasada ou prevista para hoje.</p>
-      ) : (
-        <div className="rh-agenda-groups">
-          {[
-            { title: "Atrasadas", entries: overdue, kind: "overdue" },
-            { title: "Para hoje", entries: today, kind: "today" },
-          ].map(({ title, entries, kind }) =>
-            entries.length ? (
-              <section className="rh-agenda-group" key={kind} aria-labelledby={`rh-agenda-${kind}`}>
-                <h3 id={`rh-agenda-${kind}`}>
-                  {title} <span>{entries.length}</span>
-                </h3>
-                <ul>
-                  {entries.map(({ journey, task, overdue: isOverdue }) => (
-                    <li key={task.id}>
-                      <button
-                        type="button"
-                        className="rh-agenda-item"
-                        onClick={() => onTask(journey, task)}
-                        aria-label={`Abrir atividade ${task.title}, de ${journey.employee.name}, responsável ${task.assignee?.name ?? "não definido"}, ${deadlineLabel(task.dueAt, workspace.settings.timezone, isOverdue)}`}
-                      >
-                        <span className={`rh-agenda-deadline ${isOverdue ? "overdue" : "today"}`}>
-                          {isOverdue ? <TriangleAlert size={14} /> : <Clock3 size={14} />}
-                          {deadlineLabel(task.dueAt, workspace.settings.timezone, isOverdue)}
-                        </span>
-                        <span className="rh-agenda-task">
-                          <strong>{task.title}</strong>
-                          <small>{journey.employee.name} · {task.stageTitle}</small>
-                        </span>
-                        <span className="rh-agenda-assignee">
-                          <small>Responsável</small>
-                          <strong>{task.assignee?.name ?? "A definir"}</strong>
-                        </span>
-                        <span className="rh-agenda-state">
-                          <TaskBadge status={task.status} />
-                          {task.syncState !== "synced" && (
-                            <small className={`rh-agenda-sync ${task.syncState}`}>
-                              {syncLabel(task.syncState)}
-                            </small>
-                          )}
-                        </span>
-                        <span className="rh-agenda-open">Abrir atividade <ArrowRight size={14} /></span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ) : null,
-          )}
+      {loading ? <p className="rh-agenda-empty" role="status">Carregando atividades…</p> : items.length === 0 ? (
+        <div className="rh-agenda-empty-state"><span><CalendarCheck2 size={20} /></span><div><strong>Nenhuma atividade de RH para hoje</strong><p>Quando uma atividade vencer ou atrasar, ela aparecerá aqui.</p></div><button type="button" className="rh-agenda-view-all" onClick={onView}>Ver jornadas <ArrowRight size={14} /></button></div>
+      ) : focused ? (
+        <div className="rh-agenda-simple-list">
+          {items.map((item, index) => {
+            const reason = priorityForRhItem(item).reason;
+            const needsReason = item.overdue || item.task.critical || item.task.syncState !== "synced";
+            return <article className={`rh-work-row ${index === 0 ? "rh-work-row-focus" : ""}`} key={item.task.id}>
+              <span className={`rh-work-indicator ${item.overdue ? "late" : item.task.critical ? "critical" : "due"}`} aria-hidden="true">{item.overdue ? <TriangleAlert size={16} /> : <Clock3 size={16} />}</span>
+              <div className="rh-work-main"><strong>{item.task.title}</strong><span>{item.journey.employee.name} · {item.journey.type === "onboarding" ? "Entrada" : "Saída"}</span>{needsReason && <small className="rh-work-reason">{item.task.syncState !== "synced" ? syncLabel(item.task.syncState) : reason}</small>}</div>
+              <div className="rh-work-meta"><span>{item.overdue ? "Vencida" : "Hoje"} · {shortDate(item.task.dueAt, workspace.settings.timezone)}</span><small>Responsável: {item.task.assignee?.name ?? "A definir"}</small></div>
+              {item.task.bitrixUrl && <a className="rh-work-bitrix" href={item.task.bitrixUrl} target="_blank" rel="noreferrer" aria-label={`Abrir tarefa no Bitrix: ${item.task.title}`}><ExternalLink size={15} /></a>}
+              <button className="rh-work-open" type="button" onClick={() => onTask(item.journey, item.task)}>{index === 0 ? "Abrir atividade" : "Abrir"}<ArrowRight size={15} /></button>
+            </article>;
+          })}
         </div>
-      )}
+      ) : null}
     </section>
   );
 }

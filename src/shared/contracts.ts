@@ -35,6 +35,7 @@ export interface ActivityDefinition {
   visibility: Visibility;
   checklist: ChecklistDefinition[];
   documents: DocumentLink[];
+  competencies?: string[];
 }
 export interface StageDefinition {
   id: string;
@@ -46,6 +47,7 @@ export interface JourneyTemplate {
   name: string;
   description: string;
   type: JourneyType;
+  profile: string;
   version: number;
   stages: StageDefinition[];
   updatedAt: string;
@@ -65,6 +67,9 @@ export interface JourneyTask {
   visibility: Visibility;
   bitrixTaskId: string | null;
   bitrixUrl: string | null;
+  bitrixStageId: string | null;
+  bitrixStageTitle: string | null;
+  remoteDeleted: boolean;
   status: TaskStatus;
   syncState: SyncState;
   checklist: (ChecklistDefinition & {
@@ -91,6 +96,8 @@ export interface Journey {
   templateId: string;
   templateName: string;
   templateVersion: number;
+  templateProfile: string;
+  approvedTrail?: ApprovedTrailSnapshot | null;
   referenceDate: string;
   status: "creating" | "active" | "completed" | "cancelled";
   source: "manual" | "approval";
@@ -103,6 +110,32 @@ export interface Journey {
   completedCount: number;
   radar: "ok" | "attention" | "critical" | "unknown";
   tasks: JourneyTask[];
+}
+export interface TrailCompetency {
+  name: string;
+  importance: "essential" | "important" | "additional";
+  activityIds: string[];
+}
+export interface TrailActivityRecommendation {
+  activityId: string;
+  stageId: string;
+  order: number;
+  offsetDays: number;
+  offsetUnit?: "calendar_days" | "business_days";
+  assigneeRole: AssigneeRole;
+  reason: string;
+}
+export interface TrailSuggestion {
+  templateId: string;
+  templateVersion: number;
+  profile: string;
+  competencies: TrailCompetency[];
+  gaps: string[];
+  activities: TrailActivityRecommendation[];
+}
+export interface ApprovedTrailSnapshot extends TrailSuggestion {
+  source: "ai";
+  approvedAt: string;
 }
 export interface ProcessMapping {
   entityTypeId: number;
@@ -132,6 +165,7 @@ export interface Settings {
   roleAssignments: Record<AppRole, string[]>;
   defaultAssignees: Partial<Record<AssigneeRole, string>>;
   process: ProcessMapping | null;
+  rhProject: { id: string; name: string; url: string } | null;
   setupComplete: boolean;
 }
 export interface SessionInfo {
@@ -182,6 +216,7 @@ export interface PublicStatus {
   webhookConnected?: boolean;
   firstAdminCreated?: boolean;
   outgoingWebhookConfigured?: boolean;
+  aiConfigured?: boolean;
 }
 export interface DiscoveryOption {
   id: string;
@@ -195,6 +230,7 @@ export interface CreateJourneyInput {
   employeeId: string;
   referenceDate: string;
   assignees: Partial<Record<AssigneeRole, string>>;
+  approvedTrail?: TrailSuggestion;
 }
 export interface ApiError {
   code: string;

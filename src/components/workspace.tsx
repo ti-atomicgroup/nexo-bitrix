@@ -12,7 +12,6 @@ import {
   Plus,
   Route,
   Search,
-  TriangleAlert,
   Zap,
 } from "lucide-react";
 import { useState } from "react";
@@ -49,18 +48,20 @@ export function JourneyTable({
   journeys,
   onJourney,
   timezone,
+  employeeView = false,
 }: {
   journeys: Journey[];
   onJourney: (journey: Journey) => void;
   timezone: string;
+  employeeView?: boolean;
 }) {
   return (
     <div className="table-scroll">
       <table className="journey-table">
         <thead>
           <tr>
-            <th>Colaborador</th>
-            <th>Jornada</th>
+            <th>{employeeView ? "Sua jornada" : "Colaborador"}</th>
+            <th>{employeeView ? "Trilha" : "Jornada"}</th>
             <th>Data principal</th>
             <th>Progresso</th>
             <th>Situação</th>
@@ -198,7 +199,6 @@ export function Overview({
   const active = workspace.journeys.filter(
     (j) => j.status === "active" || j.status === "creating",
   );
-  const critical = active.filter((j) => j.radar === "critical");
   const completed = workspace.journeys.filter((j) => j.status === "completed");
   const filtered = active.filter((j) =>
     `${j.employee.name} ${j.employee.department} ${j.templateName}`
@@ -210,16 +210,15 @@ export function Overview({
     <>
       <div className="page-heading">
         <div>
-          <div className="eyebrow">Pessoas e processos</div>
           <h1>
             {workspace.session.role === "colaborador"
               ? `Sua jornada, ${firstName}`
-              : "Visão geral"}
+            : workspace.session.canManage ? `Olá, ${firstName}` : "Central de jornadas"}
           </h1>
           <p>
             {workspace.session.role === "colaborador"
               ? "Suas próximas etapas e tudo o que você precisa para seguir."
-              : "Acompanhe cada entrada, cada saída e o que precisa da sua atenção."}
+              : workspace.session.canManage ? "Veja o que precisa avançar primeiro." : "Acompanhe entradas e saídas, etapa por etapa."}
           </p>
         </div>
         {workspace.session.canManage && (
@@ -229,65 +228,15 @@ export function Overview({
           </Button>
         )}
       </div>
-      <div className="metric-strip" aria-label="Resumo das jornadas">
-        <div className="metric">
-          <span>
-            <Route size={16} />
-            Em andamento
-          </span>
-          <strong>{active.length.toString().padStart(2, "0")}</strong>
-          <small>jornadas ativas</small>
-        </div>
-        <div className="metric">
-          <span>
-            <ArrowDownLeft size={16} />
-            Onboardings
-          </span>
-          <strong>
-            {active
-              .filter((j) => j.type === "onboarding")
-              .length.toString()
-              .padStart(2, "0")}
-          </strong>
-          <small>pessoas chegando</small>
-        </div>
-        <div className="metric">
-          <span>
-            <ArrowUpRight size={16} />
-            Offboardings
-          </span>
-          <strong>
-            {active
-              .filter((j) => j.type === "offboarding")
-              .length.toString()
-              .padStart(2, "0")}
-          </strong>
-          <small>transições em curso</small>
-        </div>
-        <div className={`metric ${critical.length ? "metric-alert" : ""}`}>
-          <span>
-            <TriangleAlert size={16} />
-            Precisam de atenção
-          </span>
-          <strong>{critical.length.toString().padStart(2, "0")}</strong>
-          <small>
-            {critical.length
-              ? "jornadas com risco crítico"
-              : "nenhuma jornada crítica"}
-          </small>
-        </div>
-      </div>
       {workspace.session.canManage && (
         <RhDailyAgenda
           workspace={workspace}
+          query={query}
           onTask={onJourney}
           onView={() => onView("journeys")}
         />
       )}
-      {workspace.session.role !== "colaborador" && (
-        <ReadinessQueue workspace={workspace} onJourney={onJourney} />
-      )}
-      <div className="overview-layout">
+      {!workspace.session.canManage && <div className="overview-layout">
         <div className="main-column">
           <section className="workspace-section">
             <SectionHeader
@@ -403,7 +352,7 @@ export function Overview({
             </div>
           </div>
         </aside>
-      </div>
+      </div>}
     </>
   );
 }
@@ -415,7 +364,8 @@ export function JourneysView({
   query,
   filterDate,
   onClearDate,
-}: Shared & { filterDate: string; onClearDate: () => void }) {
+  onDate,
+}: Shared & { filterDate: string; onClearDate: () => void; onDate: (date: string) => void }) {
   const [type, setType] = useState<"all" | JourneyType>("all");
   const [status, setStatus] = useState("active");
   const journeys = workspace.journeys.filter(
@@ -434,9 +384,8 @@ export function JourneysView({
     <>
       <div className="page-heading">
         <div>
-          <div className="eyebrow">Central de operações</div>
-          <h1>Jornadas</h1>
-          <p>Cada pessoa, suas etapas e um próximo passo claro.</p>
+          <h1>{workspace.session.canManage ? "Jornadas" : "Minha trilha"}</h1>
+          <p>{workspace.session.canManage ? "Cada pessoa, suas etapas e um próximo passo claro." : "Acompanhe suas etapas, materiais e próximos passos."}</p>
         </div>
         {workspace.session.canManage && (
           <Button onClick={onCreate}>
@@ -487,12 +436,14 @@ export function JourneysView({
           <span className="count-label">{journeys.length} jornadas</span>
         </div>
       </div>
+      {workspace.session.canManage && <ReadinessQueue workspace={workspace} onJourney={onJourney} />}
       <section className="workspace-section">
         {journeys.length ? (
           <JourneyTable
             journeys={journeys}
             onJourney={onJourney}
             timezone={workspace.settings.timezone}
+            employeeView={!workspace.session.canManage}
           />
         ) : (
           <EmptyState
@@ -512,6 +463,14 @@ export function JourneysView({
           />
         )}
       </section>
+      {workspace.session.canManage && <section className="workspace-section upcoming-section">
+        <SectionHeader title="Datas principais" description="Movimentações previstas nos próximos sete dias." />
+        <CalendarStrip journeys={workspace.journeys} timezone={workspace.settings.timezone} onDate={onDate} />
+      </section>}
+      {workspace.session.canManage && workspace.audit.length > 0 && <section className="workspace-section activity-section">
+        <SectionHeader title="Histórico recente" />
+        <div className="activity-feed">{workspace.audit.slice(0, 8).map((entry) => <div className="activity-item" key={entry.id}><span className="activity-point"><CheckCheck size={13} /></span><div><p>{entry.message}</p><small>{entry.actorName} · {timeAgo(entry.createdAt).toLowerCase()}</small></div></div>)}</div>
+      </section>}
     </>
   );
 }
@@ -544,7 +503,6 @@ export function TasksView({
     <>
       <div className="page-heading">
         <div>
-          <div className="eyebrow">Meu espaço</div>
           <h1>Minhas tarefas</h1>
           <p>Suas entregas para que cada jornada aconteça.</p>
         </div>
@@ -638,7 +596,6 @@ export function AutomationsView({
     <>
       <div className="page-heading">
         <div>
-          <div className="eyebrow">Padronização em movimento</div>
           <h1>Automações</h1>
           <p>Uma aprovação no Bitrix. Todas as etapas no lugar.</p>
         </div>

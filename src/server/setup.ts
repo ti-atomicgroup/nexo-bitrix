@@ -16,10 +16,10 @@ export class Setup {
     this.auth.requireManage(session);
     const scopes = z.array(z.string()).parse(await this.bitrix.call(session.user.id, "scope", {}));
     const methods = z.array(z.string()).parse(await this.bitrix.call(session.user.id, "methods", {}));
-    const requiredScopes = ["task", "user_brief", "crm"];
+    const requiredScopes = ["task", "user_brief", "crm", "sonet"];
     const missingScopes = requiredScopes.filter(scope => !scopes.includes(scope) && !(scope === "user_brief" && scopes.includes("user")));
     const webhook = this.store.get("webhook", "incoming", webhookConfigurationSchema);
-    return { scopes, missingScopes, canProvision: Boolean(webhook) && scopes.includes("userfieldconfig") && scopes.includes("crm") && session.canConfigure, methods: methods.filter(method => ["crm.type.add", "crm.item.add", "tasks.task.add", "task.checklistitem.add", "userfieldconfig.add"].includes(method)) };
+    return { scopes, missingScopes, canProvision: Boolean(webhook) && scopes.includes("userfieldconfig") && scopes.includes("crm") && scopes.includes("sonet") && session.canConfigure, methods: methods.filter(method => ["crm.type.add", "crm.item.add", "tasks.task.add", "task.checklistitem.add", "userfieldconfig.add", "sonet_group.create", "sonet_group.get"].includes(method)) };
   }
   async discovery(session: SessionInfo, kind: string, entityTypeId?: number, categoryId?: number): Promise<DiscoveryOption[]> {
     this.auth.requireManage(session);
@@ -46,6 +46,7 @@ export class Setup {
   async configure(session: SessionInfo, input: unknown, inputRules: unknown): Promise<Settings> {
     await this.auth.requireAdmin(session);
     const next = settingsSchema.parse(input), rules = rulesSchema.parse(inputRules), current = this.auth.settings();
+    if (JSON.stringify(next.rhProject) !== JSON.stringify(current.rhProject)) throw new AppError("RH_PROJECT_MANAGED", "O vínculo do projeto RH é gerenciado pelo assistente de instalação.", 403);
     const serviceUserId = this.store.get("webhook", "incoming", webhookConfigurationSchema)?.serviceUserId;
     if (next.automationUserId !== serviceUserId) throw new AppError("AUTOMATION_IDENTITY", "A automação executa sempre como a conta que criou o webhook de entrada.", 403);
     if (!next.roleAssignments.admin.includes(session.user.id)) throw new AppError("ADMIN_RETENTION", "Mantenha o administrador atual na configuração.", 409);
@@ -79,7 +80,23 @@ export class Setup {
     const user = session.user.id;
     try {
       const capabilities = await this.discover(session);
-      if (!capabilities.canProvision || capabilities.missingScopes.length) throw new AppError("SCOPES_MISSING", "Habilite task, user_brief, crm e userfieldconfig no aplicativo Bitrix24.", 422);
+      if (!capabilities.canProvision || capabilities.missingScopes.length) throw new AppError("SCOPES_MISSING", "Habilite task, user_brief, crm, sonet e userfieldconfig no aplicativo Bitrix24.", 422);
+      const settingsBeforeProvision = this.auth.settings();
+      if (!settingsBeforeProvision.rhProject) {
+        const projectName = "Nexo · RH";
+        try {
+          const project = await this.journeys.creation("provision:rh-project", async () => {
+            const matches = (await this.bitrix.list(user, "sonet_group.get", { FILTER: { NAME: projectName } })).map(record).filter(group => group.NAME === projectName && group.PROJECT === "Y" && group.CLOSED !== "Y");
+            if (matches.length > 1) throw new AppError("PROJECT_DUPLICATE", "Há mais de um projeto Nexo · RH. Selecione o correto manualmente.", 409);
+            return matches[0] ? text(matches[0].ID) : null;
+          }, async () => (await this.bitrix.createRhProject(projectName, user)).id);
+          const rhProject = { id: project, name: projectName, url: `${this.auth.env.portalUrl}/workgroups/group/${project}/` };
+          this.store.put("settings", "current", { ...this.auth.settings(), rhProject });
+        } catch (error) {
+          if (error instanceof AppError) throw error;
+          throw new AppError("RH_PROJECT_CREATE", "Não foi possível criar o projeto privado Nexo · RH. Confirme o escopo sonet e a permissão da conta do webhook para criar projetos.", 422);
+        }
+      }
       const title = "Nexo · Movimentações de Pessoas";
       const types = (await this.bitrix.list(user, "crm.type.list", {}, "types")).map(record);
       const existing = types.filter(type => type.title === title);
@@ -123,6 +140,7 @@ export class Setup {
     await this.auth.requireAdmin(session);
     const settings = this.auth.settings(), capabilities = await this.discover(session);
     if (capabilities.missingScopes.length) throw new AppError("SCOPES_MISSING", `Habilite os escopos: ${capabilities.missingScopes.join(", ")}.`, 422);
+    if (!settings.rhProject) throw new AppError("RH_PROJECT_REQUIRED", "Crie ou conecte o projeto privado Nexo · RH antes de concluir a instalação.", 409);
     if (!settings.process || !settings.automationUserId) throw new AppError("SETUP_INCOMPLETE", "Configure o processo e autorize uma conta de automação.", 409);
     const templates = this.store.list("template", savedTemplateSchema);
     if (!templates.length) throw new AppError("TEMPLATE_REQUIRED", "Crie pelo menos um modelo de jornada.", 409);

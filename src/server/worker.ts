@@ -16,6 +16,10 @@ export class Worker {
   async processEvent(job: EventJob) {
     const settings = this.auth.settings();
     if (!settings.setupComplete || !settings.automationUserId) throw new AppError("AUTOMATION_REQUIRED", "Conclua a instalação e autorize a automação.", 409);
+    if (job.event.startsWith("ONTASK")) {
+      if (job.taskId) await this.journeys.refreshByBitrixTaskId(job.taskId, job.event === "ONTASKDELETE");
+      return;
+    }
     if (!job.event.startsWith("ONCRMDYNAMIC")) { this.store.enqueue(`sync:event:${Date.now()}`, "sync", {}); return; }
     const process = settings.process;
     if (!process || job.entityTypeId !== process.entityTypeId || !job.itemId) return;
@@ -42,7 +46,7 @@ export class Worker {
     for (const journey of this.store.list("journey", journeySchema)) {
       if (journey.status === "cancelled" || journey.status === "completed") { this.store.remove("issue", `sync:${journey.id}`); continue; }
       try {
-        if (journey.status === "creating" || journey.tasks.some(task => task.syncState !== "synced")) await this.journeys.runJourney(journey.id);
+        if (journey.status === "creating" || journey.tasks.some(task => task.syncState !== "synced" && !task.remoteDeleted)) await this.journeys.runJourney(journey.id);
         else await this.journeys.reconcileJourney(journey.id, userId);
         this.store.remove("issue", `sync:${journey.id}`);
       } catch (error) {

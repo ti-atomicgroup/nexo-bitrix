@@ -237,7 +237,6 @@ export function SettingsView({
     <>
       <div className="page-heading">
         <div>
-          <div className="eyebrow">Seu ambiente Nexo</div>
           <h1>
             {draft.setupComplete ? "Configurações" : "Vamos preparar seu Nexo"}
           </h1>
@@ -316,8 +315,12 @@ export function SettingsView({
                   <ExternalLink size={14} />
                 </a>
               </div>
+              <div className="rh-project-summary">
+                <div><span className="rh-project-mark"><Layers3 size={17} /></span><div><strong>Projeto privado do RH</strong><p>{workspace.settings.rhProject ? workspace.settings.rhProject.name : "Ainda não configurado"}</p></div></div>
+                {workspace.settings.rhProject ? <a href={workspace.settings.rhProject.url} target="_blank" rel="noreferrer">Abrir Kanban <ExternalLink size={14} /></a> : <p>Será criado durante a preparação do processo. Adicione os usuários de RH como participantes no Bitrix para liberar o quadro.</p>}
+              </div>
               <div className="form-section-heading"><Link2 size={17} /><h3>Eventos automáticos</h3></div>
-              <p className="field-help">No Bitrix24, cadastre um webhook de saída para o evento ONCRMDYNAMICITEMUPDATE. Use a URL abaixo como endereço do handler e cole aqui o token recebido no evento.</p>
+              <p className="field-help">No Bitrix24, cadastre webhooks de saída para ONCRMDYNAMICITEMUPDATE e ONTASKUPDATE. Use a URL abaixo como endereço do handler e cole aqui o token recebido nos eventos.</p>
               <label className="field"><span>URL do handler</span><input readOnly value={typeof window === "undefined" ? "" : `${window.location.origin}/api/bitrix/events`} onFocus={(event) => event.currentTarget.select()} /></label>
               <div className="form-grid">
                 <label className="field"><span>Token do webhook de saída</span><input type="password" autoComplete="off" value={outgoingToken} onChange={(event) => setOutgoingToken(event.target.value)} placeholder={outgoingConfigured ? "Token salvo · informe novo para substituir" : "Cole o token gerado pelo Bitrix24"} /></label>

@@ -40,10 +40,10 @@ function checkOrigin(request: Request, allowPortal = false) {
 }
 export async function status() {
   const missing = missingEnvironment();
-  const result: PublicStatus = { installed: false, configured: false, portalDomain: null, appUrl: "", missingEnvironment: missing, version: "1.0.0", webhookConnected: false, firstAdminCreated: false, outgoingWebhookConfigured: false };
+  const result: PublicStatus = { installed: false, configured: false, portalDomain: null, appUrl: "", missingEnvironment: missing, version: "1.0.0", webhookConnected: false, firstAdminCreated: false, outgoingWebhookConfigured: false, aiConfigured: false };
   if (missing.length) return json(result);
   try {
-    const env = validateEnvironment(); result.appUrl = env.appUrl; result.portalDomain = env.portalDomain;
+    const env = validateEnvironment(); result.appUrl = env.appUrl; result.portalDomain = env.portalDomain; result.aiConfigured = env.aiConfigured;
     const runtime = getRuntime(), incoming = runtime.store.get("webhook", "incoming", webhookConfigurationSchema), outgoing = runtime.store.get("webhook", "outgoing", outgoingWebhookSchema), users = runtime.store.list("localUser", localUserSchema);
     result.webhookConnected = Boolean(incoming);
     result.firstAdminCreated = users.some(user => user.role === "admin" && user.active);
@@ -104,6 +104,7 @@ export async function api(request: Request, resource: string, id?: string) {
       return json(await runtime.setup.finish(session));
     }
     const session = runtime.auth.session(sessionToken(request));
+    if (resource === "ai-trail" && request.method === "POST") return json(await runtime.trails.suggest(session, await body(request)));
     if (resource === "users" && request.method === "GET") return json(runtime.auth.listLocalUsers(session));
     if (resource === "users" && request.method === "POST") return json(await runtime.auth.createLocalUser(session, await body(request)));
     if (resource === "users" && request.method === "DELETE" && id) { await runtime.auth.deactivateLocalUser(session, id); return json({ deactivated: true }); }

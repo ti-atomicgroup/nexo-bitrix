@@ -55,6 +55,7 @@ export const offboardingTemplates: StarterTemplate[] = [
     description:
       "Acolha a decisão da pessoa e organize com gestor e People uma transição respeitosa. Revise os prazos conforme o último dia acordado.",
     type: "offboarding",
+    profile: "Geral",
     stages: [
       {
         id: "voluntario-alinhamento",
@@ -174,6 +175,7 @@ export const offboardingTemplates: StarterTemplate[] = [
     description:
       "Estruture uma comunicação cuidadosa, transição segura e orientação individual. People revisa benefícios e pagamentos conforme a política aplicável.",
     type: "offboarding",
+    profile: "Geral",
     stages: [
       {
         id: "involuntario-alinhamento",

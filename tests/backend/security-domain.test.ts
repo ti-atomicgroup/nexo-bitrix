@@ -6,10 +6,10 @@ import type { Journey, JourneyTask } from "../../src/shared/contracts";
 
 const env = { NEXO_ENCRYPTION_KEY: "ab".repeat(32), NEXO_SETUP_TOKEN: "setup-secret-long-enough", NEXO_APP_URL: "https://nexo.example.com", BITRIX_PORTAL_URL: "https://acme.bitrix24.com", NEXO_DATA_DIR: "./data" };
 export function task(overrides: Partial<JourneyTask> = {}): JourneyTask {
-  return { id: "t1", journeyId: "j1", title: "Acesso", description: "", stageTitle: "Preparar", stageOrder: 0, assigneeRole: "ti", assignee: null, dueAt: "2026-10-22T20:59:00.000Z", required: true, critical: true, visibility: "team", bitrixTaskId: "99", bitrixUrl: null, status: "pending", syncState: "synced", checklist: [], documents: [], ...overrides };
+  return { id: "t1", journeyId: "j1", title: "Acesso", description: "", stageTitle: "Preparar", stageOrder: 0, assigneeRole: "ti", assignee: null, dueAt: "2026-10-22T20:59:00.000Z", required: true, critical: true, visibility: "team", bitrixTaskId: "99", bitrixUrl: null, bitrixStageId: null, bitrixStageTitle: null, remoteDeleted: false, status: "pending", syncState: "synced", checklist: [], documents: [], ...overrides };
 }
 export function journey(tasks: JourneyTask[]): Journey {
-  return { id: "j1", type: "onboarding", employee: { id: "3", name: "Ana", position: "", department: "", active: true }, templateId: "m1", templateName: "Modelo", templateVersion: 1, referenceDate: "2026-10-22", status: "active", source: "manual", sourceItemId: 100, sourceUrl: null, createdAt: "2026-10-22T00:00:00Z", completedAt: null, progress: 0, taskCount: tasks.length, completedCount: 0, radar: "unknown", tasks };
+  return { id: "j1", type: "onboarding", employee: { id: "3", name: "Ana", position: "", department: "", active: true }, templateId: "m1", templateName: "Modelo", templateVersion: 1, templateProfile: "Geral", referenceDate: "2026-10-22", status: "active", source: "manual", sourceItemId: 100, sourceUrl: null, createdAt: "2026-10-22T00:00:00Z", completedAt: null, progress: 0, taskCount: tasks.length, completedCount: 0, radar: "unknown", tasks };
 }
 describe("configuração e fronteira de confiança", () => {
   it("não gera segredos nem aceita portal arbitrário/SSRF", () => {

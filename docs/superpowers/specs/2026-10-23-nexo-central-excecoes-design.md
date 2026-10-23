@@ -17,7 +17,7 @@ A home deve responder, numa olhada: **qual atividade devo fazer agora, para quem
 
 ## Direção visual e tese
 
-**Nexo é a lista de trabalho que orienta a próxima ação:** uma atividade em foco e uma fila compacta das próximas responsabilidades ocupam a home. A sensação de uma LLM em trabalho aparece numa sequência simples: contexto necessário → prioridade compreensível → ação. O Nexo não afirma ter um modelo de IA nem inventa recomendações; as explicações são calculadas a partir dos dados e regras existentes.
+**Nexo é a lista de trabalho que orienta a próxima ação:** uma atividade em foco e uma fila compacta das próximas responsabilidades ocupam a home. A sensação de uma LLM em trabalho aparece numa sequência simples: contexto necessário → prioridade compreensível → ação. A home não usa IA para classificar urgência; as explicações da fila continuam baseadas nos dados e regras existentes. A recomendação de IA para trilhas de onboarding fica numa etapa separada, revisada pelo RH.
 
 Preservar as cores já aprovadas: superfícies claras, grafite, verde esmeralda e cores semânticas atuais para prazo e risco. A personalidade vem da leitura simples e do ritmo do trabalho. Cor só aparece para indicar localização, estado e urgência reais.
 
@@ -54,7 +54,7 @@ No Bitrix estreito e em celular, a lista mantém a mesma ordem e prioridade; a n
 
 ## Escopo e limites
 
-Esta entrega simplifica a home de RH e a linguagem de jornadas, modelos e abertura de processo. Ela preserva contratos, regras, papéis e operações Bitrix existentes, enquanto torna os passos de configuração e abertura mais claros e recolhe opções avançadas. Não adiciona IA generativa, novas regras de risco nem automações de negócio.
+Esta entrega simplifica a home de RH e a linguagem de jornadas, modelos e abertura de processo. Ela preserva contratos, regras, papéis e operações Bitrix existentes, enquanto torna os passos de configuração e abertura mais claros e recolhe opções avançadas. Não adiciona IA à classificação da home nem novas regras de risco; a assistência de IA para trilhas de onboarding é definida na especificação de modelos por perfil e Kanban.
 
 ## Validação da implementação
 

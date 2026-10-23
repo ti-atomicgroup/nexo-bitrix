@@ -40,6 +40,7 @@ function newActivity(): ActivityDefinition {
     visibility: "team",
     checklist: [],
     documents: [],
+    competencies: [],
   };
 }
 function newStage(): StageDefinition {
@@ -55,6 +56,7 @@ export function emptyTemplate(type: JourneyType): JourneyTemplate {
     name: "",
     description: "",
     type,
+    profile: "Geral",
     version: 1,
     stages: [newStage()],
     updatedAt: new Date().toISOString(),
@@ -75,16 +77,18 @@ export function TemplatesView({
   onDuplicate: (template: JourneyTemplate) => void;
 }) {
   const [filter, setFilter] = useState<"all" | JourneyType>("all");
+  const [profileFilter, setProfileFilter] = useState("all");
+  const profiles = [...new Set(workspace.templates.map((t) => t.profile))].sort();
   const templates = workspace.templates.filter(
     (t) =>
       (filter === "all" || t.type === filter) &&
-      `${t.name} ${t.description}`.toLowerCase().includes(query.toLowerCase()),
+      (profileFilter === "all" || t.profile === profileFilter) &&
+      `${t.name} ${t.description} ${t.profile}`.toLowerCase().includes(query.toLowerCase()),
   );
   return (
     <>
       <div className="page-heading">
         <div>
-          <div className="eyebrow">Consistência em cada etapa</div>
           <h1>Modelos de jornada</h1>
           <p>Configure uma vez. Cuide de cada pessoa com o mesmo padrão.</p>
         </div>
@@ -95,6 +99,7 @@ export function TemplatesView({
           </Button>
         )}
       </div>
+      <label className="field template-profile-filter"><span>Perfil</span><select aria-label="Filtrar modelos por perfil" value={profileFilter} onChange={(event) => setProfileFilter(event.target.value)}><option value="all">Todos os perfis</option>{profiles.map((profile) => <option key={profile} value={profile}>{profile}</option>)}</select></label>
       <div className="filter-bar">
         <div className="segmented">
           <button
@@ -129,6 +134,7 @@ export function TemplatesView({
                     <Layers3 size={24} />
                   </span>
                   <TypeBadge type={template.type} />
+                  <span className="template-profile-tag">{template.profile}</span>
                   <span className="version-label">v{template.version}</span>
                 </div>
                 <h2>{template.name}</h2>
@@ -231,6 +237,7 @@ export function TemplateEditor({
   const [draft, setDraft] = useState(() => structuredClone(template));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [step, setStep] = useState<1 | 2>(1);
   function updateStage(
     id: string,
     updater: (stage: StageDefinition) => StageDefinition,
@@ -273,6 +280,7 @@ export function TemplateEditor({
       );
       return;
     }
+    if (step === 1) { setStep(2); return; }
     setBusy(true);
     try {
       await onSave(draft, isNew);
@@ -296,6 +304,7 @@ export function TemplateEditor({
       <form onSubmit={submit}>
         <fieldset disabled={readOnly || busy} className="editor-fieldset">
           <div className="modal-body">
+            {step === 1 ? <>
             <div className="form-grid">
               <label className="field">
                 <span>
@@ -325,6 +334,11 @@ export function TemplateEditor({
                   <option value="onboarding">Onboarding</option>
                   <option value="offboarding">Offboarding</option>
                 </select>
+              </label>
+              <label className="field">
+                <span>Perfil do colaborador <i>*</i></span>
+                <input required minLength={2} maxLength={100} value={draft.profile} onChange={(event) => setDraft((old) => ({ ...old, profile: event.target.value }))} placeholder="Ex.: Vendedor, RH, Liderança" />
+                <small>Ajuda o RH a escolher o roteiro certo para cada pessoa.</small>
               </label>
             </div>
             <label className="field">
@@ -399,11 +413,10 @@ export function TemplateEditor({
                       </button>
                     </div>
                   </div>
-                  {stage.activities.map((activity, activityIndex) => (
+                  {stage.activities.map((activity) => (
                     <details
                       className="activity-editor"
                       key={activity.id}
-                      open={activityIndex === 0}
                     >
                       <summary>
                         <Pencil size={14} />
@@ -464,6 +477,11 @@ export function TemplateEditor({
                               })
                             }
                           />
+                        </label>
+                        <label className="field">
+                          <span>Competências desenvolvidas</span>
+                          <input value={(activity.competencies ?? []).join(", ")} maxLength={1200} placeholder="Ex.: CRM, comunicação com clientes, processo comercial" onChange={(e) => updateActivity(stage.id, activity.id, { competencies: [...new Set(e.target.value.split(",").map((value) => value.trim()).filter(Boolean).slice(0, 40))] })} />
+                          <small>Separe por vírgula. A IA usa estas etiquetas para relacionar habilidades às atividades do modelo.</small>
                         </label>
                         <div className="form-grid">
                           <label className="field">
@@ -739,6 +757,13 @@ export function TemplateEditor({
               <Plus size={16} />
               Adicionar etapa
             </Button>
+            </> : <div className="template-review">
+              <span className="eyebrow">Revisão final</span>
+              <h3>{draft.name}</h3>
+              <p>{draft.type === "onboarding" ? "Onboarding" : "Offboarding"} · perfil {draft.profile}</p>
+              <div className="template-review-summary">{draft.stages.length} etapas · {draft.stages.flatMap((stage) => stage.activities).length} atividades · {draft.stages.flatMap((stage) => stage.activities).filter((activity) => activity.required).length} obrigatórias</div>
+              <ol>{draft.stages.map((stage) => <li key={stage.id}><strong>{stage.title}</strong><ul>{stage.activities.map((activity) => <li key={activity.id}>{activity.title} <small>· {roleLabels[activity.assigneeRole]} · {activity.offsetDays >= 0 ? "+" : ""}{activity.offsetDays} dias {activity.offsetUnit === "business_days" ? "úteis" : "corridos"}</small></li>)}</ul></li>)}</ol>
+            </div>}
             {error && (
               <div role="alert" className="form-error">
                 {error}
@@ -749,15 +774,16 @@ export function TemplateEditor({
         <div className="modal-footer">
           <span>
             <ShieldCheck size={15} />
-            Jornadas em andamento serão preservadas
+            {step === 1 ? "Configure o essencial; detalhes avançados ficam dentro de cada atividade." : "Jornadas em andamento serão preservadas"}
           </span>
           <div>
+            {step === 2 && !readOnly && <Button variant="ghost" onClick={() => { setError(""); setStep(1); }}>Voltar para editar</Button>}
             <Button variant="secondary" onClick={onClose}>
               Fechar
             </Button>
             {!readOnly && (
               <Button type="submit" loading={busy}>
-                Salvar modelo
+                {step === 1 ? "Revisar modelo" : "Salvar modelo"}
                 <CheckCheck size={16} />
               </Button>
             )}

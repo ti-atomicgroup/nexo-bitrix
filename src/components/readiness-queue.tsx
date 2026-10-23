@@ -59,8 +59,8 @@ export function ReadinessQueue({ workspace, onJourney }: { workspace: Workspace;
         <div className="readiness-title-block">
           <span className="readiness-icon" aria-hidden="true"><Clock3 size={19} /></span>
           <div>
-            <h2 id="readiness-title">Próximos prazos e pendências</h2>
-            <p>O que pede atenção agora, começando pelos acessos de TI.</p>
+            <h2 id="readiness-title">Radar de prontidão</h2>
+            <p>Pendências sinalizadas e prazos de TI que pedem acompanhamento.</p>
           </div>
         </div>
         <div className="readiness-summary" aria-live="polite">

@@ -35,3 +35,15 @@ it("aceita formato form e rejeita segredo ou portal divergentes", () => {
   expect(() => events.receive({ ...form, "auth[application_token]": "wrong-secret" })).toThrow();
   expect(() => events.receive({ ...form, "auth[domain]": "evil.bitrix24.com" })).toThrow();
 });
+it("extrai ID da tarefa de atualizações e rejeita evento de tarefa sem ID", () => {
+  const { env, store, events } = setup();
+  events.configureOutgoingToken("outgoing-secret-123456789");
+  const auth = { application_token: "outgoing-secret-123456789", domain: env.portalDomain };
+  events.receive({ event: "ONTASKUPDATE", ts: "update-1", auth, data: { FIELDS_AFTER: { ID: "321" } } });
+  events.receive({ event: "ONTASKUPDATE", ts: "update-1", auth, data: { FIELDS_AFTER: { ID: "321" } } });
+  expect(store.nextJobs()).toHaveLength(1);
+  expect(JSON.parse(store.nextJobs()[0]?.body ?? "{}")).toEqual({ event: "ONTASKUPDATE", taskId: "321" });
+  expect(() => events.receive({ event: "ONTASKDELETE", ts: "delete-1", auth, data: { FIELDS: {} } })).toThrow();
+  events.receive({ event: "ONTASKUPDATE", ts: "update-2", auth, "data[FIELDS_AFTER][ID]": "322" });
+  expect(store.nextJobs()).toHaveLength(2);
+});

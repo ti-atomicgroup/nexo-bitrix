@@ -38,6 +38,7 @@ import {
   statusSchema,
   taskSchema,
   templateSchema,
+  trailSuggestionSchema,
   workspaceSchema,
 } from "@/shared/validation";
 import { ApiClient, errorMessage, RequestError } from "@/lib/client";
@@ -204,6 +205,9 @@ export function NexoApp() {
       "Jornada iniciada. A criação das tarefas será acompanhada pelo Nexo.",
     );
   }
+  async function suggestTrail(description: string, templateId: string) {
+    return api.request("/api/ai/onboarding-trail", trailSuggestionSchema, { description, templateId });
+  }
   async function saveTemplate(template: JourneyTemplate, isNew: boolean) {
     await api.request(
       isNew
@@ -345,7 +349,7 @@ export function NexoApp() {
               aria-current={view === item.view ? "page" : undefined}
             >
               <item.icon size={18} />
-              <span>{item.label}</span>
+              <span>{item.view === "journeys" && !workspace.session.canManage ? "Minha trilha" : item.label}</span>
               {item.view === "tasks" && myPending > 0 && (
                 <span className="nav-count">{myPending}</span>
               )}
@@ -411,6 +415,10 @@ export function NexoApp() {
             <kbd>⌃ K</kbd>
           </label>
           <div className="topbar-actions">
+            <span className="topbar-sync-status" aria-live="polite">
+              <span className={`dot ${syncBusy ? "is-syncing" : ""}`} aria-hidden="true" />
+              {syncBusy ? "Sincronizando" : timeAgo(workspace.lastSyncAt)}
+            </span>
             <button
               className={`icon-button ${syncBusy ? "is-syncing" : ""}`}
               disabled={syncBusy}
@@ -483,6 +491,7 @@ export function NexoApp() {
               onCreate={createJourney}
               filterDate={filterDate}
               onClearDate={() => setFilterDate("")}
+              onDate={setFilterDate}
             />
           )}
           {view === "tasks" && (
@@ -568,6 +577,8 @@ export function NexoApp() {
       {modal === "journey" && (
         <JourneyForm
           workspace={workspace}
+          aiConfigured={status?.aiConfigured === true}
+          onSuggestTrail={suggestTrail}
           onClose={() => setModal(null)}
           onSubmit={create}
         />

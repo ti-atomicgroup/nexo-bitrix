@@ -2,7 +2,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes, scryptSync, 
 import { existsSync } from "node:fs";
 import { AppError } from "./errors";
 
-export interface Environment { encryptionKey: string; setupToken: string; appUrl: string; portalUrl: string; portalDomain: string; dataDir: string }
+export interface Environment { encryptionKey: string; setupToken: string; appUrl: string; portalUrl: string; portalDomain: string; dataDir: string; aiBaseUrl: string | null; aiModel: string | null; aiApiKey: string | null; aiConfigured: boolean }
 const required = ["NEXO_ENCRYPTION_KEY", "NEXO_SETUP_TOKEN", "NEXO_APP_URL", "BITRIX_PORTAL_URL"];
 export function missingEnvironment(env: Record<string, string | undefined> = process.env): string[] {
   return required.filter(key => !env[key]);
@@ -17,7 +17,17 @@ export function validateEnvironment(env: Record<string, string | undefined> = pr
   if (portal.protocol !== "https:" || portal.username || portal.password || portal.port || portal.search || portal.hash || portal.pathname !== "/" || !/^[a-z0-9][a-z0-9-]*\.(?:bitrix24\.(?:com|com\.br|es|eu|de|fr|it|pl|ru|cn|in|com\.tr)|bitrix24site\.com)$/i.test(portal.hostname)) throw new AppError("PORTAL_INVALID", "BITRIX_PORTAL_URL deve ser a origem HTTPS de um portal Bitrix24 cloud.", 503);
   const app = new URL(env.NEXO_APP_URL ?? "");
   if (app.username || app.password || app.search || app.hash || (app.protocol !== "https:" && !(app.protocol === "http:" && ["localhost", "127.0.0.1"].includes(app.hostname)))) throw new AppError("APP_URL_INVALID", "NEXO_APP_URL deve ser HTTPS; localhost HTTP é permitido no desenvolvimento.", 503);
-  return { encryptionKey, setupToken, appUrl: app.origin, portalUrl: portal.origin, portalDomain: portal.hostname, dataDir: env.NEXO_DATA_DIR || (existsSync("/app/.data") ? "/app/.data" : "./data") };
+  const rawAiUrl = env.NEXO_AI_BASE_URL?.trim() || "", aiModel = env.NEXO_AI_MODEL?.trim() || "", aiApiKey = env.NEXO_AI_API_KEY?.trim() || "";
+  let aiBaseUrl: string | null = null;
+  if (rawAiUrl) {
+    try {
+      const aiUrl = new URL(rawAiUrl);
+      const localHttp = app.hostname === "localhost" || app.hostname === "127.0.0.1";
+      if ((aiUrl.protocol === "https:" || (localHttp && aiUrl.protocol === "http:" && ["localhost", "127.0.0.1"].includes(aiUrl.hostname))) && !aiUrl.username && !aiUrl.password && !aiUrl.search && !aiUrl.hash) aiBaseUrl = aiUrl.origin + aiUrl.pathname.replace(/\/+$/, "");
+    } catch { /* optional integration stays disabled on invalid configuration */ }
+  }
+  const aiConfigured = Boolean(aiBaseUrl && aiModel && aiApiKey);
+  return { encryptionKey, setupToken, appUrl: app.origin, portalUrl: portal.origin, portalDomain: portal.hostname, dataDir: env.NEXO_DATA_DIR || (existsSync("/app/.data") ? "/app/.data" : "./data"), aiBaseUrl: aiConfigured ? aiBaseUrl : null, aiModel: aiConfigured ? aiModel : null, aiApiKey: aiConfigured ? aiApiKey : null, aiConfigured };
 }
 export function portalFromDomain(domain: string, env: Environment): string {
   if (domain.toLowerCase() !== env.portalDomain) throw new AppError("PORTAL_MISMATCH", "Portal não autorizado.", 403);

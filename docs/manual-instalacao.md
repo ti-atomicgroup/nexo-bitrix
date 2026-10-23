@@ -48,13 +48,19 @@ Copie cada valor diretamente para a variável correspondente na Onnira. Trate-os
 
 Ative o volume persistente da Onnira no caminho `/app/.data`. Salve as variáveis e mande a Onnira republicar/reiniciar a aplicação. A página deve abrir na URL publicada e mostrar o assistente de instalação.
 
+### Ativar sugestões opcionais por IA
+
+Para habilitar a trilha guiada, adicione também `NEXO_AI_BASE_URL` (endpoint HTTPS compatível com OpenAI Chat Completions, sem `/chat/completions`), `NEXO_AI_MODEL` e `NEXO_AI_API_KEY`. Os três valores ficam somente como segredos/variáveis no servidor da Onnira. Sem qualquer um deles, a abertura manual continua disponível e a tela informa que a sugestão está desabilitada. Não cole a chave no Nexo ou no Git.
+
+Ao pedir uma sugestão, o RH cola a descrição da vaga. O Nexo envia essa descrição e o catálogo do modelo escolhido ao provedor configurado; não envia nome, e-mail ou identificador do colaborador. O texto da vaga é mantido apenas durante a solicitação e não é salvo pelo Nexo. Antes de usar com dados internos, confirme a política de retenção e uso de dados do provedor contratado pela empresa. O RH revisa e aprova as tarefas e prazos antes de iniciar a jornada. Competências sem atividade correspondente são mostradas como lacunas para decisão humana.
+
 ## 3. Crie o webhook de entrada no Bitrix
 
 O webhook de entrada permite que o Nexo consulte o Bitrix e crie tarefas em nome do usuário de serviço.
 
 1. Entre no portal [helpbr24.bitrix24.com.br](https://helpbr24.bitrix24.com.br) com o usuário de serviço de RH.
 2. Abra **Aplicativos → Recursos do desenvolvedor → Webhooks → Webhook de entrada**. Os nomes dos menus podem variar um pouco conforme a interface do portal.
-3. Conceda os escopos `task`, `user_brief` (ou `user`), `crm` e `userfieldconfig` se for criar campos pelo assistente.
+3. Conceda os escopos `task`, `user_brief` (ou `user`), `crm`, `sonet` e `userfieldconfig`. `sonet` permite preparar o projeto RH; `userfieldconfig` permite criar campos do processo.
 4. Crie o webhook e copie a URL completa, inclusive a parte secreta. O Bitrix só mostra essa credencial durante a criação.
 5. Em outra aba, abra a URL publicada do Nexo. No assistente, cole a URL completa do webhook de entrada e o valor de `NEXO_SETUP_TOKEN`; escolha **Testar conexão**.
 6. Quando a validação passar, crie o primeiro administrador local do Nexo. Vincule o mesmo usuário Bitrix que criou o webhook.
@@ -63,9 +69,9 @@ Se a validação indicar escopos ausentes, edite ou crie novamente o webhook com
 
 ## 4. Configure o processo e os modelos
 
-No assistente do Nexo, configure o processo **Movimentações de Pessoas** ou selecione um processo que já exista. O app consulta campos e etapas disponíveis no Bitrix; nenhum ID precisa ser copiado para o código.
+No assistente do Nexo, configure o processo **Movimentações de Pessoas** ou selecione um processo que já exista. O app consulta campos e etapas disponíveis no Bitrix; nenhum ID precisa ser copiado para o código. A preparação também cria uma vez o projeto privado **Nexo · RH** para as tarefas e o Kanban.
 
-Depois, escolha os responsáveis de RH e TI, revise os modelos iniciais de onboarding e offboarding e ajuste atividades, prazos, instruções e obrigatoriedade. A tarefa de preparação para TI é calculada para três dias úteis antes da entrada e um dia útil antes da saída. Feriados não são descontados até haver calendário configurado.
+Depois, adicione os profissionais de RH como participantes do projeto no Bitrix24, escolha os responsáveis de RH e TI, revise os modelos iniciais de onboarding e offboarding e ajuste atividades, prazos, instruções e obrigatoriedade. Crie modelos por perfil, como RH, Vendedor ou Liderança. Na abertura, o RH escolhe explicitamente o modelo e revisa as etapas antes de iniciar. A tarefa de preparação para TI é calculada para três dias úteis antes da entrada e um dia útil antes da saída. Feriados não são descontados até haver calendário configurado.
 
 Faça o primeiro teste com dados fictícios: inicie uma jornada manual, abra a tarefa criada no Bitrix, confira responsável, prazo e checklist e marque uma atividade concluída. O teste de offboarding também deve ser feito com uma pessoa fictícia; o Nexo registra solicitações para revogar acessos, enquanto a equipe responsável realiza e confirma as ações nos outros sistemas.
 
@@ -73,11 +79,11 @@ Faça o primeiro teste com dados fictícios: inicie uma jornada manual, abra a t
 
 O início manual funciona sem este passo. Para iniciar jornadas quando uma aprovação muda de etapa no Bitrix, crie um webhook de saída:
 
-1. No Bitrix, abra a área de webhooks de saída/eventos e assine o evento `ONCRMDYNAMICITEMUPDATE`.
+1. No Bitrix, abra a área de webhooks de saída/eventos e assine `ONCRMDYNAMICITEMUPDATE` para aprovações e `ONTASKUPDATE` para sincronizar movimentações no Kanban. `ONTASKDELETE` pode ser usado para sinalizar tarefas removidas.
 2. No Nexo, abra **Configurações → Conexão** e copie a URL do handler de eventos, terminada em `/api/bitrix/events`.
 3. Cole essa URL no Bitrix e salve a configuração do evento.
 4. Copie o token emitido/configurado para proteger o envio e registre-o nas configurações de conexão do Nexo.
-5. Mude um registro fictício de movimentação para a etapa de aprovação configurada e confira se uma única jornada foi criada.
+5. Mude um registro fictício para a etapa de aprovação configurada e confira se uma única jornada foi criada. Depois mova uma tarefa fictícia entre colunas do Kanban e confirme a atualização no Nexo.
 
 Webhook de entrada significa **Nexo chama o Bitrix**. Webhook de saída significa **Bitrix avisa o Nexo** quando o registro muda. Não use o endereço do webhook de entrada como endereço do evento.
 
@@ -86,7 +92,7 @@ Webhook de entrada significa **Nexo chama o Bitrix**. Webhook de saída signific
 | O que você vê | O que conferir |
 | --- | --- |
 | Página informa que falta configuração | Confira as quatro variáveis principais (`NEXO_APP_URL`, `BITRIX_PORTAL_URL`, `NEXO_ENCRYPTION_KEY`, `NEXO_SETUP_TOKEN`), salve e reinicie na Onnira. |
-| `SCOPES_MISSING` | Recrie o webhook de entrada com `task`, `user_brief` ou `user`, `crm` e, quando necessário, `userfieldconfig`; atualize a URL no Nexo. |
+| `SCOPES_MISSING` | Recrie o webhook de entrada com `task`, `user_brief` ou `user`, `crm`, `sonet` e `userfieldconfig`; atualize a URL no Nexo. |
 | Bitrix retorna 403 ou acesso negado | Confira permissões do usuário que criou o webhook. O Bitrix aplica as permissões dessa conta às operações do Nexo. |
 | Início automático não acontece | Confira a URL `/api/bitrix/events`, assinatura do evento, token de saída e regra que associa a etapa de aprovação a um modelo. |
 | Dados somem após republicar | Ative o volume persistente em `/app/.data` e mantenha o mesmo valor de `NEXO_ENCRYPTION_KEY`. |
@@ -101,6 +107,7 @@ Para suporte, anote horário, ação, mensagem/código de erro e identificador d
 - [ ] Webhook de entrada passou no teste de conexão.
 - [ ] Administrador local está vinculado ao usuário Bitrix correto.
 - [ ] Uma jornada manual de teste criou tarefas reais no Bitrix.
+- [ ] Projeto privado Nexo · RH está acessível aos profissionais RH convidados no Bitrix.
 - [ ] (Opcional) Evento de saída iniciou exatamente uma jornada no teste.
 - [ ] Backup seguro da chave de criptografia foi guardado.
 

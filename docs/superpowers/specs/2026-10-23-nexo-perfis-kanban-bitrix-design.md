@@ -1,12 +1,12 @@
 # Nexo — modelos por perfil e Kanban de tarefas Bitrix
 
-**Estado:** direção aprovada pelo usuário em 23/10/2026; revisão do texto atualizada solicitada após feedback sobre a quantidade de informação na tela.
+**Estado:** direção da trilha assistida por IA aprovada em 23/10/2026; Feedz registrada como inspiração conceitual, sem reproduzir sua interface ou fluxos.
 
 ## Problema e resultado
 
 O Nexo já permite configurar etapas, atividades, prazos relativos, responsáveis, checklists e materiais, e cria tarefas nativas no Bitrix24. Também consulta novamente status, prazo, responsável e checklist das tarefas. Hoje, porém, os modelos não distinguem o perfil profissional de quem está entrando, as tarefas não são agrupadas num projeto RH com Kanban e eventos de tarefa não atualizam diretamente a atividade correspondente.
 
-O resultado desejado é permitir que People configure modelos diferentes por perfil — como RH, Vendas ou TI —, escolha o modelo adequado ao abrir uma jornada e acompanhe as atividades no Kanban nativo do projeto Bitrix. O Bitrix permanece a referência operacional das tarefas; o Nexo mantém o contexto da jornada e reflete as alterações dos dois lados.
+O resultado desejado é permitir que People configure modelos diferentes por perfil — como RH, Vendas ou TI —, escolha o modelo adequado ao abrir uma jornada e acompanhe as atividades no Kanban nativo do projeto Bitrix. Para onboarding, uma assistente de IA poderá comparar a descrição da vaga com competências e atividades aprovadas por RH, sugerindo uma trilha que o RH revisa antes de iniciar. O Bitrix permanece a referência operacional das tarefas; o Nexo mantém o contexto da jornada e reflete as alterações dos dois lados.
 
 A interface do Nexo deve ser didática e sucinta para o profissional que executa o processo. Cada tela deve mostrar o próximo passo e as informações necessárias para realizá-lo, deixando detalhes secundários e controles avançados para quando forem solicitados.
 
@@ -19,6 +19,11 @@ A interface do Nexo deve ser didática e sucinta para o profissional que executa
 - As regras de aprovação automática existentes continuam apontando diretamente para um modelo específico.
 - Cada jornada guarda a versão do modelo usada na criação. Alterar ou arquivar um modelo não modifica jornadas em andamento.
 - Cada atividade, incluindo entrevista e sessões 1:1 em momentos diferentes, é uma tarefa própria no Bitrix. O prazo é informado como deslocamento em dias corridos ou úteis em relação à data principal da jornada.
+- A trilha de onboarding pode ser adaptada a partir da descrição de cargo: a IA recomenda conteúdo e atividades catalogados pelo RH, distribui-os em etapas e sugere prazos. RH revisa e aprova a trilha antes de qualquer criação de tarefa; a IA não avalia nem pontua o colaborador.
+- Feedz é apenas inspiração conceitual para organizar etapas, materiais e progresso. O Nexo terá identidade visual e fluxo próprios, desenhados em torno da revisão do RH e da execução real no Kanban e nas tarefas do Bitrix; não reproduzirá telas, textos ou fluxos da Feedz.
+- A descrição da vaga é colada pelo RH durante a abertura. O Nexo envia o texto somente ao provedor configurado no servidor, não o guarda após a análise e persiste apenas a trilha aprovada e suas justificativas. A empresa deve configurar um provedor cuja política de retenção seja compatível com a sua.
+- As atividades dos modelos podem ter competências associadas para permitir correspondência rastreável. A IA só recomenda atividades e materiais que RH já aprovou; competências sem cobertura ficam explícitas para revisão, sem inventar uma atividade pronta.
+- O provedor de IA é opcional, configurado por variáveis secretas na Onnira por um administrador. A interface não recebe nem persiste a chave. Sem configuração ou em caso de indisponibilidade, a abertura manual por modelo continua funcionando.
 - A fonte oficial para status, etapa do Kanban, responsável, prazo e checklist das tarefas é o Bitrix. O Nexo também pode solicitar ações operacionais existentes, como iniciar/concluir tarefa e concluir itens de checklist, sempre gravando no Bitrix.
 - Continuar no modo webhook-only. O evento `ONTASKUPDATE` será cadastrado no painel de webhook de saída do Bitrix e validado no handler Nexo. O webhook de entrada não pode chamar `event.bind`; essa limitação está documentada pelo Bitrix.
 
@@ -35,6 +40,12 @@ Radar, calendário, histórico e tabela completa de jornadas não ocupam a home.
 O início de jornada é um fluxo curto: selecionar pessoa, tipo/perfil do processo e data; revisar o modelo escolhido, as atividades e os responsáveis; iniciar. A tela exibe cargo e departamento do Bitrix como contexto, sem duplicar esses dados em vários painéis.
 
 A configuração de modelo também será guiada. Primeiro, RH informa tipo, nome e perfil. Depois, organiza etapas e atividades numa lista simples, onde prazo e responsável ficam à vista. Checklist, criticidade, visibilidade e materiais ficam sob **Mais detalhes** em cada atividade. Uma revisão final resume etapas, tarefas e prazos antes de salvar. O texto explica o significado dos campos com exemplos curtos, como “1:1 de 30 dias — 30 dias após a admissão”.
+
+### Trilha de onboarding assistida
+
+Na abertura de um onboarding, RH pode colar a descrição da vaga e selecionar um modelo de referência. A IA extrai competências e resultados esperados, compara-os às competências associadas às atividades e materiais que RH já aprovou e prepara uma sugestão por etapas. Cada item recomendado explica a competência atendida e a evidência textual que motivou a sugestão. Itens sem correspondência no catálogo ficam em uma lista de lacunas para o RH decidir se cadastra uma atividade.
+
+RH pode remover, reordenar e ajustar atividades, prazos e responsáveis antes de aprovar. A etapa de revisão mostra duração, conteúdos e cobertura das competências de forma simples. Ao confirmar, o Nexo congela o plano aprovado na jornada e só então cria as tarefas no Bitrix. A trilha do colaborador apresenta as etapas, prazos, materiais, tarefas visíveis para ele e progresso concluído; detalhes internos de RH continuam ocultos. A IA não cria, move nem conclui tarefas por conta própria.
 
 ### Projeto RH e conexão
 
@@ -66,6 +77,8 @@ O projeto RH será privado, e apenas usuários autorizados de RH poderão abrir 
 
 Os dados operacionais sensíveis, como justificativas internas de desligamento ou anotações da entrevista de saída, não devem ser copiados para o título ou descrição da tarefa. Cada tarefa contém somente informação suficiente para executar a atividade, de acordo com sua visibilidade.
 
+A IA recebe somente a descrição profissional fornecida pelo RH e os metadados do catálogo necessários à correspondência; não recebe nome, e-mail, perfil pessoal ou histórico do colaborador. A chave do provedor permanece em segredo de servidor. Conteúdo retornado pelo modelo é validado contra o contrato e as atividades existentes antes de ser exibido. O RH é responsável por revisar a recomendação; nenhum atributo pessoal é inferido ou avaliado.
+
 ## Erros e estados
 
 - Escopo `sonet` ausente ou falta de permissão para criar o projeto: impedir provisionamento e mostrar o requisito que falta.
@@ -87,10 +100,14 @@ Os dados operacionais sensíveis, como justificativas internas de desligamento o
 8. Confirmar que a home apresenta a próxima atividade com colaborador, prazo, responsável e uma ação principal; itens de referência e histórico ficam em suas seções próprias.
 9. Confirmar que início e configuração de modelos seguem passos curtos, linguagem simples, revisão antes de salvar e detalhes avançados recolhidos.
 10. Executar testes de domínio e API, validação de tipos, lint, build e testes de navegador nas telas de home, modelos, abertura de jornada, projeto e detalhe da tarefa.
+11. Gerar uma recomendação com uma descrição fictícia, confirmar competências, atividades e materiais justificáveis, lacunas explícitas e ausência de dados pessoais no payload.
+12. Alterar e aprovar a trilha, então confirmar que apenas a versão revisada gera tarefas, prazos, responsáveis, checklists e materiais no Bitrix.
+13. Visualizar a trilha como colaborador e confirmar etapas, conteúdos e progresso, sem tarefas ou campos internos de RH.
+14. Simular chave de IA ausente, erro do provedor, saída inválida e timeout; confirmar fallback manual e ausência de tarefas parciais ou duplicadas.
 
 ## Delimitação
 
-Esta especificação cobre modelos de onboarding por perfil e tarefas nativas organizadas no projeto/Kanban privado do Bitrix, com atualização bidirecional entre a execução operacional do Bitrix e o contexto Nexo. Não inclui Kanban duplicado no Nexo, criação automática de usuários em outros serviços, revogação efetiva de acessos externos, nem sincronização de mudanças de modelo para jornadas ativas.
+Esta especificação cobre modelos de onboarding por perfil, recomendação assistida por IA com aprovação humana, acompanhamento simplificado do colaborador e tarefas nativas organizadas no projeto/Kanban privado do Bitrix. Não inclui Kanban duplicado no Nexo, avaliação de candidatos ou colaboradores, geração autônoma de política ou tarefa, criação automática de usuários em outros serviços, revogação efetiva de acessos externos, nem sincronização de mudanças de modelo para jornadas ativas.
 
 ## Referências oficiais
 
@@ -100,3 +117,7 @@ Esta especificação cobre modelos de onboarding por perfil e tarefas nativas or
 - [Bitrix24 — Criar projeto ou grupo](https://apidocs.bitrix24.com/api-reference/sonet-group/sonet-group-create.html)
 - [Bitrix24 — Etapas do Kanban de tarefas](https://apidocs.bitrix24.com/api-reference/tasks/stages/index.html)
 - [Bitrix24 — event.bind](https://apidocs.bitrix24.com/api-reference/events/event-bind.html)
+- [Feedz — Trilhas por cargo e departamento](https://www.feedz.com.br/trilhas/)
+- [TOTVS — Onboarding com etapas, prazos e conteúdos multimídia na linha Feedz](https://produtos.totvs.com/ficha-tecnica/tudo-sobre-o-totvs-rh-metas-e-objetivos-linha-feedz/)
+
+As referências Feedz/TOTVS servem somente para identificar princípios de organização de trilhas. O desenho visual e operacional do Nexo será original e específico à integração com Bitrix24.

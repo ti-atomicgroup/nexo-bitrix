@@ -2,21 +2,21 @@
 
 ## Identidade e autorização
 
-O Nexo utiliza a identidade Bitrix de quem abriu a aplicação. Credenciais de cada usuário são separadas; ações interativas não utilizam o token administrativo de outro usuário. Papéis Nexo são uma restrição adicional às permissões efetivas do portal.
+O Nexo usa contas locais para autenticar profissionais. Operações Bitrix e eventos em segundo plano usam somente a identidade da conta de RH que criou o webhook de entrada. Essa conta de serviço precisa ter permissões efetivas suficientes para cada método; papéis Nexo restringem quem pode administrar o app, enquanto permissões do Bitrix continuam valendo para tarefas e projeto.
 
 A primeira instalação requer administrador verificado pelo Bitrix e segredo de bootstrap definido na hospedagem. As próximas aberturas e eventos validam o portal, `member_id` e o token da aplicação preservado na instalação. O domínio cloud autorizado é fixado por variável de ambiente; endpoints arbitrários recebidos em eventos não são utilizados.
 
 ## Credenciais e sessões
 
-Tokens OAuth, segredo da aplicação e token de verificação são cifrados com AES-256-GCM. A chave de criptografia pertence à configuração da hospedagem e deve ficar fora do código e do banco. Não alterar essa chave sem procedimento de migração; a perda impede recuperar as credenciais cifradas.
+URL do webhook de entrada e token do webhook de saída são cifrados com AES-256-GCM. A chave de criptografia pertence à configuração da hospedagem e deve ficar fora do código e do banco. Não alterar essa chave sem procedimento de migração; a perda impede recuperar as credenciais cifradas.
 
-As sessões do Nexo usam tokens aleatórios, armazenados por hash no banco e mantidos em memória no frame do navegador. O contexto de abertura é retirado do fragmento da URL depois da leitura. OAuth e segredos não são enviados como dados do workspace, gravados em localStorage ou incluídos nos logs. A sessão expira; para renovar o contexto, reabra a aplicação pelo portal.
+As sessões do Nexo usam tokens aleatórios, armazenados por hash no banco e mantidos em memória no navegador. Credenciais Bitrix não são enviadas como dados do workspace, gravadas em localStorage ou incluídas nos logs. A sessão expira; entre novamente com sua conta local do Nexo.
 
 ## Dados mantidos
 
 O SQLite contém modelos, snapshots das jornadas, usuários necessários ao processo, vínculos com tarefas e movimentações, checklists, configurações, auditoria e fila de sincronização. Informações operacionais podem conter dados pessoais e exigem proteção do volume e dos backups. A biblioteca de materiais utiliza links para arquivos existentes no Bitrix, sob suas permissões originais.
 
-Escopos utilizados: `task`, `user_brief`, `crm` e `userfieldconfig` para provisionar campos. A aplicação não solicita escopo completo de alteração de usuários nem executa desligamentos ou revogações em outros sistemas.
+Escopos utilizados: `task`, `user_brief` (ou `user`), `crm`, `sonet` para o projeto privado RH e `userfieldconfig` para provisionar campos. O projeto não recebe membros não-RH automaticamente. A aplicação não solicita escopo completo de alteração de usuários nem executa desligamentos ou revogações em outros sistemas.
 
 ## Automação e confiabilidade
 
@@ -35,3 +35,7 @@ Use `npm run backup` para produzir uma cópia consistente pela API SQLite. A có
 Em suspeita de vazamento, revogue a chave/tokens no Bitrix e restrinja a instalação antes de retomar a integração. Preserve os registros necessários à investigação sem divulgar credenciais. O administrador deve definir a retenção de históricos e backups conforme sua política; esta versão não possui expurgo automático. Solicitações de exclusão exigem procedimento administrativo que considere banco, backups e registros nativos do Bitrix.
 
 A homologação real de permissões e implantação ainda é obrigatória antes do uso com pessoas reais.
+
+## Sugestões opcionais por IA
+
+O provedor é configurado no servidor da Onnira pelas variáveis `NEXO_AI_BASE_URL`, `NEXO_AI_MODEL` e `NEXO_AI_API_KEY`; a chave não é retornada em status nem enviada ao navegador. Sem configuração completa, o fluxo manual segue ativo. A descrição profissional colada pelo RH é encaminhada ao provedor configurado sem dados pessoais do colaborador e não é persistida pelo Nexo. O administrador deve validar contrato, região e política de retenção do provedor antes de habilitar. Respostas são estruturadas e validadas contra o modelo: IDs externos, novos procedimentos ou alterações de responsável são rejeitados. A recomendação não inicia tarefas; RH revisa e confirma o plano.

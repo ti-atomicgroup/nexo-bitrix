@@ -26,7 +26,7 @@ export class BitrixClient {
   }
 
   private async webhookRequest(webhook: { userId: string; secret: string }, method: string, params: Record<string, unknown>): Promise<{ result: unknown; next?: number }> {
-    if (!/^[a-z][a-z0-9.]*$/i.test(method)) throw new AppError("METHOD_INVALID", "Método Bitrix inválido.");
+    if (!/^[a-z][a-z0-9._]*$/i.test(method)) throw new AppError("METHOD_INVALID", "Método Bitrix inválido.");
     const throttle = this.store.get("throttle", "portal", throttleSchema);
     if (throttle && throttle.until > Date.now()) throw new BitrixError("RATE_LIMIT", true);
     let response: Response;
@@ -77,6 +77,12 @@ export class BitrixClient {
     const raw = result[0];
     if (!raw) throw new AppError("USER_UNAVAILABLE", "Usuário não está disponível para esta conta.", 403);
     return parseUser(raw);
+  }
+
+  async createRhProject(name: string, userId: string): Promise<{ id: string; name: string; url: string }> {
+    const result = await this.call(userId, "sonet_group.create", { NAME: name, DESCRIPTION: "Quadro privado de tarefas dos processos de Pessoas geridos pelo Nexo.", PROJECT: "Y", VISIBLE: "N", OPENED: "N", INITIATE_PERMS: "A" });
+    const id = text(result);
+    return { id, name, url: `${this.env.portalUrl}/workgroups/group/${id}/` };
   }
 
   private rateLimit(retryAfter: string | null): never {

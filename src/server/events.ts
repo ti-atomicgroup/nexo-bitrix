@@ -5,7 +5,7 @@ import { AppError } from "./errors";
 import { integer, record, outgoingWebhookSchema } from "./models";
 import { decrypt, encrypt, portalFromDomain, safeEqual } from "./security";
 import { Store } from "./store";
-export const eventJobSchema = z.object({ event: z.string(), entityTypeId: z.number().int().nonnegative().optional(), itemId: z.number().int().positive().optional() });
+export const eventJobSchema = z.object({ event: z.string(), entityTypeId: z.number().int().nonnegative().optional(), itemId: z.number().int().positive().optional(), taskId: z.string().regex(/^[1-9]\d{0,15}$/).optional() });
 export type EventJob = z.infer<typeof eventJobSchema>;
 export class Events {
   constructor(readonly store: Store, readonly auth: Auth) {}
@@ -25,6 +25,16 @@ export class Events {
     if (event.startsWith("ONCRMDYNAMIC")) {
       const fields = body.data === undefined ? { ID: body["data[FIELDS][ID]"], ENTITY_TYPE_ID: body["data[FIELDS][ENTITY_TYPE_ID]"] } : record(record(body.data).FIELDS);
       job = { event, itemId: integer(fields.ID), entityTypeId: integer(fields.ENTITY_TYPE_ID) };
+    } else {
+      const data = body.data === undefined ? null : record(body.data);
+      const fieldsAfter = data?.FIELDS_AFTER === undefined ? undefined : record(data.FIELDS_AFTER);
+      const fieldsBefore = data?.FIELDS_BEFORE === undefined ? undefined : record(data.FIELDS_BEFORE);
+      const flatFields = { ID: body["data[FIELDS_AFTER][ID]"] ?? body["data[FIELDS_BEFORE][ID]"] ?? body["data[FIELDS][ID]"] };
+      const taskIdValue = fieldsAfter?.ID ?? fieldsBefore?.ID ?? flatFields.ID;
+      if (event === "ONTASKUPDATE" || event === "ONTASKDELETE" || event === "ONTASKADD") {
+        if (taskIdValue === undefined || taskIdValue === null || !/^[1-9]\d{0,15}$/.test(String(taskIdValue))) throw new AppError("TASK_EVENT_ID", "O evento de tarefa não contém um ID válido.", 400);
+        job = { event, taskId: String(taskIdValue) };
+      }
     }
     const ts = z.union([z.string(), z.number()]).optional().parse(body.ts);
     const handlerId = body.event_handler_id === undefined ? null : String(body.event_handler_id);
