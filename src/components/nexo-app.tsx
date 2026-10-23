@@ -1,6 +1,5 @@
 "use client";
 
-import Script from "next/script";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import {
@@ -41,12 +40,7 @@ import {
   templateSchema,
   workspaceSchema,
 } from "@/shared/validation";
-import {
-  ApiClient,
-  consumeLaunchHash,
-  errorMessage,
-  RequestError,
-} from "@/lib/client";
+import { ApiClient, errorMessage, RequestError } from "@/lib/client";
 import { appRoleLabels, timeAgo } from "@/lib/format";
 import { Avatar, Button, Logo, Modal } from "./ui";
 import {
@@ -84,12 +78,8 @@ const navItems: {
 
 export function NexoApp() {
   const [api] = useState(() => new ApiClient());
-  const launchRef = useRef<ReturnType<typeof consumeLaunchHash> | undefined>(
-    undefined,
-  );
   const [status, setStatus] = useState<PublicStatus | null>(null);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
-  const [bootstrap, setBootstrap] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [view, setView] = useState<View>("overview");
@@ -118,35 +108,19 @@ export function NexoApp() {
     (error: unknown) => {
       setError(errorMessage(error));
       if (error instanceof RequestError && error.status === 401) {
-        api.setToken("");
         setWorkspace(null);
       }
     },
-    [api],
+    [],
   );
   useEffect(() => {
-    if (launchRef.current === undefined)
-      launchRef.current = consumeLaunchHash(window.location.hash);
-    const launch = launchRef.current;
-    if (window.location.hash)
-      window.history.replaceState(
-        null,
-        "",
-        window.location.pathname + window.location.search,
-      );
     let active = true;
     async function initialize() {
       const nextStatus = await api.request("/api/status", statusSchema);
       if (!active) return;
       setStatus(nextStatus);
-      if (launch) {
-        api.setToken(launch.token);
-        if (launch.kind === "bootstrap") setBootstrap(true);
-        else {
-          const next = await reload();
-          if (!next.settings.setupComplete) setView("settings");
-        }
-      }
+      try { const next = await reload(); if (!next.settings.setupComplete) setView("settings"); }
+      catch (error) { if (!(error instanceof RequestError && error.status === 401)) throw error; }
     }
     initialize()
       .catch((error) => {
@@ -194,20 +168,32 @@ export function NexoApp() {
     }
     setModal("journey");
   }
+  async function connectWebhook(url: string, setupToken: string) {
+    await api.request("/api/setup", z.object({ connected: z.boolean() }), { action: "connect-webhook", url, setupToken });
+    const next = await api.request("/api/status", statusSchema); setStatus(next);
+  }
   async function bootstrapInstall(values: {
     setupToken: string;
-    clientId: string;
-    clientSecret: string;
+    email: string;
+    password: string;
+    bitrixUserId: string;
   }) {
     const result = await api.request(
       "/api/setup",
-      z.object({ token: z.string(), session: sessionSchema }),
-      { action: "bootstrap", ...values },
+      z.object({ session: sessionSchema }),
+      { action: "bootstrap-admin", ...values },
     );
-    api.setToken(result.token);
-    setBootstrap(false);
+    void result;
     await reload();
     setView("settings");
+  }
+  async function login(email: string, password: string) {
+    await api.request("/api/auth", z.object({ session: sessionSchema }), { action: "login", email, password });
+    setError(""); await reload();
+  }
+  async function logout() {
+    await api.request("/api/auth", z.object({ loggedOut: z.boolean() }), { action: "logout" });
+    setWorkspace(null); setModal(null); setError("");
   }
   async function create(values: CreateJourneyInput) {
     const journey = await api.request("/api/journeys", journeySchema, values);
@@ -289,17 +275,13 @@ export function NexoApp() {
   if (!workspace)
     return (
       <>
-        <Script
-          src="https://api.bitrix24.com/api/v1/"
-          strategy="afterInteractive"
-          onLoad={() => window.BX24?.init(() => window.BX24?.fitWindow())}
-        />
         <SetupScreen
           status={status}
-          bootstrap={bootstrap}
           loading={loading}
           error={error}
+          onConnect={connectWebhook}
           onBootstrap={bootstrapInstall}
+          onLogin={login}
           onRetry={() => {
             setError("");
             api
@@ -325,11 +307,6 @@ export function NexoApp() {
   const currentNav = allowedNav.find((n) => n.view === view) || allowedNav[0];
   return (
     <div className="app-shell">
-      <Script
-        src="https://api.bitrix24.com/api/v1/"
-        strategy="afterInteractive"
-        onLoad={() => window.BX24?.init(() => window.BX24?.fitWindow())}
-      />
       <a className="skip-link" href="#main-content">
         Ir para o conteúdo
       </a>
@@ -551,8 +528,10 @@ export function NexoApp() {
             <SettingsView
               workspace={workspace}
               api={api}
+              outgoingWebhookConfigured={status?.outgoingWebhookConfigured}
               onUpdated={async () => {
                 await reload();
+                setStatus(await api.request("/api/status", statusSchema));
               }}
               notify={notify}
             />
@@ -736,14 +715,14 @@ export function NexoApp() {
               </div>
               <div>
                 <dt>Autenticação</dt>
-                <dd>Identidade do Bitrix24</dd>
+                <dd>Conta local vinculada ao Bitrix24</dd>
               </div>
             </dl>
             <div className="info-strip">
               <ShieldCheck size={17} />
               <p>
-                O Nexo respeita as permissões da sua conta. Para trocar de
-                usuário, acesse a conta desejada no Bitrix e reabra a aplicação.
+                Suas permissões são definidas pelo papel atribuído no Nexo. As
+                operações no portal usam a conta de serviço do webhook.
               </p>
             </div>
           </div>
@@ -751,6 +730,7 @@ export function NexoApp() {
             <Button variant="secondary" onClick={() => setModal(null)}>
               Fechar
             </Button>
+            <Button variant="ghost" onClick={() => void logout()}>Sair</Button>
             <a
               className="button button-primary"
               href={`https://${workspace.session.portalDomain}`}

@@ -1,35 +1,23 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { ApiClient, consumeLaunchHash } from "../../src/lib/client";
-
-describe("contexto de abertura do frame", () => {
-  it("recupera uma sessão opaca sem aceitar identificadores de usuário", () => {
-    expect(consumeLaunchHash("#session=" + "a".repeat(43))).toEqual({
-      kind: "session",
-      token: "a".repeat(43),
-    });
-    expect(consumeLaunchHash("#userId=1&role=admin")).toBeNull();
-  });
-  it("rejeita contexto ambíguo ou truncado", () => {
-    expect(consumeLaunchHash("#session=abc")).toBeNull();
-    expect(
-      consumeLaunchHash(
-        "#session=" + "a".repeat(43) + "&bootstrap=" + "b".repeat(43),
-      ),
-    ).toBeNull();
-  });
-});
+import { ApiClient } from "../../src/lib/client";
 
 describe("cliente da API", () => {
+  it("envia cookies same-origin sem anexar token Bearer", async () => {
+    let requestInit: RequestInit | undefined;
+    const client = new ApiClient(async (_input, init) => { requestInit = init; return Response.json({ data: { ok: true } }); });
+    await client.request("/api/workspace", z.object({ ok: z.boolean() }));
+    expect(requestInit?.credentials).toBe("same-origin");
+    expect(new Headers(requestInit?.headers).has("Authorization")).toBe(false);
+  });
   it("não envia a sessão para destinos externos", async () => {
-    const client = new ApiClient(() => "secret");
+    const client = new ApiClient();
     await expect(
       client.request("https://example.org/api/workspace", z.unknown()),
     ).rejects.toThrow("inválido");
   });
   it("apresenta mensagem de erro do servidor e preserva o código", async () => {
     const client = new ApiClient(
-      () => "token",
       async () =>
         new Response(
           JSON.stringify({
@@ -50,7 +38,6 @@ describe("cliente da API", () => {
   });
   it("rejeita resposta incompatível em vez de mostrar sucesso", async () => {
     const client = new ApiClient(
-      () => "token",
       async () => new Response(JSON.stringify({ data: { id: null } })),
     );
     await expect(

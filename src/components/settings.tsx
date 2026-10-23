@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import {
   ArrowRight,
   Check,
@@ -56,15 +56,18 @@ const blankProcess = (): ProcessMapping => ({
   completedStageId: "",
   cancelledStageId: "",
 });
+const localAccountSchema = z.object({ id: z.string(), bitrixUserId: z.string(), user: z.object({ id: z.string(), name: z.string(), position: z.string(), department: z.string(), avatar: z.string().optional(), active: z.boolean() }), email: z.string(), role: z.enum(["admin", "rh", "gestor", "executor", "colaborador"]), active: z.boolean(), createdAt: z.string() });
 
 export function SettingsView({
   workspace,
   api,
+  outgoingWebhookConfigured = false,
   onUpdated,
   notify,
 }: {
   workspace: Workspace;
   api: ApiClient;
+  outgoingWebhookConfigured?: boolean;
   onUpdated: () => Promise<void>;
   notify: (message: string) => void;
 }) {
@@ -81,7 +84,14 @@ export function SettingsView({
   const [stages, setStages] = useState<DiscoveryOption[]>([]);
   const [provisionOpen, setProvisionOpen] = useState(false);
   const [capabilities, setCapabilities] = useState(false);
+  const [outgoingToken, setOutgoingToken] = useState("");
+  const [outgoingConfigured, setOutgoingConfigured] = useState(outgoingWebhookConfigured);
+  const [localAccounts, setLocalAccounts] = useState<z.infer<typeof localAccountSchema>[]>([]);
+  const [newAccount, setNewAccount] = useState({ email: "", password: "", bitrixUserId: "", role: "rh" as Exclude<AppRole, "admin"> });
   const process = draft.process;
+  useEffect(() => {
+    api.request("/api/users", z.array(localAccountSchema)).then(setLocalAccounts).catch((cause) => setError(errorMessage(cause)));
+  }, [api]);
   function setProcess(patch: Partial<ProcessMapping>) {
     setDraft((old) => ({
       ...old,
@@ -182,6 +192,30 @@ export function SettingsView({
       );
     });
   }
+  async function saveOutgoingWebhook() {
+    await perform(async () => {
+      const result = await api.request("/api/setup", z.object({ configured: z.boolean(), handlerUrl: z.string() }), { action: "set-outgoing-token", token: outgoingToken });
+      setOutgoingToken(""); setOutgoingConfigured(true);
+      await onUpdated();
+      try { await navigator.clipboard.writeText(result.handlerUrl); notify("Token salvo. URL do handler copiada; o Nexo validará o token no primeiro evento recebido."); }
+      catch { notify("Token salvo. Copie a URL do handler exibida acima para cadastrar no Bitrix24."); }
+    });
+  }
+  async function createAccount() {
+    await perform(async () => {
+      const account = await api.request("/api/users", localAccountSchema, newAccount);
+      setLocalAccounts((items) => [...items.filter((item) => item.id !== account.id), account]);
+      setNewAccount({ email: "", password: "", bitrixUserId: "", role: "rh" });
+      await onUpdated(); notify("Acesso Nexo criado para " + account.user.name + ".");
+    });
+  }
+  async function deactivateAccount(account: z.infer<typeof localAccountSchema>) {
+    await perform(async () => {
+      await api.request(`/api/users/${encodeURIComponent(account.id)}`, z.object({ deactivated: z.boolean() }), undefined, "DELETE");
+      setLocalAccounts((items) => items.map((item) => item.id === account.id ? { ...item, active: false } : item));
+      notify("Acesso desativado.");
+    });
+  }
   async function finish() {
     await perform(async () => {
       await save();
@@ -190,16 +224,7 @@ export function SettingsView({
       });
       setDraft(saved);
       await onUpdated();
-      if (window.BX24) {
-        window.BX24.installFinish();
-        notify(
-          "Instalação concluída. O Nexo está pronto para as primeiras jornadas.",
-        );
-      } else {
-        notify(
-          "Configuração salva. Abra o app dentro do Bitrix para finalizar a instalação no portal.",
-        );
-      }
+      notify("Configuração salva. O Nexo está pronto para as primeiras jornadas.");
     });
   }
   const tabs = [
@@ -266,10 +291,10 @@ export function SettingsView({
         >
           {tab === "connection" && (
             <>
-              <SectionHeader
-                title="Conexão com o Bitrix24"
-                description="A conta e as permissões vêm do seu portal."
-              />
+                <SectionHeader
+                  title="Conexão com o Bitrix24"
+                  description="O Nexo executa as operações com a conta RH que criou o webhook."
+                />
               <div className="connection-summary">
                 <span className="integration-logo large">
                   b<span>24</span>
@@ -278,7 +303,7 @@ export function SettingsView({
                   <h3>{workspace.session.portalDomain}</h3>
                   <p>
                     <span className="dot dot-onboarding" />
-                    Identidade de {workspace.session.user.name}
+                    Webhook ativo · conta operacional {workspace.settings.automationUserId || "não definida"}
                   </p>
                 </div>
                 <a
@@ -291,6 +316,14 @@ export function SettingsView({
                   <ExternalLink size={14} />
                 </a>
               </div>
+              <div className="form-section-heading"><Link2 size={17} /><h3>Eventos automáticos</h3></div>
+              <p className="field-help">No Bitrix24, cadastre um webhook de saída para o evento ONCRMDYNAMICITEMUPDATE. Use a URL abaixo como endereço do handler e cole aqui o token recebido no evento.</p>
+              <label className="field"><span>URL do handler</span><input readOnly value={typeof window === "undefined" ? "" : `${window.location.origin}/api/bitrix/events`} onFocus={(event) => event.currentTarget.select()} /></label>
+              <div className="form-grid">
+                <label className="field"><span>Token do webhook de saída</span><input type="password" autoComplete="off" value={outgoingToken} onChange={(event) => setOutgoingToken(event.target.value)} placeholder={outgoingConfigured ? "Token salvo · informe novo para substituir" : "Cole o token gerado pelo Bitrix24"} /></label>
+                <div className="field"><span>Status</span><p className="field-help">{outgoingConfigured ? "Webhook de eventos configurado" : "Aguardando configuração"}</p></div>
+              </div>
+              <Button type="button" variant="secondary" loading={busy} disabled={!outgoingToken} onClick={saveOutgoingWebhook}><ShieldCheck size={15} />Salvar token do webhook</Button>
               <div className="form-grid">
                 <label className="field">
                   <span>Nome da empresa</span>
@@ -361,9 +394,8 @@ export function SettingsView({
               <div className="info-strip">
                 <KeyRound size={18} />
                 <p>
-                  As credenciais são configuradas na instalação. Após alterar a
-                  chave da aplicação no Bitrix, reinstale o Nexo para atualizar
-                  a autorização.
+                  A conexão é protegida no servidor. Se o webhook de entrada
+                  for rotacionado, valide a nova URL no assistente de conexão.
                 </p>
               </div>
             </>
@@ -690,43 +722,12 @@ export function SettingsView({
               </div>
               <div className="form-section-heading">
                 <ShieldCheck size={17} />
-                <h3>Identidade das automações</h3>
+                <h3>Conta de execução Bitrix24</h3>
               </div>
-              <label className="authorization-checkbox">
-                <input
-                  type="checkbox"
-                  checked={draft.automationUserId === workspace.session.user.id}
-                  onChange={(e) =>
-                    setDraft((old) => ({
-                      ...old,
-                      automationUserId: e.target.checked
-                        ? workspace.session.user.id
-                        : null,
-                    }))
-                  }
-                />
-                <span>
-                  <strong>Usar minha identidade para as automações</strong>
-                  <small>
-                    As tarefas automáticas serão executadas como{" "}
-                    {workspace.session.user.name}, respeitando as permissões
-                    dessa conta.
-                  </small>
-                </span>
-              </label>
-              {draft.automationUserId &&
-                draft.automationUserId !== workspace.session.user.id && (
-                  <p className="field-help">
-                    Identidade atualmente autorizada:{" "}
-                    {workspace.users.find(
-                      (u) => u.id === draft.automationUserId,
-                    )?.name || "usuário do portal"}
-                    .
-                  </p>
-                )}
+              <p className="field-help">Todas as ações no Bitrix são realizadas pela conta vinculada ao webhook. Para trocar essa identidade, recrie o webhook com a conta de serviço desejada e reconecte o Nexo.</p>
               <SectionHeader
                 title="Papéis no Nexo"
-                description="O acesso continua limitado às permissões de cada usuário no Bitrix24."
+                description="O acesso ao Nexo usa contas locais vinculadas a usuários Bitrix24."
               />
               <div className="role-assignments">
                 {roles.map((role) => (
@@ -773,6 +774,15 @@ export function SettingsView({
                   </details>
                 ))}
               </div>
+              <SectionHeader title="Acessos ao Nexo" description="Crie contas individuais para RH, gestores, executores e colaboradores, vinculadas a usuários ativos do Bitrix24." />
+              <div className="form-grid">
+                <label className="field"><span>Usuário Bitrix24</span><select value={newAccount.bitrixUserId} onChange={(event) => setNewAccount((old) => ({ ...old, bitrixUserId: event.target.value }))}><option value="">Selecione uma pessoa</option>{workspace.users.filter((user) => user.active).map((user) => <option key={user.id} value={user.id}>{user.name} · {user.id}</option>)}</select></label>
+                <label className="field"><span>Papel</span><select value={newAccount.role} onChange={(event) => setNewAccount((old) => ({ ...old, role: event.target.value as Exclude<AppRole, "admin"> }))}>{roles.filter((role) => role !== "admin").map((role) => <option key={role} value={role}>{appRoleLabels[role]}</option>)}</select></label>
+                <label className="field"><span>E-mail de acesso</span><input type="email" value={newAccount.email} onChange={(event) => setNewAccount((old) => ({ ...old, email: event.target.value }))} /></label>
+                <label className="field"><span>Senha inicial (mínimo 12 caracteres)</span><input type="password" autoComplete="new-password" minLength={12} value={newAccount.password} onChange={(event) => setNewAccount((old) => ({ ...old, password: event.target.value }))} /></label>
+              </div>
+              <Button type="button" variant="secondary" loading={busy} disabled={!newAccount.bitrixUserId || !newAccount.email || newAccount.password.length < 12} onClick={createAccount}><Plus size={15} />Criar acesso</Button>
+              <div className="audit-list">{localAccounts.map((account) => <div key={account.id}><span className="audit-icon"><Users size={16} /></span><div><strong>{account.user.name} · {appRoleLabels[account.role]}</strong><small>{account.email} · {account.active ? "Ativo" : "Desativado"}</small></div>{account.active && account.role !== "admin" && <Button type="button" variant="ghost" onClick={() => deactivateAccount(account)}>Desativar</Button>}</div>)}</div>
             </>
           )}
           {tab === "audit" && (

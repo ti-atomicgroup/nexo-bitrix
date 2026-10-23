@@ -6,10 +6,10 @@ import { Auth } from "./auth";
 import { BitrixClient } from "./bitrix";
 import { AppError } from "./errors";
 import { integer, record, text } from "./models";
-import { encrypt } from "./security";
 import { Store } from "./store";
 import { Journeys } from "./journeys";
 import { rulesSchema, settingsSchema, userId } from "./validation";
+import { outgoingWebhookSchema, webhookConfigurationSchema } from "./models";
 export class Setup {
   constructor(readonly store: Store, readonly auth: Auth, readonly bitrix: BitrixClient, readonly journeys: Journeys) {}
   async discover(session: SessionInfo) {
@@ -18,7 +18,8 @@ export class Setup {
     const methods = z.array(z.string()).parse(await this.bitrix.call(session.user.id, "methods", {}));
     const requiredScopes = ["task", "user_brief", "crm"];
     const missingScopes = requiredScopes.filter(scope => !scopes.includes(scope) && !(scope === "user_brief" && scopes.includes("user")));
-    return { scopes, missingScopes, canProvision: scopes.includes("userfieldconfig") && scopes.includes("crm") && session.canConfigure, methods: methods.filter(method => ["crm.type.add", "crm.item.add", "tasks.task.add", "task.checklistitem.add", "event.bind", "userfieldconfig.add"].includes(method)) };
+    const webhook = this.store.get("webhook", "incoming", webhookConfigurationSchema);
+    return { scopes, missingScopes, canProvision: Boolean(webhook) && scopes.includes("userfieldconfig") && scopes.includes("crm") && session.canConfigure, methods: methods.filter(method => ["crm.type.add", "crm.item.add", "tasks.task.add", "task.checklistitem.add", "userfieldconfig.add"].includes(method)) };
   }
   async discovery(session: SessionInfo, kind: string, entityTypeId?: number, categoryId?: number): Promise<DiscoveryOption[]> {
     this.auth.requireManage(session);
@@ -42,11 +43,11 @@ export class Setup {
     }
     throw new AppError("DISCOVERY_KIND", "Escolha processes, categories, fields ou stages.");
   }
-  async configure(session: SessionInfo, input: unknown, inputRules: unknown, clientSecret?: string): Promise<Settings> {
+  async configure(session: SessionInfo, input: unknown, inputRules: unknown): Promise<Settings> {
     await this.auth.requireAdmin(session);
     const next = settingsSchema.parse(input), rules = rulesSchema.parse(inputRules), current = this.auth.settings();
-    if (next.automationUserId !== current.automationUserId && next.automationUserId !== null && next.automationUserId !== session.user.id) throw new AppError("AUTOMATION_IDENTITY", "A conta de automação deve ser a pessoa que está autorizando esta configuração.", 403);
-    if (next.automationUserId === session.user.id) this.bitrix.credentials(session.user.id);
+    const serviceUserId = this.store.get("webhook", "incoming", webhookConfigurationSchema)?.serviceUserId;
+    if (next.automationUserId !== serviceUserId) throw new AppError("AUTOMATION_IDENTITY", "A automação executa sempre como a conta que criou o webhook de entrada.", 403);
     if (!next.roleAssignments.admin.includes(session.user.id)) throw new AppError("ADMIN_RETENTION", "Mantenha o administrador atual na configuração.", 409);
     const references = new Set([...Object.values(next.defaultAssignees), ...Object.values(next.roleAssignments).flat()]);
     for (const target of references) { if (target) { const user = await this.bitrix.user(session.user.id, userId.parse(target)); if (!user.active) throw new AppError("USER_INACTIVE", "A configuração contém usuário inativo."); } }
@@ -64,15 +65,9 @@ export class Setup {
     const hasAssignees = templates.every(template => template.stages.every(stage => stage.activities.every(activity => activity.assigneeRole === "colaborador" || Boolean(next.defaultAssignees[activity.assigneeRole]))));
     const sameProcess = JSON.stringify(current.process) === JSON.stringify(next.process);
     const operational = Boolean(next.process && next.automationUserId && templates.length && hasAssignees && sameProcess && next.automationUserId === current.automationUserId);
-    const settings: Settings = { ...next, portalDomain: current.portalDomain, applicationClientId: current.applicationClientId, setupComplete: current.setupComplete && operational };
+    const settings: Settings = { ...next, portalDomain: current.portalDomain, applicationClientId: "webhook-only", setupComplete: current.setupComplete && operational };
     this.store.transaction(() => {
       this.store.put("settings", "current", settings); this.store.put("rules", "current", rules);
-      if (clientSecret !== undefined) {
-        if (!clientSecret || clientSecret.length > 1000) throw new AppError("CLIENT_SECRET", "Client secret inválido.");
-        const installation = this.auth.installation();
-        if (!installation) throw new AppError("NOT_INSTALLED", "Instalação ausente.", 503);
-        this.store.put("installation", "current", { ...installation, clientSecret: encrypt(clientSecret, this.auth.env.encryptionKey) });
-      }
     });
     this.journeys.audit("settings.saved", "Configuração atualizada por administrador autorizado.", session.user.name);
     return settings;
@@ -136,11 +131,7 @@ export class Setup {
     if (!automation.active) throw new AppError("AUTOMATION_INACTIVE", "A conta de automação está inativa.", 409);
     const rules = this.store.get("rules", "current", rulesSchema) ?? [];
     await this.configure(session, settings, rules);
-    const handler = `${this.auth.env.appUrl}/api/bitrix/events`;
-    const existing = z.array(z.unknown()).parse(await this.bitrix.call(settings.automationUserId, "event.get", {})).map(record);
-    for (const event of ["ONTASKADD", "ONTASKUPDATE", "ONTASKDELETE", "ONCRMDYNAMICITEMADD", "ONCRMDYNAMICITEMUPDATE"]) {
-      if (!existing.some(item => String(item.event).toUpperCase() === event && item.handler === handler)) await this.bitrix.call(settings.automationUserId, "event.bind", { event, handler, auth_type: Number(settings.automationUserId) });
-    }
+    if (!this.store.get("webhook", "outgoing", outgoingWebhookSchema)) throw new AppError("OUTGOING_WEBHOOK_REQUIRED", "Configure o webhook de saída no Bitrix24 e valide o token no Nexo.", 409);
     const done = { ...this.auth.settings(), setupComplete: true }; this.store.put("settings", "current", done);
     this.journeys.audit("setup.finished", "Instalação validada e eventos registrados.", session.user.name);
     return done;

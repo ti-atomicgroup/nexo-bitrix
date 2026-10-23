@@ -39,9 +39,7 @@ export class Journeys {
     this.store.put("issue", id, { id, title, message, retryable, createdAt: new Date().toISOString(), ...(sourceItemId ? { sourceItemId } : {}) });
   }
   sourceKey(entityTypeId: number, itemId: number): string {
-    const installation = this.auth.installation();
-    if (!installation) throw new AppError("NOT_INSTALLED", "Instalação ausente.", 503);
-    return `approval:${installation.memberId}:${entityTypeId}:${itemId}`;
+    return `approval:${this.auth.env.portalDomain}:${entityTypeId}:${itemId}`;
   }
   sourceJourney(entityTypeId: number, itemId: number, marker?: unknown): Journey | null {
     const reserved = this.store.reservationId(this.sourceKey(entityTypeId, itemId));
@@ -122,7 +120,6 @@ export class Journeys {
     const input: CreateJourneyInput = createJourneySchema.parse(body), settings = this.auth.settings();
     if (!settings.setupComplete || !settings.process) throw new AppError("SETUP_REQUIRED", "Conclua a configuração antes de criar jornadas.", 409);
     if (!settings.automationUserId) throw new AppError("AUTOMATION_REQUIRED", "Autorize uma conta de automação nas configurações.", 409);
-    this.bitrix.credentials(settings.automationUserId);
     const template = this.store.get("template", input.templateId, savedTemplateSchema);
     if (!template || template.type !== input.type) throw new AppError("TEMPLATE_INVALID", "Selecione um modelo compatível.");
     const employee = await this.bitrix.user(session.user.id, input.employeeId);

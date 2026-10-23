@@ -7,15 +7,15 @@ import { BitrixClient } from "./bitrix";
 import { AppError, BitrixError } from "./errors";
 import { eventJobSchema, type EventJob } from "./events";
 import { Journeys } from "./journeys";
-import { integer, metadataSchema, record, text } from "./models";
+import { integer, metadataSchema, record, text, webhookConfigurationSchema } from "./models";
 import { Store } from "./store";
 import { rulesSchema } from "./validation";
 export class Worker {
   private readonly owner = randomUUID();
   constructor(readonly store: Store, readonly auth: Auth, readonly bitrix: BitrixClient, readonly journeys: Journeys) {}
   async processEvent(job: EventJob) {
-    const settings = this.auth.settings(), install = this.auth.installation();
-    if (!settings.setupComplete || !install || !settings.automationUserId) throw new AppError("AUTOMATION_REQUIRED", "Conclua a instalação e autorize a automação.", 409);
+    const settings = this.auth.settings();
+    if (!settings.setupComplete || !settings.automationUserId) throw new AppError("AUTOMATION_REQUIRED", "Conclua a instalação e autorize a automação.", 409);
     if (!job.event.startsWith("ONCRMDYNAMIC")) { this.store.enqueue(`sync:event:${Date.now()}`, "sync", {}); return; }
     const process = settings.process;
     if (!process || job.entityTypeId !== process.entityTypeId || !job.itemId) return;
@@ -32,8 +32,8 @@ export class Worker {
     const user = await this.bitrix.user(userId, userId);
     const admin = settings.roleAssignments.admin.includes(userId), hr = settings.roleAssignments.rh.includes(userId);
     if (!admin && !hr) throw new AppError("AUTOMATION_ROLE", "A conta de automação deve ser RH ou administrador autorizado.", 403);
-    const session: SessionInfo = { user, role: admin ? "admin" : "rh", portalDomain: this.auth.env.portalDomain, memberId: install.memberId, expiresAt: new Date(Date.now() + 60000).toISOString(), canManage: true, canConfigure: false };
-    await this.journeys.create(session, { requestId: `approval-${process.entityTypeId}-${job.itemId}`, type: rule.type, templateId: rule.templateId, employeeId, referenceDate, assignees: {} }, { source: `approval:${install.memberId}:${process.entityTypeId}:${job.itemId}`, itemId: job.itemId });
+    const session: SessionInfo = { user, role: admin ? "admin" : "rh", portalDomain: this.auth.env.portalDomain, memberId: this.auth.env.portalDomain, expiresAt: new Date(Date.now() + 60000).toISOString(), canManage: true, canConfigure: false };
+    await this.journeys.create(session, { requestId: `approval-${process.entityTypeId}-${job.itemId}`, type: rule.type, templateId: rule.templateId, employeeId, referenceDate, assignees: {} }, { source: `approval:${this.auth.env.portalDomain}:${process.entityTypeId}:${job.itemId}`, itemId: job.itemId });
   }
   async reconcile() {
     const settings = this.auth.settings(), userId = settings.automationUserId;
@@ -71,14 +71,14 @@ export class Worker {
     if (!hasErrors) this.store.put("sync-meta", "current", { lastSyncAt: new Date().toISOString(), syncRunning: false });
   }
   private globalError(error: unknown): boolean {
-    return error instanceof BitrixError && ((error.retryable && !["JOURNEY_BUSY", "CREATE_UNCERTAIN"].includes(error.code)) || ["OAUTH_REAUTHORIZE", "insufficient_scope", "INVALID_CREDENTIALS", "NO_AUTH_FOUND"].includes(error.code));
+    return error instanceof BitrixError && ((error.retryable && !["JOURNEY_BUSY", "CREATE_UNCERTAIN"].includes(error.code)) || ["insufficient_scope", "INVALID_CREDENTIALS", "NO_AUTH_FOUND"].includes(error.code));
   }
   async tick(): Promise<void> {
     if (!this.store.lease("worker", this.owner, 120000)) return;
     const heartbeat = setInterval(() => this.store.lease("worker", this.owner, 120000), 30000);
     const metadata = this.store.get("sync-meta", "current", metadataSchema);
     try {
-      if (!this.auth.installation()) return;
+      if (!this.store.get("webhook", "incoming", webhookConfigurationSchema)) return;
       this.store.put("sync-meta", "current", { lastSyncAt: metadata?.lastSyncAt ?? null, syncRunning: true, syncStartedAt: Date.now() });
       this.store.enqueue(`periodic:${Math.floor(Date.now() / 60000)}`, "sync", {});
       for (const job of this.store.nextJobs()) {

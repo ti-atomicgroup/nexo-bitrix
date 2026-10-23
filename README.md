@@ -32,22 +32,19 @@ O comando não sobrescreve um `.env` existente nem imprime as chaves. No Windows
 | `NEXO_DATA_DIR`       | Diretório persistente. Padrão local: `./data`; na Onnira, o volume detectado em `/app/.data`.   |
 | `PORT`                | Porta HTTP. Padrão: `3000`.                                                                     |
 
-As credenciais da aplicação Bitrix são informadas pelo administrador no assistente, dentro do portal. Não cole tokens em conversas, repositórios ou exemplos públicos.
+O Nexo usa somente webhooks Bitrix24. A URL do webhook de entrada é armazenada criptografada no servidor; o token do webhook de saída também. Nunca publique esses valores em código ou repositórios.
 
-## Instalar no Bitrix24
+## Conectar ao Bitrix24
 
-1. Publique o Nexo em HTTPS e configure as variáveis e a persistência na Onnira.
-2. No Bitrix, abra Aplicativos → Recursos do desenvolvedor → Outros → Aplicação local. Escolha aplicação de servidor.
-3. Informe instalação inicial `https://SEU-APP/api/bitrix/install` e página da aplicação `https://SEU-APP/api/bitrix/launch`.
-4. Marque a opção em que a aplicação conclui a instalação e defina o nome de menu **Nexo**.
-5. Conceda `task`, `user_brief`, `crm` e `userfieldconfig` para que o assistente possa preparar os campos do processo de RH.
-6. Salve a aplicação e obtenha o ID e a chave secreta gerados pelo Bitrix.
-7. Abra a aplicação pelo portal. Informe o segredo `NEXO_SETUP_TOKEN`, o ID e a chave da aplicação.
-8. No assistente, crie **Movimentações de Pessoas** ou associe um processo existente. Os campos, funis e etapas são descobertos pelo portal.
-9. Revise modelos, responsáveis padrão e papéis. Autorize explicitamente sua identidade de RH para execução das automações e confira suas permissões de CRM e tarefas.
-10. Conclua a instalação pelo assistente. O Nexo confirma a conclusão ao Bitrix pelo SDK.
+1. Publique o Nexo em HTTPS na Onnira, configure as quatro variáveis obrigatórias e habilite o volume persistente.
+2. No portal Bitrix24, entre com uma conta RH de serviço e crie um **webhook de entrada** em Aplicativos → Recursos do desenvolvedor → Webhooks. Conceda `task`, `user_brief` (ou `user`), `crm` e `userfieldconfig`. Dê à conta de serviço apenas as permissões necessárias para usuários, tarefas e processos de RH.
+3. Abra a URL do Nexo. Cole a URL completa do webhook e o `NEXO_SETUP_TOKEN`; o Nexo testa a conexão e os escopos.
+4. Crie o primeiro acesso local de administrador. O ID Bitrix vinculado precisa ser o mesmo da conta que criou o webhook, pois o Bitrix executa operações usando essa identidade.
+5. Configure empresa, responsáveis e processo **Movimentações de Pessoas** (novo ou existente). Os campos e etapas são descobertos pela API REST.
+6. Para inícios automáticos, cadastre no Bitrix um **webhook de saída** para `ONCRMDYNAMICITEMUPDATE`. Use o handler mostrado em Configurações → Conexão e cole no Nexo o token emitido no evento.
+7. Revise modelos e regras de aprovação e conclua a configuração. A reconciliação periódica cobre eventos perdidos.
 
-A primeira versão atende uma empresa e um portal por instalação. Cada cliente configura suas próprias credenciais e mapeamentos. O domínio do portal é fixado no servidor. O acesso pelo endereço externo orienta a abertura pelo Bitrix; não cria uma conta paralela.
+O Nexo fica hospedado na Onnira e é acessado pela URL do app. Webhooks Bitrix não oferecem interface nativa nem SSO. Contas locais do Nexo controlam quem pode acessar a tela; os IDs Bitrix vinculados são usados para selecionar colaboradores e responsáveis. As ações de integração sempre são realizadas pela conta que criou o webhook de entrada.
 
 ## Publicar na Onnira
 

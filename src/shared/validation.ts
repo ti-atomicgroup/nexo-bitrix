@@ -156,6 +156,9 @@ export const statusSchema: z.ZodType<PublicStatus> = z.object({
   appUrl: z.string(),
   missingEnvironment: z.array(z.string()),
   version: z.string(),
+  webhookConnected: z.boolean().optional(),
+  firstAdminCreated: z.boolean().optional(),
+  outgoingWebhookConfigured: z.boolean().optional(),
 });
 export const discoverySchema: z.ZodType<DiscoveryOption[]> = z.array(
   z.object({ id: z.string(), name: z.string(), type: z.string().optional() }),

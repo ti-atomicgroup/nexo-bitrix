@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { existsSync } from "node:fs";
 import { AppError } from "./errors";
 
@@ -22,6 +22,26 @@ export function validateEnvironment(env: Record<string, string | undefined> = pr
 export function portalFromDomain(domain: string, env: Environment): string {
   if (domain.toLowerCase() !== env.portalDomain) throw new AppError("PORTAL_MISMATCH", "Portal não autorizado.", 403);
   return env.portalUrl;
+}
+export function parseIncomingWebhookUrl(value: string, env: Environment): { userId: string; secret: string } {
+  let url: URL;
+  try { url = new URL(value); } catch { throw new AppError("WEBHOOK_URL_INVALID", "Cole a URL completa do webhook HTTPS do portal configurado.", 400); }
+  const match = /^\/rest\/(\d+)\/([A-Za-z0-9_-]+)\/?$/.exec(url.pathname);
+  if (url.protocol !== "https:" || url.origin !== env.portalUrl || url.username || url.password || url.search || url.hash || !match?.[1] || !match[2]) throw new AppError("WEBHOOK_URL_INVALID", "A URL deve ser um webhook HTTPS válido do portal configurado, sem parâmetros extras.", 400);
+  return { userId: match[1], secret: match[2] };
+}
+export function hashPassword(password: string): string {
+  const salt = randomBytes(16), cost = 16384, blockSize = 8, parallel = 1;
+  const derived = scryptSync(password, salt, 64, { N: cost, r: blockSize, p: parallel, maxmem: 64 * 1024 * 1024 });
+  return `scrypt$${cost}$${blockSize}$${parallel}$${salt.toString("hex")}$${derived.toString("hex")}`;
+}
+export function verifyPassword(password: string, encoded: string): boolean {
+  const [algorithm, costRaw, blockRaw, parallelRaw, saltRaw, derivedRaw] = encoded.split("$");
+  if (algorithm !== "scrypt" || !costRaw || !blockRaw || !parallelRaw || !saltRaw || !derivedRaw || !/^[a-f\d]{32}$/i.test(saltRaw) || !/^[a-f\d]{128}$/i.test(derivedRaw)) return false;
+  const cost = Number(costRaw), blockSize = Number(blockRaw), parallel = Number(parallelRaw);
+  if (cost !== 16384 || blockSize !== 8 || parallel !== 1) return false;
+  const expected = Buffer.from(derivedRaw, "hex"), actual = scryptSync(password, Buffer.from(saltRaw, "hex"), expected.length, { N: cost, r: blockSize, p: parallel, maxmem: 64 * 1024 * 1024 });
+  return timingSafeEqual(expected, actual);
 }
 export function encrypt(value: string, key: string): string {
   const iv = randomBytes(12), cipher = createCipheriv("aes-256-gcm", Buffer.from(key, "hex"), iv);

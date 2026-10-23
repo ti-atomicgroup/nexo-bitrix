@@ -179,6 +179,9 @@ export interface PublicStatus {
   appUrl: string;
   missingEnvironment: string[];
   version: string;
+  webhookConnected?: boolean;
+  firstAdminCreated?: boolean;
+  outgoingWebhookConfigured?: boolean;
 }
 export interface DiscoveryOption {
   id: string;

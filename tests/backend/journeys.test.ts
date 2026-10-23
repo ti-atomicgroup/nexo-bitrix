@@ -26,7 +26,7 @@ async function setup() {
   let uncertain = false, nextId = 10;
   const transport: typeof fetch = async (input, init) => {
     if (String(input).includes("oauth.bitrix.info")) return Response.json({ access_token: "good", refresh_token: "rotated-refresh", expires_in: 3600, member_id: "member1", user_id: "1" });
-    const method = String(input).split("/rest/")[1]?.replace(".json", ""), body = z.record(z.string(), z.unknown()).parse(JSON.parse(String(init?.body)));
+    const method = new URL(String(input)).pathname.split("/").pop()?.replace(".json", ""), body = z.record(z.string(), z.unknown()).parse(JSON.parse(String(init?.body)));
     const fields = body.fields ? z.record(z.string(), z.unknown()).parse(body.fields) : {};
     if (method === "user.current") return Response.json({ result: { ID: "1", NAME: "RH", LAST_NAME: "", ACTIVE: true } });
     if (method === "user.admin") return Response.json({ result: true });
@@ -67,8 +67,8 @@ async function setup() {
     throw new Error(`Unexpected ${method}`);
   };
   const bitrix = new BitrixClient(store, env, transport), auth = new Auth(store, env, bitrix), service = new Journeys(store, auth, bitrix);
-  const boot = await auth.launch({ DOMAIN: env.portalDomain, AUTH_ID: "good", REFRESH_ID: "refresh", APPLICATION_TOKEN: "app-token", member_id: "member1", AUTH_EXPIRES: "3600" });
-  const { session } = await auth.bootstrap(boot.token, env.setupToken, "local.nexo", "secret");
+  bitrix.configureWebhook(`https://${env.portalDomain}/rest/1/test-secret/`, "1");
+  const { session } = await auth.bootstrapLocalAdmin(env.setupToken, "rh@example.com", "Senha-de-teste-segura-2026", "1");
   store.put("settings", "current", { ...auth.settings(), setupComplete: true, automationUserId: "1", defaultAssignees: { ti: "1", colaborador: "2" }, process: { entityTypeId: 1050, categoryId: 0, employeeField: "ufCrmEmployee", dateField: "ufCrmDate", onboardingStageId: "ONBOARD", offboardingStageId: "OFFBOARD", inProgressStageId: "PROGRESS", completedStageId: "DONE", cancelledStageId: "CANCEL" } });
   const template = service.saveTemplate(session, { id: "model1", name: "Modelo", description: "", type: "onboarding", version: 1, stages: [{ id: "stage1", title: "Preparação", activities: [{ id: "activity1", title: "Acesso TI", description: "", assigneeRole: "ti", offsetDays: -1, required: true, critical: true, visibility: "hr", checklist: [], documents: [] }, { id: "activity2", title: "Boas-vindas", description: "", assigneeRole: "colaborador", offsetDays: 0, required: true, critical: false, visibility: "employee", checklist: [], documents: [] }] }] });
   return { store, auth, bitrix, service, session, template, tasks, checklists, remoteItem, remoteItems, approvedIds, access, hooks, makeUncertain: () => { uncertain = true; } };
@@ -111,7 +111,6 @@ it("colaborador vê apenas suas atividades e contadores recalculados", async () 
   const { service, session } = await setup();
   const created = await service.create(session, input); await service.runJourney(created.id);
   const employee: SessionInfo = { ...session, user: { ...session.user, id: "2" }, role: "colaborador", canManage: false, canConfigure: false };
-  service.bitrix.saveCredentials({ ...service.bitrix.credentials("1"), userId: "2" });
   const visible = await service.visible(employee, service.get(created.id));
   expect(visible?.tasks.map(task => task.title)).toEqual(["Boas-vindas"]);
   expect(visible?.taskCount).toBe(1);
@@ -130,7 +129,8 @@ it("evento autenticado sem access_token é durável e aprovação repetida cria 
   store.put("rules", "current", [{ id: "r1", name: "Aprovado", type: "onboarding", templateId: "model1", stageId: "ONBOARD", enabled: true }]);
   remoteItem.stageId = "ONBOARD";
   const events = new Events(store, auth);
-  const payload = { event: "ONCRMDYNAMICITEMUPDATE", ts: "123", auth: { application_token: "app-token", member_id: "member1", domain: env.portalDomain }, data: { FIELDS: { ID: "50", ENTITY_TYPE_ID: "1050" } } };
+  events.configureOutgoingToken("outgoing-secret-123456789");
+  const payload = { event: "ONCRMDYNAMICITEMUPDATE", ts: "123", auth: { application_token: "outgoing-secret-123456789", domain: env.portalDomain }, data: { FIELDS: { ID: "50", ENTITY_TYPE_ID: "1050" } } };
   expect(() => events.receive({ ...payload, auth: { ...payload.auth, application_token: "forged" } })).toThrow();
   events.receive(payload); events.receive(payload);
   expect(store.nextJobs().filter(job => job.kind === "event")).toHaveLength(1);
@@ -174,7 +174,8 @@ it("SPA criada manualmente não gera outra jornada ao entrar em aprovação", as
   await worker.processEvent({ event: "ONCRMDYNAMICITEMUPDATE", entityTypeId: 1050, itemId: 50 });
   await worker.processEvent({ event: "ONCRMDYNAMICITEMUPDATE", entityTypeId: 1050, itemId: 50 });
   expect(store.list("journey", z.object({ id: z.string() }))).toEqual([{ id: manual.id }]);
-  expect(store.reserve("approval:member1:1050:50", "approval:member1:1050:50", "unexpected").id).toBe(manual.id);
+  const key = service.sourceKey(1050, 50);
+  expect(store.reserve(key, key, "unexpected").id).toBe(manual.id);
   expect(tasks.size).toBe(2);
 });
 it("cancelamento da SPA impede tarefas de uma jornada ainda na fila", async () => {
@@ -207,7 +208,6 @@ it("resposta vazia ou ID divergente do Bitrix não revela o snapshot da tarefa",
   const { service, session, access } = await setup();
   const created = await service.create(session, input); await service.runJourney(created.id);
   const employee: SessionInfo = { ...session, user: { ...session.user, id: "2" }, role: "colaborador", canManage: false, canConfigure: false };
-  service.bitrix.saveCredentials({ ...service.bitrix.credentials("1"), userId: "2" });
   access.empty = true;
   expect(await service.visible(employee, service.get(created.id))).toBe(null);
   access.empty = false; access.mismatched = true;

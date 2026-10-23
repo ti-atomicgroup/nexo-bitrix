@@ -1,10 +1,12 @@
 import { z } from "zod";
 export const userSchema = z.object({ id: z.string(), name: z.string(), position: z.string(), department: z.string(), avatar: z.string().optional(), active: z.boolean() });
-export const credentialSchema = z.object({ userId: z.string(), memberId: z.string(), access: z.string(), refresh: z.string(), expiresAt: z.number(), invalid: z.boolean().default(false) });
-export type Credential = z.infer<typeof credentialSchema>;
-export const installationSchema = z.object({ memberId: z.string(), appId: z.string(), clientId: z.string(), clientSecret: z.string(), applicationToken: z.string(), installedAt: z.string() });
-export const contextSchema = z.object({ user: userSchema, admin: z.boolean(), memberId: z.string(), appId: z.string(), appCode: z.string(), applicationToken: z.string(), credential: credentialSchema, expiresAt: z.number() });
-export const storedSessionSchema = z.object({ user: userSchema, admin: z.boolean(), memberId: z.string(), expiresAt: z.number() });
+export const webhookConfigurationSchema = z.object({ url: z.string(), serviceUserId: z.string(), verifiedAt: z.string() });
+export type WebhookConfiguration = z.infer<typeof webhookConfigurationSchema>;
+export const outgoingWebhookSchema = z.object({ tokenEncrypted: z.string(), handlerUrl: z.string(), verifiedAt: z.string() });
+export const localUserSchema = z.object({ id: z.string(), bitrixUserId: z.string(), user: userSchema, email: z.string().email(), role: z.enum(["admin", "rh", "gestor", "executor", "colaborador"]), passwordHash: z.string(), active: z.boolean(), createdAt: z.string() });
+export type LocalUser = z.infer<typeof localUserSchema>;
+export const localSessionSchema = z.object({ userId: z.string(), tokenHash: z.string(), expiresAt: z.number() });
+export const storedSessionSchema = z.object({ user: userSchema, admin: z.boolean(), memberId: z.string(), localUserId: z.string().optional(), expiresAt: z.number() });
 export const auditSchema = z.object({ id: z.string(), action: z.string(), message: z.string(), actorName: z.string(), createdAt: z.string(), journeyId: z.string().optional() });
 export const issueSchema = z.object({ id: z.string(), title: z.string(), message: z.string(), createdAt: z.string(), sourceItemId: z.number().optional(), retryable: z.boolean() });
 export const metadataSchema = z.object({ lastSyncAt: z.string().nullable(), syncRunning: z.boolean(), syncStartedAt: z.number().optional() });

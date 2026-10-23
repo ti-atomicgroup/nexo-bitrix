@@ -18,7 +18,7 @@ it("provisiona IDs dinâmicos e usa CRM_<id interno>, preservando categoria zero
   const fieldMetadata: Record<string, unknown> = {};
   const transport: typeof fetch = async (input, init) => {
     if (String(input).includes("oauth.bitrix.info")) return Response.json({ access_token: "good", refresh_token: "rotated-refresh", expires_in: 3600, member_id: "member1", user_id: "1" });
-    const method = String(input).split("/rest/")[1]?.replace(".json", ""), body = z.record(z.string(), z.unknown()).parse(JSON.parse(String(init?.body)));
+    const method = new URL(String(input)).pathname.split("/").pop()?.replace(".json", ""), body = z.record(z.string(), z.unknown()).parse(JSON.parse(String(init?.body)));
     if (method === "user.current") return Response.json({ result: { ID: "1", NAME: "Admin", ACTIVE: true } });
     if (method === "user.admin") return Response.json({ result: true });
     if (method === "app.info") return Response.json({ result: { ID: "7", CODE: "local.nexo" } });
@@ -45,8 +45,8 @@ it("provisiona IDs dinâmicos e usa CRM_<id interno>, preservando categoria zero
     throw new Error(`Unexpected ${method}`);
   };
   const bitrix = new BitrixClient(store, env, transport), auth = new Auth(store, env, bitrix), journeys = new Journeys(store, auth, bitrix), setup = new Setup(store, auth, bitrix, journeys);
-  const boot = await auth.launch({ DOMAIN: env.portalDomain, AUTH_ID: "good", REFRESH_ID: "refresh", APPLICATION_TOKEN: "application", member_id: "member1", AUTH_EXPIRES: "3600" });
-  const { session } = await auth.bootstrap(boot.token, env.setupToken, "local.nexo", "secret");
+  bitrix.configureWebhook(`https://${env.portalDomain}/rest/1/test-secret/`, "1");
+  const { session } = await auth.bootstrapLocalAdmin(env.setupToken, "rh@example.com", "Senha-de-teste-segura-2026", "1");
   const mapping = await setup.provision(session);
   expect(mapping).toMatchObject({ entityTypeId: 1098, categoryId: 0, employeeField: "ufCrm23NexoEmployee", dateField: "ufCrm23NexoDate", onboardingStageId: "DT1098_0:NEXO_ONBOARD" });
   expect(await setup.discovery(session, "categories", 1098)).toEqual([{ id: "0", name: "Geral", type: "category" }]);

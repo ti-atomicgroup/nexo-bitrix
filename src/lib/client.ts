@@ -11,34 +11,12 @@ export class RequestError extends Error {
   }
 }
 
-export function consumeLaunchHash(
-  hash: string,
-): { kind: "session" | "bootstrap"; token: string } | null {
-  const params = new URLSearchParams(hash.replace(/^#/, ""));
-  const session = params.get("session");
-  const bootstrap = params.get("bootstrap");
-  if (session && bootstrap) return null;
-  const token = session || bootstrap;
-  if (!token || !/^[a-zA-Z0-9_-]{32,256}$/.test(token)) return null;
-  return { kind: session ? "session" : "bootstrap", token };
-}
-
 const errorSchema = z.object({
   error: z.object({ code: z.string(), message: z.string() }),
 });
 
 export class ApiClient {
-  private token = "";
-  private readonly getToken: () => string;
-  constructor(
-    getToken?: () => string,
-    private readonly fetcher: typeof fetch = fetch,
-  ) {
-    this.getToken = getToken || (() => this.token);
-  }
-  setToken(token: string) {
-    this.token = token;
-  }
+  constructor(private readonly fetcher: typeof fetch = fetch) {}
 
   async request<T>(
     path: string,
@@ -54,8 +32,6 @@ export class ApiClient {
       throw new RequestError("Endereço de API inválido.", "INVALID_PATH", 400);
     }
     const headers: Record<string, string> = { Accept: "application/json" };
-    const token = this.getToken();
-    if (token) headers.Authorization = `Bearer ${token}`;
     if (body !== undefined) headers["Content-Type"] = "application/json";
     let response: Response;
     try {
@@ -64,6 +40,7 @@ export class ApiClient {
         method: method || (body === undefined ? "GET" : "POST"),
         headers,
         body: body === undefined ? undefined : JSON.stringify(body),
+        credentials: "same-origin",
         cache: "no-store",
         redirect: "error",
         signal: AbortSignal.timeout(60000),
