@@ -23,33 +23,33 @@ O Nexo é aberto pela URL da Onnira. O Bitrix fornece os dados e as tarefas por 
    | Inicialização | `npm start` |
    | Porta | `3000` |
 
-4. Publique a aplicação. Copie a URL HTTPS que a Onnira mostrar, por exemplo `https://seu-app.onnira.com.br`. Essa será a `NEXO_APP_URL`.
+4. Publique a aplicação. Copie a URL HTTPS pública que a Onnira mostrar, por exemplo `https://seu-app.onnira.com.br`. Essa URL será o valor de `NEXO_APP_URL`.
 
-## 2. Configure as variáveis da Onnira
+## 2. Configure o serviço Onnira
 
-Na configuração da aplicação, abra **Variáveis de ambiente** (ou **Environment Variables**) e adicione:
+Abra a URL publicada do Nexo. A tela **Configure a hospedagem** mostra os mesmos passos deste manual. Na Onnira, entre nas configurações do serviço publicado e abra **Variáveis de ambiente** (ou **Environment Variables**). Crie estas quatro variáveis:
 
 | Nome | Valor |
 | --- | --- |
-| `NEXO_APP_URL` | URL HTTPS da aplicação, sem `/` no final |
-| `BITRIX_PORTAL_URL` | `https://helpbr24.bitrix24.com.br` |
+| `NEXO_APP_URL` | URL HTTPS pública copiada da Onnira, sem `/` no final |
+| `BITRIX_PORTAL_URL` | `https://helpbr24.bitrix24.com.br` (ou a URL base do portal que será conectado) |
 | `NEXO_ENCRYPTION_KEY` | Chave secreta aleatória com 64 caracteres hexadecimais |
 | `NEXO_SETUP_TOKEN` | Segredo aleatório forte para proteger a configuração inicial |
 | `NEXO_CHAT_API_KEY` | (Opcional) chave aleatória para o conector do chat Onnira |
 | `NEXO_DATA_DIR` | `/app/.data` |
 | `PORT` | `3000` |
 
-Para gerar os dois segredos no Windows PowerShell, abra o terminal no projeto baixado e execute:
+Para gerar os dois segredos no Windows PowerShell, não é preciso baixar o projeto. Abra o PowerShell no seu computador, copie e execute:
 
 ```powershell
 node -e "console.log('NEXO_ENCRYPTION_KEY=' + require('crypto').randomBytes(32).toString('hex')); console.log('NEXO_SETUP_TOKEN=' + require('crypto').randomBytes(32).toString('base64url'))"
 ```
 
-Copie cada valor diretamente para a variável correspondente na Onnira. Trate-os como senhas: não os envie no chat, não os coloque no Git e não os compartilhe em capturas de tela. Guarde uma cópia segura da chave de criptografia; sem ela, os webhooks armazenados não podem ser decifrados depois de uma restauração.
+O comando imprime uma linha por variável. Copie o texto depois do sinal `=` para o campo **Value** com o mesmo nome na Onnira. Trate os dois valores como senhas: não os envie no chat, não os coloque no Git e não os compartilhe em capturas de tela. Guarde uma cópia segura da chave de criptografia; sem ela, os webhooks armazenados não podem ser decifrados depois de uma restauração.
 
 Para habilitar comandos pelo chat Onnira, gere também uma chave separada para `NEXO_CHAT_API_KEY` (pelo menos 32 caracteres aleatórios). No PowerShell, use `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"` e cole o resultado apenas na variável de ambiente do servidor Onnira e no campo de segredo do conector. Nunca reutilize `NEXO_SETUP_TOKEN` ou o webhook Bitrix.
 
-Ative o volume persistente da Onnira no caminho `/app/.data`. Salve as variáveis e mande a Onnira republicar/reiniciar a aplicação. A página deve abrir na URL publicada e mostrar o assistente de instalação.
+Adicione também `NEXO_DATA_DIR` com o valor `/app/.data` e `PORT` com `3000`. Ative o volume persistente da Onnira no caminho `/app/.data`. Salve as variáveis e reinicie ou publique novamente a aplicação. Volte para a página do Nexo e clique em **Verificar novamente**. Quando os quatro valores forem válidos, o Nexo mostrará a etapa de conexão Bitrix. Se algum valor estiver ausente ou inválido, confira os nomes, copie novamente a URL pública sem `/` final e reinicie o serviço depois de salvar.
 
 ### Ativar sugestões opcionais por IA
 

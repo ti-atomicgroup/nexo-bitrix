@@ -2,9 +2,11 @@ import { expect, test } from "@playwright/test";
 import { existsSync, mkdirSync } from "node:fs";
 import { addRhTask, fixtureWorkspace, mockWorkspaceApi } from "./fixtures";
 
-test("configuração pública mostra os pré-requisitos sem inventar conexão", async ({
+test("configuração pública orienta a instalação Onnira e a geração segura das chaves", async ({
   page,
+  context,
 }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.goto("/");
   await expect(
     page.getByRole("heading", { name: "Configure a hospedagem" }),
@@ -18,11 +20,33 @@ test("configuração pública mostra os pré-requisitos sem inventar conexão", 
   await expect(
     page.getByText("BITRIX_PORTAL_URL", { exact: true }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Adicione as variáveis na Onnira" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("NEXO_SETUP_TOKEN", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Gere os dois segredos no seu computador" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Copiar comando" }).click();
+  await expect(page.getByRole("status")).toHaveText("Comando copiado");
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(
+    "randomBytes(32)",
+  );
+  await expect(
+    page.getByRole("heading", { name: "Salve, reinicie e verifique" }),
+  ).toBeVisible();
   mkdirSync("output/playwright", { recursive: true });
   await page.screenshot({
     path: "output/playwright/nexo-instalacao.png",
     fullPage: true,
   });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByRole("button", { name: "Copiar comando" })).toBeVisible();
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+  ).toBe(true);
 });
 
 test("central filtra jornadas e mantém a sessão somente em memória", async ({
