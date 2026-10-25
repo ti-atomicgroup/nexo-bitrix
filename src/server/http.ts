@@ -48,7 +48,7 @@ function checkOrigin(request: Request, allowPortal = false) {
 export async function status(request?: Request) {
   const result: PublicStatus = { installed: false, configured: false, portalDomain: null, appUrl: "", missingEnvironment: [], version: "1.0.0", webhookConnected: false, firstAdminCreated: false, outgoingWebhookConfigured: false, aiConfigured: false };
   try {
-    const runtime = getRuntime(), env = runtime.env; if (request) pinAppOrigin(env, runtime.store, request.url); result.appUrl = env.appUrl; result.portalDomain = env.portalDomain || null; result.aiConfigured = env.aiConfigured;
+    const runtime = getRuntime(), env = runtime.env; if (request) pinAppOrigin(env, runtime.store, request.url, request.headers); result.appUrl = env.appUrl; result.portalDomain = env.portalDomain || null; result.aiConfigured = env.aiConfigured;
     const incoming = runtime.store.get("webhook", "incoming", webhookConfigurationSchema), outgoing = runtime.store.get("webhook", "outgoing", outgoingWebhookSchema), users = runtime.store.list("localUser", localUserSchema);
     result.webhookConnected = Boolean(incoming);
     result.firstAdminCreated = users.some(user => user.role === "admin" && user.active);
@@ -69,7 +69,7 @@ export async function events(request: Request) {
 export async function api(request: Request, resource: string, id?: string) {
   try {
     const runtime = getRuntime();
-    pinAppOrigin(runtime.env, runtime.store, request.url);
+    pinAppOrigin(runtime.env, runtime.store, request.url, request.headers);
     checkOrigin(request);
     if (resource === "auth" && request.method === "POST") {
       const input = z.record(z.string(), z.unknown()).parse(await body(request)), action = z.enum(["login", "logout"]).parse(input.action);

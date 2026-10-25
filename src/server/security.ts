@@ -60,10 +60,21 @@ export function loadInstanceEnvironment(env: Record<string, string | undefined> 
   if (storedKey && env.NEXO_ENCRYPTION_KEY && storedKey !== env.NEXO_ENCRYPTION_KEY) throw new AppError("KEY_MISMATCH", "A chave da instância difere da chave configurada. Preserve a chave original.", 503);
   return validateEnvironment({ ...env, NEXO_DATA_DIR: dataDir, NEXO_ENCRYPTION_KEY: env.NEXO_ENCRYPTION_KEY || storedKey });
 }
-export function pinAppOrigin(env: Environment, store: Store, requestUrl: string): string {
-  const url = new URL(requestUrl), origin = url.origin;
+export function pinAppOrigin(env: Environment, store: Store, requestUrl: string, headers?: Headers): string {
+  const internalUrl = new URL(requestUrl);
+  const publicHost = headers?.get("x-forwarded-host") ?? headers?.get("host");
+  const protocol = headers?.get("x-forwarded-proto") ?? internalUrl.protocol.slice(0, -1);
+  let url = internalUrl;
+  if (publicHost) {
+    try {
+      if (!/^(http|https)$/.test(protocol) || publicHost.includes(",")) throw new Error("Invalid forwarded origin");
+      url = new URL(`${protocol}://${publicHost}`);
+      if (url.username || url.password || url.pathname !== "/" || url.search || url.hash) throw new Error("Invalid forwarded host");
+    } catch { throw new AppError("APP_ORIGIN_INVALID", "A origem pública da aplicação é inválida.", 403); }
+  }
+  const origin = url.origin;
   const local = url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname);
-  const onnira = url.protocol === "https:" && /^[a-z0-9-]+\.onnira\.com\.br$/i.test(url.hostname);
+  const onnira = url.protocol === "https:" && !url.port && /^[a-z0-9-]+\.onnira\.com\.br$/i.test(url.hostname);
   if (env.appUrl) {
     if (env.appUrl !== origin) throw new AppError("APP_ORIGIN_MISMATCH", "A origem da aplicação não corresponde à instância configurada.", 403);
     return env.appUrl;

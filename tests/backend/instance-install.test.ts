@@ -30,6 +30,18 @@ describe("instalação com somente webhook e senha", () => {
     reopened.close();
   });
 
+  it("usa o host público encaminhado pelo proxy quando Next.js expõe 0.0.0.0", () => {
+    const dir = instance();
+    const env = loadInstanceEnvironment({ NEXO_DATA_DIR: dir });
+    const store = new Store(join(dir, "nexo.sqlite"));
+    const internalUrl = "http://0.0.0.0:3000/api/status";
+    const headers = new Headers({ host: "0.0.0.0:3000", "x-forwarded-host": "8437def3-67ef-4f7f-8aae-09e468ba4a5f.onnira.com.br", "x-forwarded-proto": "https" });
+    try {
+      expect(pinAppOrigin(env, store, internalUrl, headers)).toBe("https://8437def3-67ef-4f7f-8aae-09e468ba4a5f.onnira.com.br");
+      expect(() => pinAppOrigin(env, store, internalUrl, new Headers({ host: "evil.example.com", "x-forwarded-proto": "https" }))).toThrow();
+    } finally { store.close(); }
+  });
+
   it("só permite ao navegador que conectou o webhook criar o primeiro RH", async () => {
     const dir = instance();
     const env = loadInstanceEnvironment({ NEXO_DATA_DIR: dir, NEXO_APP_URL: "https://nexo.example.com" });
