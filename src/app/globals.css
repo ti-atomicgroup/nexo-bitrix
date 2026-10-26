@@ -1,0 +1,137 @@
+/*
+ * Nexo — sistema visual "Linhas".
+ * Cada pessoa percorre uma linha (verde = entrada, laranja = saída) com estações (etapas).
+ * Estrutura em verde-floresta; amarelo marca ação e "você está aqui".
+ */
+:root {
+  /* Cores de estrutura */
+  --forest: #0b3b2c;
+  --forest-hover: #145240;
+  --forest-line: #23614d;
+  --on-forest: #ffffff;
+  --on-forest-muted: #b8d3c7;
+
+  /* Texto e superfícies */
+  --ink: #0e2a21;
+  --muted: #4a5a52;
+  --canvas: #eef3ef;
+  --paper: #ffffff;
+  --line: #d3ddd7;
+
+  /* Linhas e sinais */
+  --green: #00a651;
+  --green-strong: #00843d;
+  --green-tint: #dcf2e6;
+  --orange: #ff6a13;
+  --orange-tint: #ffe8d9;
+  --orange-ink: #7a2e00;
+  --yellow: #ffd200;
+  --yellow-tint: #fff6cc;
+  --red: #d7261e;
+  --red-tint: #fde8e7;
+  --red-ink: #8f1610;
+  --blue: #0066cc;
+
+  /* Tipografia */
+  --font-ui: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Barlow Condensed", "Barlow", system-ui, sans-serif;
+  --font-brand: "Archivo Black", "Barlow", system-ui, sans-serif;
+  --text-xs: 0.8125rem;
+  --text-s: 0.875rem;
+  --text-m: 1rem;
+  --text-l: 1.25rem;
+  --text-xl: 1.75rem;
+  --text-2xl: 2.5rem;
+  --text-3xl: 3.5rem;
+
+  /* Forma e espaço */
+  --radius-s: 4px;
+  --radius-m: 6px;
+  --radius-pill: 999px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --track: 6px;
+  --station: 16px;
+  --container: 1120px;
+  --focus-ring: 0 0 0 3px var(--yellow), 0 0 0 5px var(--forest);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--canvas);
+  color: var(--ink);
+  font: 400 var(--text-m) / 1.5 var(--font-ui);
+  font-variant-numeric: tabular-nums;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: 0.005em;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--blue);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-s);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

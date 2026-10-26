@@ -1,0 +1,20 @@
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  line-height: 1;
+}
+
+.word {
+  font-family: var(--font-brand);
+  letter-spacing: -0.02em;
+  transform: translateY(-0.04em);
+}
+
+.onDark .word {
+  color: var(--on-forest);
+}
+
+.onLight .word {
+  color: var(--forest);
+}
