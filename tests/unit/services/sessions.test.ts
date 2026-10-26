@@ -100,3 +100,16 @@ describe("sessões Bearer", () => {
     expect(authenticate(bearer(second.token))).toBeNull();
   });
 });
+
+describe("cabeçalho próprio X-Nexo-Session", () => {
+  it("lê o token do cabeçalho próprio, que a borda da Onnira não remove", () => {
+    const token = "a".repeat(43);
+    expect(readBearerToken(new Request("http://localhost/api/me", { headers: { "X-Nexo-Session": token } }))).toBe(token);
+  });
+
+  it("ignora valor com formato inválido e cai para Authorization", () => {
+    const token = "b".repeat(43);
+    const request = new Request("http://localhost/api/me", { headers: { "X-Nexo-Session": "curto", Authorization: `Bearer ${token}` } });
+    expect(readBearerToken(request)).toBe(token);
+  });
+});

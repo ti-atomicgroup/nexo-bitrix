@@ -169,7 +169,8 @@ async function call<T>(name: ApiRouteName, options: RequestOptions = {}): Promis
   const route = API_ROUTES[name];
   const headers: Record<string, string> = { Accept: "application/json" };
   const token = getToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
+  // A borda da Onnira remove `Authorization`; o servidor lê primeiro o cabeçalho próprio.
+  if (token) headers["X-Nexo-Session"] = token;
   if (options.body !== undefined) headers["Content-Type"] = "application/json";
 
   let response: Response;

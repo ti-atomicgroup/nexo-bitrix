@@ -63,7 +63,7 @@ export function Diagnostics({ variant }: { variant: "same-origin" | "no-referrer
     /* eslint-enable react-hooks/set-state-in-effect */
 
     const started = performance.now();
-    fetch("/api/probe", { headers: { Authorization: "Bearer sonda-sem-valor" }, cache: "no-store" })
+    fetch("/api/probe", { headers: { Authorization: "Bearer sonda-sem-valor", "X-Nexo-Session": "sonda-sem-valor-0000000000" }, cache: "no-store" })
       .then(async (response) => {
         const body = await response.json();
         setServer(body);
@@ -73,7 +73,12 @@ export function Diagnostics({ variant }: { variant: "same-origin" | "no-referrer
         put("auth", {
           label: "Cabeçalho Authorization chega ao servidor",
           status: request.authorizationPresent ? "ok" : "falha",
-          detail: request.authorizationPresent ? "Sim: o login por token funciona." : "Não: a borda remove o cabeçalho.",
+          detail: request.authorizationPresent ? "Sim: chega ao servidor." : "Não: a borda remove este cabeçalho (o Nexo usa X-Nexo-Session).",
+        });
+        put("sessionHeader", {
+          label: "Cabeçalho X-Nexo-Session chega ao servidor",
+          status: request.sessionHeaderPresent ? "ok" : "falha",
+          detail: request.sessionHeaderPresent ? "Sim: o login do Nexo funciona dentro da Onnira." : "Não: a borda remove o cabeçalho próprio também.",
         });
         const sqlite: Array<{ driver: string; ok: boolean; rows?: number; journalMode?: string; error?: string }> = body?.sqlite ?? [];
         for (const item of sqlite) {

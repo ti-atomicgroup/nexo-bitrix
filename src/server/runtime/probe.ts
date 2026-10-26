@@ -103,6 +103,7 @@ export function serverProbe(headers: Headers) {
       secFetchMode: header("sec-fetch-mode"),
       secFetchDest: header("sec-fetch-dest"),
       authorizationPresent: headers.has("authorization"),
+      sessionHeaderPresent: headers.has("x-nexo-session"),
       cookieNames: (header("cookie") ?? "")
         .split(";")
         .map((part) => part.split("=")[0]?.trim())

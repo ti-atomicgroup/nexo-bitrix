@@ -57,8 +57,11 @@ export function LinkTab({ journey, today, onChanged }: { journey: JourneyDTO; to
       await navigator.clipboard.writeText(created);
       toast.show({ tone: "success", title: "Link copiado" });
     } catch {
+      // Dentro do painel da Onnira a API de área de transferência é bloqueada; o comando antigo ainda funciona com o texto selecionado.
       inputRef.current?.select();
-      toast.show({ tone: "info", title: "Copie com Ctrl+C", description: "O navegador não deixou copiar sozinho; o link já está selecionado." });
+      const copied = typeof document.execCommand === "function" && document.execCommand("copy");
+      if (copied) toast.show({ tone: "success", title: "Link copiado" });
+      else toast.show({ tone: "info", title: "Copie com Ctrl+C", description: "O navegador não deixou copiar sozinho; o link já está selecionado." });
     }
   };
 

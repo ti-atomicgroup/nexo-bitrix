@@ -36,8 +36,13 @@ export function issueSession(user: Pick<AppUserRow, "id">, now = Date.now()): Is
   return { token, tokenHash, expiresAt };
 }
 
-/** Lê só `Authorization: Bearer <token>` (sem cookies: o Nexo roda num iframe cross-site). */
+/** Cabeçalho próprio: a borda da Onnira remove `Authorization` antes de chegar ao app. */
+export const SESSION_HEADER = "x-nexo-session";
+
+/** Lê o token de `X-Nexo-Session` ou, como alternativa, de `Authorization: Bearer` (sem cookies: o Nexo roda num iframe cross-site). */
 export function readBearerToken(request: Request): string | null {
+  const own = request.headers.get(SESSION_HEADER)?.trim();
+  if (own && /^[A-Za-z0-9_-]{20,200}$/.test(own)) return own;
   const header = request.headers.get("authorization");
   if (!header) return null;
   return BEARER.exec(header)?.[1] ?? null;
