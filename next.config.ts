@@ -32,7 +32,8 @@ const nextConfig: NextConfig = {
   // Build enxuto: o plano Inicial da Onnira tem 512 MB de memória.
   productionBrowserSourceMaps: false,
   enablePrerenderSourceMaps: false,
-  experimental: { webpackMemoryOptimizations: true, webpackBuildWorker: true, serverSourceMaps: false },
+  // Um processo só: o worker de build e os workers de páginas estáticas ficariam fora do limite de memória.
+  experimental: { webpackMemoryOptimizations: true, webpackBuildWorker: false, serverSourceMaps: false, cpus: 1 },
   // A checagem de tipos roda em `npm run typecheck`; no build ela estoura a memória de 512 MB da Onnira.
   typescript: { ignoreBuildErrors: true },
   env: {
