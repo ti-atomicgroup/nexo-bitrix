@@ -28,7 +28,7 @@ export function ConnectStep({ check, onConnected, onContinue, reconnect = false 
   const formRef = useRef<HTMLFormElement>(null);
   const [url, setUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [failure, setFailure] = useState<string | null>(null);
+  const [failure, setFailure] = useState<{ message: string; detail: string | null } | null>(null);
   const [pending, setPending] = useState(false);
   const missing = check ? missingRequiredScopes(check.scopes) : [];
 
@@ -55,7 +55,8 @@ export function ConnectStep({ check, onConnected, onContinue, reconnect = false 
       setUrl("");
       onConnected(result);
     } catch (caught) {
-      setFailure(toApiError(caught).message);
+      const apiError = toApiError(caught);
+      setFailure({ message: apiError.message, detail: apiError.detail });
     } finally {
       setPending(false);
     }
@@ -114,7 +115,8 @@ export function ConnectStep({ check, onConnected, onContinue, reconnect = false 
 
       {failure ? (
         <Notice tone="error" role="alert" title="Não foi possível conectar">
-          {failure}
+          {failure.message}
+          {failure.detail ? ` Detalhe técnico: ${failure.detail}.` : null}
         </Notice>
       ) : null}
 

@@ -115,6 +115,30 @@ export function Diagnostics({ variant }: { variant: "same-origin" | "no-referrer
     }
   };
 
+  const [bitrixHost, setBitrixHost] = useState("");
+  const testBitrix = async () => {
+    const host = bitrixHost.trim().replace(/^https?:\/\//i, "").split("/")[0] ?? "";
+    if (!host) return;
+    put("egress", { label: "Saída até o Bitrix24", status: "aguardando", detail: `Testando ${host}…` });
+    try {
+      const response = await fetch(`/api/probe?bitrix=${encodeURIComponent(host)}`, { cache: "no-store" });
+      const egress = (await response.json())?.egress;
+      setServer((current: unknown) => ({ ...(current as object), egress }));
+      if (!egress || egress.error) {
+        put("egress", { label: "Saída até o Bitrix24", status: "falha", detail: egress?.error ?? "Sem resposta da sonda." });
+        return;
+      }
+      const line = (attempt: { ok: boolean; status?: number; error?: string; ms: number }) => (attempt.ok ? `HTTP ${attempt.status} em ${attempt.ms} ms` : `${attempt.error} (${attempt.ms} ms)`);
+      put("egress-dns", { label: "DNS do portal", status: egress.dns.ok ? "ok" : "falha", detail: egress.dns.ok ? egress.dns.addresses.join(", ") : egress.dns.error });
+      put("egress", { label: "Saída até o Bitrix24 (fetch)", status: egress.bitrixFetch.ok ? "ok" : "falha", detail: line(egress.bitrixFetch) });
+      put("egress-ipv4", { label: "Saída até o Bitrix24 (IPv4)", status: egress.bitrixIpv4.ok ? "ok" : "falha", detail: line(egress.bitrixIpv4) });
+      put("egress-neutral", { label: "Saída para a internet (example.com)", status: egress.neutralFetch.ok ? "ok" : "falha", detail: line(egress.neutralFetch) });
+      put("egress-proxy", { label: "Proxy no ambiente", status: "ok", detail: egress.proxyEnv.length ? egress.proxyEnv.join(", ") : "Nenhum" });
+    } catch (error) {
+      put("egress", { label: "Saída até o Bitrix24", status: "falha", detail: error instanceof Error ? error.message : "Sem resposta." });
+    }
+  };
+
   const manualPopup = () => {
     const opened = window.open("/api/health", "_blank");
     if (opened) opened.opener = null;
@@ -179,6 +203,31 @@ export function Diagnostics({ variant }: { variant: "same-origin" | "no-referrer
             </div>
           ))}
         </div>
+
+        <h2 className={styles.subtitle}>Conexão com o Bitrix24</h2>
+        <form
+          className={styles.actions}
+          onSubmit={(event) => {
+            event.preventDefault();
+            void testBitrix();
+          }}
+        >
+          <label className={styles.lead} htmlFor="bitrix-host">
+            Domínio do portal (sem o webhook)
+          </label>
+          <input
+            id="bitrix-host"
+            className={styles.secondary}
+            placeholder="suaempresa.bitrix24.com.br"
+            autoComplete="off"
+            spellCheck={false}
+            value={bitrixHost}
+            onChange={(event) => setBitrixHost(event.target.value)}
+          />
+          <button type="submit" className={styles.secondary}>
+            Testar conexão
+          </button>
+        </form>
 
         <h2 className={styles.subtitle}>Testes que dependem de um clique</h2>
         <div className={styles.actions}>

@@ -41,12 +41,15 @@ import { safeGet, safeRemove, safeSet } from "./storage";
 export class ApiError extends Error {
   readonly code: string;
   readonly status: number;
+  /** Código técnico seguro para a tela (ex.: ENOTFOUND), quando o servidor manda um. */
+  readonly detail: string | null;
 
-  constructor(code: string, message: string, status: number) {
+  constructor(code: string, message: string, status: number, detail: string | null = null) {
     super(message);
     this.name = "ApiError";
     this.code = code;
     this.status = status;
+    this.detail = detail;
   }
 }
 
@@ -202,7 +205,8 @@ async function call<T>(name: ApiRouteName, options: RequestOptions = {}): Promis
     const sessionRoute = route.auth === "user" || route.auth === "admin";
     if (response.status === 401 && sessionRoute) clearToken();
     if (isApiErrorBody(payload)) {
-      throw new ApiError(payload.error.code || `http_${response.status}`, payload.error.message, response.status);
+      const description = (payload.error as { details?: { description?: unknown } }).details?.description;
+      throw new ApiError(payload.error.code || `http_${response.status}`, payload.error.message, response.status, typeof description === "string" ? description : null);
     }
     throw new ApiError(`http_${response.status}`, fallbackMessage(response.status), response.status);
   }
