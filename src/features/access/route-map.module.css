@@ -1,0 +1,42 @@
+.map {
+  display: block;
+  width: 100%;
+  max-width: 460px;
+  height: auto;
+}
+
+.arrival,
+.departure {
+  fill: none;
+  stroke-width: 10;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.arrival {
+  stroke: var(--green);
+}
+
+.departure {
+  stroke: var(--orange);
+}
+
+.stationArrival,
+.stationDeparture {
+  fill: var(--paper);
+  stroke-width: 5;
+}
+
+.stationArrival {
+  stroke: var(--green);
+}
+
+.stationDeparture {
+  stroke: var(--orange);
+}
+
+.here {
+  fill: var(--yellow);
+  stroke: var(--forest);
+  stroke-width: 5;
+}

@@ -1,0 +1,125 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 var(--space-4);
+  border: 2px solid transparent;
+  border-radius: var(--radius-m);
+  font: 600 var(--text-m) / 1.2 var(--font-ui);
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.icon {
+  flex: none;
+}
+
+/* Amarelo: ação principal e "aqui". */
+.primary {
+  background: var(--yellow);
+  border-color: var(--yellow);
+  color: var(--ink);
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--yellow-hover);
+  border-color: var(--yellow-hover);
+}
+
+.secondary {
+  background: var(--paper);
+  border-color: var(--forest);
+  color: var(--forest);
+}
+
+.secondary:hover:not(:disabled) {
+  background: var(--green-tint);
+}
+
+/* Estrutura: botão cheio em verde-floresta. */
+.forest {
+  background: var(--forest);
+  border-color: var(--forest);
+  color: var(--on-forest);
+}
+
+.forest:hover:not(:disabled) {
+  background: var(--forest-hover);
+  border-color: var(--forest-hover);
+}
+
+.ghost {
+  background: transparent;
+  color: var(--forest);
+}
+
+.ghost:hover:not(:disabled) {
+  background: var(--green-tint);
+}
+
+.danger {
+  background: var(--paper);
+  border-color: var(--red);
+  color: var(--red-ink);
+}
+
+.danger:hover:not(:disabled) {
+  background: var(--red-tint);
+}
+
+/* Sobre o verde-floresta (painel, barra superior). */
+.onDark {
+  background: transparent;
+  border-color: var(--on-forest-muted);
+  color: var(--on-forest);
+}
+
+.onDark:hover:not(:disabled) {
+  background: var(--forest-hover);
+  border-color: var(--on-forest);
+}
+
+.small {
+  padding: 0 var(--space-3);
+  font-size: var(--text-s);
+}
+
+.full {
+  width: 100%;
+}
+
+.iconOnly {
+  padding: 0;
+  width: 44px;
+}
+
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

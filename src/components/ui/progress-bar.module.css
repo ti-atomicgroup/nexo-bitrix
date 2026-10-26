@@ -1,0 +1,32 @@
+.track {
+  position: relative;
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--forest);
+  transition: width 300ms ease;
+}
+
+.arrival {
+  background: var(--green-tint-strong);
+}
+
+.arrival .fill {
+  background: var(--green-strong);
+}
+
+.departure {
+  background: var(--orange-tint-strong);
+}
+
+.departure .fill {
+  background: var(--orange);
+}

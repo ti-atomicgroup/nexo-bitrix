@@ -1,0 +1,44 @@
+.tile {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--radius-m);
+  background: var(--forest);
+  color: var(--on-forest);
+}
+
+.s {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-s);
+}
+
+.m {
+  width: 40px;
+  height: 40px;
+}
+
+.l {
+  width: 56px;
+  height: 56px;
+}
+
+.arrival {
+  background: var(--green-strong);
+}
+
+.departure {
+  background: var(--orange);
+  color: var(--ink);
+}
+
+.attention {
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+.muted {
+  background: var(--canvas);
+  color: var(--forest);
+  box-shadow: inset 0 0 0 1px var(--line);
+}

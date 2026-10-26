@@ -1,0 +1,140 @@
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.aside {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-7);
+  padding: var(--space-6) var(--space-7);
+  background: var(--forest);
+  color: var(--on-forest);
+}
+
+.promise {
+  display: grid;
+  gap: var(--space-3);
+  max-width: 15ch;
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 4.2vw, 3.5rem);
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Cada frase começa com o traço da sua linha. */
+.arrival::before,
+.departure::before {
+  content: "";
+  display: block;
+  width: 56px;
+  height: var(--track);
+  margin-bottom: var(--space-3);
+  border-radius: 3px;
+}
+
+.arrival::before {
+  background: var(--green);
+}
+
+.departure::before {
+  background: var(--orange);
+}
+
+.arrival,
+.departure {
+  display: block;
+}
+
+.map {
+  margin-top: auto;
+}
+
+.main {
+  display: grid;
+  place-items: center;
+  padding: var(--space-7) var(--space-5);
+  background: var(--canvas);
+}
+
+.content {
+  width: min(460px, 100%);
+}
+
+.bandPage {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.band {
+  background: var(--forest);
+  color: var(--on-forest);
+}
+
+.bandInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  max-width: 880px;
+  min-height: var(--bar-height);
+  margin: 0 auto;
+  padding: 0 var(--space-5);
+}
+
+.bandLabel {
+  color: var(--on-forest-muted);
+  font-weight: 600;
+}
+
+.bandMain {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-5) var(--space-8);
+}
+
+@media (max-width: 899px) {
+  .page {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+  }
+
+  .aside {
+    gap: var(--space-4);
+    padding: var(--space-4);
+  }
+
+  .promise {
+    max-width: none;
+    font-size: 1.75rem;
+    gap: var(--space-2);
+  }
+
+  .arrival::before,
+  .departure::before {
+    width: 36px;
+    margin-bottom: var(--space-2);
+  }
+
+  .map {
+    display: none;
+  }
+
+  .main {
+    align-items: start;
+    padding: var(--space-5) var(--space-4) var(--space-7);
+  }
+}
+
+@media (max-width: 640px) {
+  .bandInner {
+    padding: 0 var(--space-4);
+  }
+
+  .bandMain {
+    padding: var(--space-5) var(--space-4) var(--space-7);
+  }
+}

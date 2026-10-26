@@ -1,0 +1,80 @@
+.tab {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 420px);
+  align-items: start;
+  gap: var(--space-6);
+}
+
+.manage {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.intro {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.title {
+  font-size: var(--text-xl);
+}
+
+.lead {
+  max-width: 62ch;
+  color: var(--muted);
+}
+
+.created {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.urlLabel {
+  font-weight: 600;
+}
+
+.url {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 var(--space-3);
+  border: 2px solid var(--field-border);
+  border-radius: var(--radius-m);
+  background: var(--canvas);
+  font: 500 var(--text-s) / 1.4 var(--font-mono);
+}
+
+.url:focus-visible {
+  border-color: var(--forest);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.preview {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.previewTitle {
+  font-size: 1.25rem;
+}
+
+/* Moldura de celular: a página do colaborador é pensada para 360 px. */
+.phone {
+  max-height: 720px;
+  overflow-y: auto;
+  border: 2px solid var(--forest);
+  border-radius: var(--radius-m);
+  background: var(--canvas);
+}
+
+@media (max-width: 960px) {
+  .tab {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

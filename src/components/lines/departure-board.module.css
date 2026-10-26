@@ -1,0 +1,242 @@
+.board {
+  min-width: 0;
+  color: var(--on-forest);
+}
+
+.framed {
+  padding: var(--space-1) var(--space-5) var(--space-2);
+  border-radius: var(--radius-m);
+  background: var(--forest);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.head th {
+  padding: var(--space-4) var(--space-3) var(--space-3);
+  border-bottom: 2px solid var(--forest-line);
+  color: var(--on-forest-muted);
+  font-size: var(--text-s);
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.head th:first-child,
+.row td:first-child {
+  padding-left: 0;
+}
+
+.head th:last-child,
+.row td:last-child {
+  padding-right: 0;
+  text-align: right;
+}
+
+.row td {
+  padding: var(--space-4) var(--space-3);
+  border-bottom: 1px solid var(--forest-line);
+  vertical-align: middle;
+}
+
+.row:last-child td {
+  border-bottom: 0;
+}
+
+.when {
+  width: 1%;
+  white-space: nowrap;
+}
+
+/* Horário em amarelo condensado, com a virada das placas do painel. */
+.time {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--yellow);
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  animation: flap 420ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  animation-delay: calc(var(--i, 0) * 50ms);
+  transform-origin: 50% 0;
+}
+
+.alert {
+  flex: none;
+}
+
+.who {
+  min-width: 150px;
+}
+
+.name {
+  display: block;
+  color: var(--on-forest);
+  font-weight: 600;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+a.name:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  color: var(--on-forest-muted);
+  font-size: var(--text-s);
+}
+
+.dash {
+  width: 14px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--green);
+}
+
+.offboarding .dash {
+  background: var(--orange);
+}
+
+.what {
+  min-width: 220px;
+}
+
+.whatText {
+  display: block;
+  font-weight: 500;
+}
+
+.reason {
+  display: block;
+  margin-top: 2px;
+  color: var(--on-forest-muted);
+  font-size: var(--text-s);
+}
+
+.status {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.action {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.action > * + * {
+  margin-left: var(--space-2);
+}
+
+@keyframes flap {
+  from {
+    opacity: 0;
+    transform: perspective(300px) rotateX(-70deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .time {
+    animation: none;
+  }
+}
+
+/* Celular: cada partida vira um cartão, mantendo os papéis de tabela. */
+@media (max-width: 760px) {
+  .framed {
+    padding: 0 var(--space-4);
+  }
+
+  .table,
+  .table tbody {
+    display: block;
+  }
+
+  .head {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "when status"
+      "who who"
+      "what what"
+      "action action";
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-4) 0;
+    border-bottom: 1px solid var(--forest-line);
+  }
+
+  .row:last-child {
+    border-bottom: 0;
+  }
+
+  .row td {
+    display: block;
+    width: auto;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .row td:last-child {
+    text-align: left;
+  }
+
+  .when {
+    grid-area: when;
+    align-self: center;
+    white-space: normal;
+  }
+
+  .time {
+    flex-wrap: wrap;
+    font-size: 1.5rem;
+  }
+
+  .status {
+    grid-area: status;
+    align-self: center;
+  }
+
+  .who {
+    grid-area: who;
+  }
+
+  .what {
+    grid-area: what;
+  }
+
+  .action {
+    grid-area: action;
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-top: var(--space-1);
+    white-space: normal;
+  }
+
+  .action > * + * {
+    margin-left: 0;
+  }
+
+  .action > * {
+    flex: 1 1 auto;
+  }
+}

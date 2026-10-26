@@ -1,0 +1,43 @@
+.page {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.page > header {
+  margin-bottom: 0;
+}
+
+.toolbar {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-5);
+}
+
+.search {
+  flex: 1 1 300px;
+  max-width: 440px;
+}
+
+.list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.none {
+  padding: var(--space-5) 0;
+  color: var(--muted);
+}
+
+.reset {
+  min-height: 44px;
+  padding: 0 var(--space-1);
+  border: 0;
+  background: transparent;
+  color: var(--blue);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  cursor: pointer;
+}

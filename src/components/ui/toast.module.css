@@ -1,0 +1,96 @@
+.region {
+  position: fixed;
+  right: var(--space-5);
+  bottom: var(--space-5);
+  z-index: 60;
+  display: grid;
+  gap: var(--space-2);
+  width: min(400px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.stack {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-2) var(--space-3) var(--space-4);
+  border: 1px solid var(--forest-line);
+  border-radius: var(--radius-m);
+  background: var(--forest);
+  color: var(--on-forest);
+  pointer-events: auto;
+  animation: enter 180ms ease-out;
+}
+
+.icon {
+  flex: none;
+  margin-top: 2px;
+}
+
+.success .icon {
+  color: var(--green);
+}
+
+.error .icon {
+  color: var(--red-on-forest);
+}
+
+.info .icon {
+  color: var(--yellow);
+}
+
+.text {
+  flex: 1;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.title {
+  font-weight: 600;
+}
+
+.description {
+  color: var(--on-forest-muted);
+  font-size: var(--text-s);
+}
+
+.close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin: -8px 0;
+  border: 0;
+  border-radius: var(--radius-m);
+  background: transparent;
+  color: var(--on-forest);
+  cursor: pointer;
+}
+
+.close:hover {
+  background: var(--forest-hover);
+}
+
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+@media (max-width: 640px) {
+  .region {
+    right: var(--space-4);
+    left: var(--space-4);
+    bottom: var(--space-4);
+    width: auto;
+  }
+}

@@ -1,0 +1,152 @@
+.page {
+  min-height: 100vh;
+}
+
+.bar {
+  background: var(--forest);
+  color: var(--on-forest);
+}
+
+.barInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  max-width: var(--container-wide);
+  min-height: var(--bar-height);
+  margin: 0 auto;
+  padding: var(--space-2) var(--space-5);
+}
+
+.barLabel {
+  color: var(--on-forest-muted);
+  font-weight: 600;
+}
+
+.main {
+  display: grid;
+  gap: var(--space-7);
+  max-width: var(--container-wide);
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-5) var(--space-8);
+}
+
+.main > header {
+  margin-bottom: 0;
+}
+
+.toc ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.toc a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 600;
+}
+
+.section {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  padding-top: var(--space-5);
+  border-top: 2px solid var(--line);
+}
+
+.sectionHead {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.sectionTitle {
+  font-size: var(--text-2xl);
+}
+
+.note {
+  color: var(--muted);
+  font-size: var(--text-s);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.darkRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-m);
+  background: var(--forest);
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+  align-items: start;
+  gap: var(--space-4) var(--space-5);
+}
+
+.stack {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.lines {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.passes {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.narrow {
+  max-width: 420px;
+}
+
+.phones {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(390px, 100%), 1fr));
+  align-items: start;
+  gap: var(--space-5);
+}
+
+.phoneFigure {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+}
+
+.phone {
+  max-width: 390px;
+  max-height: 780px;
+  overflow-y: auto;
+  border: 2px solid var(--forest);
+  border-radius: var(--radius-m);
+  background: var(--canvas);
+}
+
+@media (max-width: 640px) {
+  .main {
+    padding: var(--space-5) var(--space-4) var(--space-7);
+  }
+
+  .barInner {
+    padding: var(--space-2) var(--space-4);
+  }
+}

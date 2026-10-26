@@ -1,0 +1,8 @@
+.stepper {
+  margin-bottom: var(--space-6);
+}
+
+.body {
+  display: grid;
+  gap: var(--space-5);
+}

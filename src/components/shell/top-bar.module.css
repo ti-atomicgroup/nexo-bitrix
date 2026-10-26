@@ -1,0 +1,142 @@
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--forest);
+  color: var(--on-forest);
+}
+
+.inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  max-width: var(--container-wide);
+  min-height: var(--bar-height);
+  margin: 0 auto;
+  padding: 0 var(--space-5);
+}
+
+.brand {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-right: var(--space-2);
+  text-decoration: none;
+}
+
+.nav {
+  align-self: stretch;
+  display: flex;
+}
+
+.navList {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.navList li {
+  display: flex;
+}
+
+/* Item ativo: traço amarelo de 4 px na base, como a linha do mapa. */
+.navLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px var(--space-3) 0;
+  border-bottom: 4px solid transparent;
+  color: var(--on-forest-muted);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.navLink:hover {
+  background: var(--forest-hover);
+  color: var(--on-forest);
+}
+
+.navLink[aria-current="page"] {
+  border-bottom-color: var(--yellow);
+  color: var(--on-forest);
+}
+
+.navIcon {
+  flex: none;
+}
+
+.tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.newJourney {
+  flex: none;
+}
+
+@media (max-width: 1099px) {
+  .navIcon {
+    display: none;
+  }
+}
+
+/* Celular e tablet estreito: a navegação desce para uma segunda linha, com ícone sobre o rótulo. */
+@media (max-width: 899px) {
+  .inner {
+    flex-wrap: wrap;
+    gap: 0 var(--space-2);
+    padding: 0 var(--space-4);
+  }
+
+  .brand {
+    min-height: 56px;
+  }
+
+  .nav {
+    order: 3;
+    flex-basis: calc(100% + 2 * var(--space-4));
+    margin: 0 calc(-1 * var(--space-4));
+    border-top: 1px solid var(--forest-line);
+  }
+
+  .navList {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .navLink {
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    width: 100%;
+    min-height: 56px;
+    padding: 6px 4px 2px;
+    font-size: var(--text-s);
+  }
+
+  .navIcon {
+    display: block;
+  }
+}
+
+@media (max-width: 519px) {
+  .newJourneyLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .newJourney {
+    width: 44px;
+    padding: 0;
+  }
+}

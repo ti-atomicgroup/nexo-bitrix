@@ -1,0 +1,72 @@
+.sync {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-m);
+  background: transparent;
+  color: var(--on-forest-muted);
+  font-size: var(--text-s);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.sync:hover:not(:disabled) {
+  background: var(--forest-hover);
+  color: var(--on-forest);
+}
+
+.sync:disabled {
+  cursor: progress;
+}
+
+.icon {
+  flex: none;
+}
+
+.ok .icon {
+  color: var(--green);
+}
+
+/* Falha: ícone amarelo e texto branco (vermelho não tem contraste sobre o verde-floresta). */
+.error {
+  color: var(--on-forest);
+  font-weight: 600;
+}
+
+.error .icon {
+  color: var(--yellow);
+}
+
+.waiting .icon {
+  color: var(--on-forest-muted);
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 1199px) {
+  .sync {
+    padding: 0;
+    justify-content: center;
+  }
+
+  .text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}

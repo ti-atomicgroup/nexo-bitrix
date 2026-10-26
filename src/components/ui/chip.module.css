@@ -1,0 +1,99 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 2px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: var(--text-s);
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.icon {
+  flex: none;
+}
+
+.neutral {
+  background: var(--canvas);
+}
+
+.ok {
+  background: var(--green-tint);
+  border-color: var(--green);
+}
+
+.ok .icon {
+  color: var(--green-strong);
+}
+
+.attention {
+  background: var(--yellow-tint);
+  border-color: var(--yellow-edge);
+}
+
+.late {
+  background: var(--red);
+  border-color: var(--red);
+  color: var(--on-forest);
+}
+
+.info .icon {
+  color: var(--blue);
+}
+
+.forest {
+  background: var(--forest);
+  border-color: var(--forest);
+  color: var(--on-forest);
+}
+
+/* Etiqueta de linha: traço de 6 px na cor da linha, como no mapa. */
+.track {
+  flex: none;
+  width: 14px;
+  height: 6px;
+  border-radius: 3px;
+}
+
+.arrival .track {
+  background: var(--green);
+}
+
+.departure .track {
+  background: var(--orange);
+}
+
+/* Sobre o painel verde-floresta. */
+.onDark.neutral,
+.onDark.info,
+.onDark.arrival,
+.onDark.departure {
+  background: transparent;
+  border-color: var(--forest-line);
+  color: var(--on-forest);
+}
+
+.onDark.info .icon {
+  color: var(--on-forest-muted);
+}
+
+.onDark.ok {
+  background: var(--green);
+  border-color: var(--green);
+  color: var(--ink);
+}
+
+.onDark.ok .icon {
+  color: var(--ink);
+}
+
+.onDark.attention {
+  background: var(--yellow);
+  border-color: var(--yellow);
+  color: var(--ink);
+}

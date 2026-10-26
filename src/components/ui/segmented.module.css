@@ -1,0 +1,76 @@
+.group {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.legend {
+  margin-bottom: var(--space-2);
+  padding: 0;
+  font-weight: 600;
+}
+
+.options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.option {
+  position: relative;
+  display: inline-flex;
+}
+
+.input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.face {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: 2px solid var(--forest);
+  border-radius: var(--radius-m);
+  background: var(--paper);
+  color: var(--forest);
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: background-color 120ms ease;
+}
+
+.option:hover .input:not(:checked) + .face {
+  background: var(--green-tint);
+}
+
+.input:checked + .face {
+  background: var(--forest);
+  color: var(--on-forest);
+}
+
+.input:focus-visible + .face {
+  box-shadow: var(--focus-ring);
+}
+
+.count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: var(--radius-s);
+  background: var(--canvas);
+  color: var(--ink);
+  font-size: var(--text-xs);
+}
+
+.input:checked + .face .count {
+  background: var(--yellow);
+}

@@ -1,0 +1,78 @@
+.empty {
+  --empty-line: var(--forest);
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  padding: var(--space-7) var(--space-5);
+  border: 2px dashed var(--line);
+  border-radius: var(--radius-m);
+  background: var(--paper);
+  text-align: center;
+}
+
+.arrival {
+  --empty-line: var(--green);
+}
+
+.departure {
+  --empty-line: var(--orange);
+}
+
+/* Trecho de linha tracejado: ninguém nesta parada ainda. */
+.line {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: min(240px, 100%);
+  margin-bottom: var(--space-2);
+}
+
+.line::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 50%;
+  height: var(--track);
+  margin-top: calc(var(--track) / -2);
+  background: repeating-linear-gradient(90deg, var(--empty-line) 0 14px, transparent 14px 22px);
+  opacity: 0.45;
+}
+
+.station {
+  position: relative;
+  width: var(--station);
+  height: var(--station);
+  border: 3px solid var(--empty-line);
+  border-radius: 50%;
+  background: var(--paper);
+}
+
+.tile {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-m);
+  background: var(--forest);
+  color: var(--on-forest);
+}
+
+.title {
+  font-size: var(--text-xl);
+}
+
+.text {
+  max-width: 52ch;
+  color: var(--muted);
+}
+
+.action {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}

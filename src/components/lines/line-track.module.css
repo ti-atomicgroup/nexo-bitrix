@@ -1,0 +1,154 @@
+.line {
+  --line-color: var(--green);
+  --line-pending: var(--green-tint-strong);
+  --dot-row: 24px;
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.offboarding {
+  --line-color: var(--orange);
+  --line-pending: var(--orange-tint-strong);
+}
+
+.withHere {
+  padding-top: 36px;
+}
+
+.stations {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--count), minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Trilho inteiro (trecho ainda não percorrido). */
+.stations::before,
+.stations::after {
+  content: "";
+  position: absolute;
+  top: calc(var(--dot-row) / 2 - var(--track) / 2);
+  left: calc(100% / var(--count) / 2);
+  height: var(--track);
+  border-radius: 3px;
+}
+
+.stations::before {
+  right: calc(100% / var(--count) / 2);
+  background: var(--line-pending);
+}
+
+/* Trecho já percorrido, até a estação atual. */
+.stations::after {
+  width: calc(100% / var(--count) * var(--reached));
+  background: var(--line-color);
+}
+
+.station {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.dot {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: var(--station);
+  height: var(--station);
+  margin-top: calc((var(--dot-row) - var(--station)) / 2);
+  border: 3px solid var(--line-color);
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.done .dot {
+  background: var(--line-color);
+}
+
+.current .dot {
+  width: var(--dot-row);
+  height: var(--dot-row);
+  margin-top: 0;
+  border-color: var(--forest);
+  background: var(--yellow);
+}
+
+.name {
+  max-width: 100%;
+  padding: 0 2px;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: 1.25;
+  text-align: center;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+.done .name {
+  color: var(--ink);
+}
+
+.current .name {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/* Marcador "Você está aqui": etiqueta amarela com seta para a estação. */
+.here {
+  position: absolute;
+  top: -34px;
+  z-index: 2;
+  padding: 3px 8px;
+  border: 2px solid var(--forest);
+  border-radius: var(--radius-s);
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.here::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  width: 0;
+  height: 0;
+  border: 6px solid transparent;
+  border-top-color: var(--forest);
+}
+
+.hereCenter {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.hereCenter::after {
+  left: calc(50% - 6px);
+}
+
+.hereStart {
+  left: calc(50% - 16px);
+}
+
+.hereStart::after {
+  left: 10px;
+}
+
+.hereEnd {
+  right: calc(50% - 16px);
+}
+
+.hereEnd::after {
+  right: 10px;
+}

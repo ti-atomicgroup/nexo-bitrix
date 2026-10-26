@@ -1,0 +1,35 @@
+.page {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--space-5);
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: var(--space-5);
+  background: var(--forest);
+  color: var(--on-forest);
+  text-align: center;
+}
+
+.error {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  max-width: 520px;
+}
+
+.title {
+  font-size: var(--text-xl);
+}
+
+.text {
+  color: var(--on-forest-muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}

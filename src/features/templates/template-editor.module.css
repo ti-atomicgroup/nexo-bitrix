@@ -1,0 +1,64 @@
+.page {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.page > header {
+  margin-bottom: 0;
+}
+
+.form {
+  display: grid;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+.section {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.sectionTitle {
+  font-size: var(--text-2xl);
+}
+
+.lead {
+  max-width: 68ch;
+  margin-top: calc(-1 * var(--space-2));
+  color: var(--muted);
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  gap: var(--space-4);
+}
+
+.wide {
+  grid-column: 1 / -1;
+}
+
+.stages {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--line);
+  background: var(--canvas);
+}
+
+.error {
+  color: var(--red-ink);
+  font-weight: 600;
+}

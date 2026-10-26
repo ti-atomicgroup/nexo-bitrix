@@ -135,3 +135,50 @@ textarea {
     scroll-behavior: auto !important;
   }
 }
+
+/* E2 */
+:root {
+  --yellow-hover: #ffdf40;
+  --green-tint-strong: #bfe6d0;
+  --orange-tint-strong: #ffd3b8;
+  --forest-deep: #082e22;
+  --overlay: rgb(8 46 34 / 0.62);
+  --container-wide: 1200px;
+  --bar-height: 64px;
+  --font-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  /* Borda de campos: contraste 4.4:1 sobre o branco (WCAG 1.4.11). */
+  --field-border: #6b7d74;
+  --yellow-edge: #b89600;
+  --red-on-forest: #ff8a84;
+  --skeleton: #dde6e0;
+  --skeleton-shine: #eaf0ec;
+}
+
+html {
+  scroll-padding-top: calc(var(--bar-height) + var(--space-4));
+}
+
+/* Diálogos modais (<dialog>) travam a rolagem da página por trás. */
+html:has(dialog[open]:modal) {
+  overflow: hidden;
+}
+
+/* Superfícies do navegador no tom do produto: seleção, cursor de texto, controles nativos e sublinhados. */
+:root {
+  accent-color: var(--forest);
+}
+
+::selection {
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+input,
+textarea {
+  caret-color: var(--forest);
+}
+
+a {
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: from-font;
+}

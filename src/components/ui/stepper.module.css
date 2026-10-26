@@ -1,0 +1,84 @@
+.stepper {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  text-align: center;
+}
+
+/* Trilho entre as estações. */
+.step::before {
+  content: "";
+  position: absolute;
+  top: 15px;
+  right: 50%;
+  width: 100%;
+  height: var(--track);
+  background: var(--line);
+}
+
+.step:first-child::before {
+  display: none;
+}
+
+.done::before,
+.current::before {
+  background: var(--forest);
+}
+
+.station {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--field-border);
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.done .station {
+  border-color: var(--forest);
+  background: var(--forest);
+  color: var(--on-forest);
+}
+
+.current .station {
+  border-color: var(--forest);
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+.label {
+  padding: 0 var(--space-1);
+  color: var(--muted);
+  font-size: var(--text-s);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.current .label {
+  color: var(--ink);
+}
+
+.done .label {
+  color: var(--ink);
+}
+
+.step:first-child .station {
+  margin-top: 0;
+}

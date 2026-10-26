@@ -1,0 +1,22 @@
+.area {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.skeleton {
+  display: block;
+  max-width: 100%;
+  border-radius: var(--radius-s);
+  background: linear-gradient(90deg, var(--skeleton) 0%, var(--skeleton-shine) 40%, var(--skeleton) 80%) 0 0 / 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.onDark {
+  background: linear-gradient(90deg, var(--forest-hover) 0%, var(--forest-line) 40%, var(--forest-hover) 80%) 0 0 / 200% 100%;
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}

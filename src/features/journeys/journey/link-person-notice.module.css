@@ -1,0 +1,12 @@
+.form {
+  display: grid;
+  gap: var(--space-3);
+  max-width: 520px;
+  margin-top: var(--space-3);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

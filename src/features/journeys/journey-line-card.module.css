@@ -1,0 +1,105 @@
+.card {
+  position: relative;
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--paper);
+  transition: border-color 120ms ease;
+}
+
+.card:hover {
+  border-color: var(--field-border);
+}
+
+.card:has(.link:focus-visible) {
+  box-shadow: var(--focus-ring);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.who {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.name {
+  font-size: 1.5rem;
+  line-height: 1.1;
+}
+
+.link {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+/* O cartão inteiro é clicável; o foco fica no nome. */
+.link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.link:focus-visible {
+  box-shadow: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.meta {
+  color: var(--muted);
+  font-size: var(--text-s);
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  font-size: var(--text-s);
+}
+
+.next {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.nextIcon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--forest);
+}
+
+.progress {
+  color: var(--muted);
+}
+
+.progress strong {
+  color: var(--ink);
+}
+
+@media (max-width: 640px) {
+  .card {
+    padding: var(--space-4);
+  }
+}

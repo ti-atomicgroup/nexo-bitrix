@@ -1,0 +1,114 @@
+.list {
+  --line-color: var(--green);
+  --line-pending: var(--green-tint-strong);
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.offboarding {
+  --line-color: var(--orange);
+  --line-pending: var(--orange-tint-strong);
+}
+
+.item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  column-gap: var(--space-4);
+  padding-bottom: var(--space-6);
+}
+
+.item:last-child {
+  padding-bottom: 0;
+}
+
+/* Trilho até a próxima estação: cheio depois de uma etapa concluída, claro adiante. */
+.item:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  top: 14px;
+  bottom: -14px;
+  left: calc(14px - var(--track) / 2);
+  width: var(--track);
+  background: var(--line-pending);
+}
+
+.done:not(:last-child)::before {
+  background: var(--line-color);
+}
+
+.dot {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin: 4px;
+  border: 3px solid var(--line-color);
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.done .dot {
+  background: var(--line-color);
+}
+
+.current .dot {
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  border-color: var(--forest);
+  background: var(--yellow);
+}
+
+.content {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  min-height: 28px;
+}
+
+.title {
+  font-size: 1.5rem;
+  overflow-wrap: anywhere;
+}
+
+.upcoming .title {
+  color: var(--muted);
+}
+
+.here {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border: 2px solid var(--forest);
+  border-radius: var(--radius-s);
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: var(--text-s);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.meta {
+  color: var(--muted);
+  font-size: var(--text-s);
+}
+
+.children {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  min-width: 0;
+}
