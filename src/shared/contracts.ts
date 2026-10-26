@@ -413,6 +413,41 @@ export interface DiagnosticsDTO {
   recentBitrixErrors: Array<{ at: string; method: string; code: string | null }>;
 }
 
+/* ───────────── Página do colaborador (/j/:token) ───────────── */
+
+export interface CollaboratorActivityDTO {
+  id: string;
+  title: string;
+  instructions: string;
+  kind: ActivityKind;
+  dueAt: string;
+  /** todo: a fazer; done: feita; waiting: ainda não liberada. */
+  status: "todo" | "done" | "waiting";
+  /** Atividade do próprio colaborador (pode marcar como feita). As outras aparecem como "o que vai acontecer". */
+  mine: boolean;
+  /** Ex.: "TI" para "TI está preparando seu notebook". Nunca o nome de quem executa tarefas internas do RH. */
+  ownerLabel: string;
+  links: LinkItem[];
+}
+
+export interface CollaboratorViewDTO {
+  kind: JourneyKind;
+  company: string;
+  person: { firstName: string; name: string };
+  /** 1º dia (entrada) ou último dia (saída). */
+  anchorDate: string;
+  /** Dias até a data-âncora no fuso da empresa (negativo depois dela). */
+  daysUntilAnchor: number;
+  /** Mensagem de boas-vindas (entrada) ou de agradecimento (saída), configurada pelo RH. */
+  message: string;
+  progress: { done: number; total: number; percent: number };
+  stages: Array<{ position: number; name: string; state: "done" | "current" | "upcoming"; activities: CollaboratorActivityDTO[] }>;
+  people: Array<{ role: "gestor" | "buddy" | "rh"; name: string; position: string | null }>;
+  contacts: Array<{ label: string; value: string }>;
+  faq: Array<{ question: string; answer: string }>;
+  completed: boolean;
+}
+
 /** Erro padrão de toda a API: mensagem em pt-BR pronta para a tela. */
 export interface ApiErrorDTO {
   error: { code: string; message: string };
