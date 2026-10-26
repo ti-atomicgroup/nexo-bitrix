@@ -133,6 +133,11 @@ export function Diagnostics({ variant }: { variant: "same-origin" | "no-referrer
       put("egress", { label: "Saída até o Bitrix24 (fetch)", status: egress.bitrixFetch.ok ? "ok" : "falha", detail: line(egress.bitrixFetch) });
       put("egress-ipv4", { label: "Saída até o Bitrix24 (IPv4)", status: egress.bitrixIpv4.ok ? "ok" : "falha", detail: line(egress.bitrixIpv4) });
       put("egress-neutral", { label: "Saída para a internet (example.com)", status: egress.neutralFetch.ok ? "ok" : "falha", detail: line(egress.neutralFetch) });
+      put("egress-ip", {
+        label: "IP de saída do servidor",
+        status: egress.outboundIp?.ok ? "ok" : "aviso",
+        detail: egress.outboundIp?.ok ? `${egress.outboundIp.ip} (é este IP que o Bitrix24 vê)` : (egress.outboundIp?.error ?? "Não informado."),
+      });
       put("egress-proxy", { label: "Proxy no ambiente", status: "ok", detail: egress.proxyEnv.length ? egress.proxyEnv.join(", ") : "Nenhum" });
     } catch (error) {
       put("egress", { label: "Saída até o Bitrix24", status: "falha", detail: error instanceof Error ? error.message : "Sem resposta." });

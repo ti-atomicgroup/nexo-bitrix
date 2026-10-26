@@ -48,7 +48,21 @@ function viaHttpsIpv4(host: string): Promise<Attempt> {
   });
 }
 
-/** Testa a saída do servidor até o portal (sem webhook, sem segredo): DNS, fetch, https IPv4 e um site neutro. */
+/** IP público de saída do servidor (o que o Bitrix24 vê), para pedir liberação ao provedor ou ao Bitrix24. */
+async function publicIp(): Promise<{ ok: boolean; ip?: string; error?: string }> {
+  for (const url of ["https://api.ipify.org?format=json", "https://api64.ipify.org?format=json"]) {
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+      const ip = ((await response.json()) as { ip?: unknown })?.ip;
+      if (typeof ip === "string" && ip.length <= 45) return { ok: true, ip };
+    } catch (error) {
+      if (url.includes("api64")) return { ok: false, error: describe(error) };
+    }
+  }
+  return { ok: false, error: "Resposta inesperada do serviço de IP." };
+}
+
+/** Testa a saída do servidor até o portal (sem webhook, sem segredo): DNS, fetch, https IPv4, um site neutro e o IP de saída. */
 export async function egressProbe(host: string) {
   let dns: { ok: boolean; addresses?: string[]; error?: string };
   try {
@@ -57,13 +71,19 @@ export async function egressProbe(host: string) {
   } catch (error) {
     dns = { ok: false, error: describe(error) };
   }
-  const [bitrixFetch, bitrixIpv4, neutralFetch] = await Promise.all([viaFetch(`https://${host}/rest/`), viaHttpsIpv4(host), viaFetch("https://example.com/")]);
+  const [bitrixFetch, bitrixIpv4, neutralFetch, outboundIp] = await Promise.all([
+    viaFetch(`https://${host}/rest/`),
+    viaHttpsIpv4(host),
+    viaFetch("https://example.com/"),
+    publicIp(),
+  ]);
   return {
     host,
     dns,
     bitrixFetch,
     bitrixIpv4,
     neutralFetch,
+    outboundIp,
     proxyEnv: ["HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy"].filter((name) => Boolean(process.env[name])),
   };
 }
