@@ -1,0 +1,419 @@
+/**
+ * Contratos (DTOs) entre a API (`src/app/api/**`) e a interface.
+ * Congelados na Fase 0: mudanças só por adição de campos opcionais, feitas pelo lead.
+ * Datas: `YYYY-MM-DD` para datas de calendário; ISO 8601 com fuso para instantes.
+ */
+import type {
+  ActivityKind,
+  ActivityRole,
+  ActivityStatus,
+  AppRole,
+  DetectionStatus,
+  JourneyKind,
+  JourneyStatus,
+  LedgerKind,
+  LedgerStatus,
+  OffboardingReason,
+  OffsetUnit,
+  OptionalScope,
+  ParticipantRole,
+  ReleaseMode,
+  RequiredScope,
+  SetupStage,
+  SyncState,
+  Visibility,
+} from "./enums";
+
+/* ───────────── Pessoas ───────────── */
+
+export interface UserRef {
+  bitrixUserId: string;
+  name: string;
+  position: string | null;
+}
+
+export interface PersonDTO {
+  id: string;
+  bitrixUserId: string | null;
+  name: string;
+  email: string | null;
+  position: string | null;
+  department: string | null;
+  active: boolean;
+  source: "bitrix" | "manual" | "crm";
+}
+
+/* ───────────── Trilhas (modelos) ───────────── */
+
+export interface LedgerTag {
+  kind: LedgerKind;
+  name: string;
+}
+
+export interface ChecklistTemplateItem {
+  /** Chave estável dentro da atividade (ex.: "google-workspace"). */
+  key: string;
+  text: string;
+  /** Quando concluído no onboarding, vira item do inventário da pessoa. */
+  ledger: LedgerTag | null;
+}
+
+export interface LinkItem {
+  label: string;
+  url: string;
+}
+
+export interface TemplateActivityDTO {
+  id: string;
+  position: number;
+  title: string;
+  instructions: string;
+  kind: ActivityKind;
+  role: ActivityRole;
+  /** Dias relativos à data-âncora (1º dia ou último dia). Negativo = antes. */
+  dueOffsetDays: number;
+  dueOffsetUnit: OffsetUnit;
+  /** HH:MM no fuso da empresa. */
+  dueTime: string;
+  required: boolean;
+  visibility: Visibility;
+  requiresApproval: boolean;
+  /** Atividade de desligamento que recebe a lista "Revogar e recolher" do inventário. */
+  ledgerRole: "revoke_and_collect" | null;
+  checklist: ChecklistTemplateItem[];
+  links: LinkItem[];
+}
+
+export interface TemplateStageDTO {
+  id: string;
+  position: number;
+  name: string;
+  description: string;
+  releaseMode: ReleaseMode;
+  releaseOffsetDays: number;
+  releaseOffsetUnit: OffsetUnit;
+  activities: TemplateActivityDTO[];
+}
+
+export interface TemplateSummaryDTO {
+  id: string;
+  kind: JourneyKind;
+  name: string;
+  profile: string;
+  description: string;
+  version: number;
+  archived: boolean;
+  stageCount: number;
+  activityCount: number;
+  /** Menor e maior deslocamento de prazo, em dias (ex.: -5 a 90). */
+  span: { fromDays: number; toDays: number };
+  updatedAt: string;
+}
+
+export interface TemplateDTO extends TemplateSummaryDTO {
+  stages: TemplateStageDTO[];
+}
+
+/** Atividade pronta da biblioteca (só leitura), para inserir em trilhas. */
+export interface LibraryActivityDTO {
+  id: string;
+  journeyKind: JourneyKind | "both";
+  group: string;
+  activity: Omit<TemplateActivityDTO, "id" | "position">;
+}
+
+/* ───────────── Jornadas ───────────── */
+
+export interface JourneyChecklistItem {
+  key: string;
+  text: string;
+  done: boolean;
+  bitrixItemId: string | null;
+  ledger: LedgerTag | null;
+}
+
+export interface ActivityDTO {
+  id: string;
+  journeyId: string;
+  stagePosition: number;
+  position: number;
+  title: string;
+  instructions: string;
+  kind: ActivityKind;
+  role: ActivityRole;
+  assignee: UserRef | null;
+  dueAt: string;
+  required: boolean;
+  visibility: Visibility;
+  requiresApproval: boolean;
+  status: ActivityStatus;
+  overdue: boolean;
+  checklist: JourneyChecklistItem[];
+  links: LinkItem[];
+  bitrixTaskId: string | null;
+  bitrixUrl: string | null;
+  bitrixMissing: boolean;
+  syncState: SyncState;
+  syncError: string | null;
+  releasedAt: string | null;
+  /** Quando a etapa ainda está bloqueada: previsão de liberação. */
+  releasesAt: string | null;
+  doneAt: string | null;
+  doneSource: "bitrix" | "nexo" | "link" | null;
+}
+
+export interface LineStationDTO {
+  position: number;
+  name: string;
+  state: "done" | "current" | "upcoming";
+}
+
+export type JourneyRisk = "ok" | "attention" | "critical";
+
+export interface JourneySummaryDTO {
+  id: string;
+  kind: JourneyKind;
+  person: PersonDTO;
+  templateName: string;
+  profile: string;
+  /** 1º dia (entrada) ou último dia (saída). */
+  anchorDate: string;
+  status: JourneyStatus;
+  progress: { done: number; total: number; percent: number };
+  line: LineStationDTO[];
+  nextStop: { label: string; at: string } | null;
+  risk: JourneyRisk;
+}
+
+export interface JourneyStageDTO {
+  position: number;
+  name: string;
+  state: "done" | "current" | "upcoming";
+  releaseMode: ReleaseMode;
+  releasesAt: string | null;
+  activities: ActivityDTO[];
+}
+
+export interface LedgerItemDTO {
+  id: string;
+  personId: string;
+  kind: LedgerKind;
+  name: string;
+  detail: string;
+  status: LedgerStatus;
+  source: "onboarding" | "manual";
+  grantedAt: string | null;
+  closedAt: string | null;
+  waivedReason: string | null;
+}
+
+export interface CompletionCheckDTO {
+  ok: boolean;
+  blockers: string[];
+}
+
+export interface CollaboratorLinkDTO {
+  active: boolean;
+  expiresAt: string | null;
+  /** Só existe na resposta que cria o link; depois o Nexo guarda apenas o hash. */
+  url?: string;
+}
+
+export interface AuditEntryDTO {
+  at: string;
+  actor: string;
+  action: string;
+  detail: string;
+}
+
+export interface JourneyDTO {
+  summary: JourneySummaryDTO;
+  participants: Partial<Record<ParticipantRole, UserRef>>;
+  stages: JourneyStageDTO[];
+  ledger: LedgerItemDTO[];
+  link: CollaboratorLinkDTO;
+  source: { type: "manual" | "trigger"; label: string | null; crmUrl: string | null };
+  /** Só para o RH; nunca vai para a página do colaborador. */
+  offboardingReason: OffboardingReason | null;
+  completion: CompletionCheckDTO;
+  projectUrl: string | null;
+  history: AuditEntryDTO[];
+}
+
+/** Resumo antes de iniciar: "14 atividades em 45 dias: TI 5, Gestor 4…". */
+export interface JourneyPreviewDTO {
+  activityCount: number;
+  spanDays: number;
+  firstDueAt: string | null;
+  lastDueAt: string | null;
+  byRole: Partial<Record<ActivityRole, number>>;
+  releasedNow: number;
+  missingAssignees: ActivityRole[];
+}
+
+/* ───────────── Painel de hoje ───────────── */
+
+export type BoardRowKind = "detection" | "missing_data" | "sync_error" | "hr_activity" | "risk" | "approval";
+export type BoardActionType = "start_journey" | "open_activity" | "nudge" | "approve" | "resolve_sync" | "link_person" | "open_journey";
+
+export interface BoardRowDTO {
+  id: string;
+  kind: BoardRowKind;
+  when: { label: string; at: string | null; overdue: boolean };
+  who: { name: string; journeyId: string | null; kind: JourneyKind | null };
+  what: string;
+  reason: string;
+  status: { tone: "ok" | "attention" | "late" | "info"; label: string };
+  action: { type: BoardActionType; label: string; targetId: string };
+}
+
+export interface SyncStatusDTO {
+  connected: boolean;
+  lastCycleAt: string | null;
+  lastError: string | null;
+  rateLimitedUntil: string | null;
+  queued: number;
+}
+
+export interface TodayDTO {
+  date: string;
+  greetingName: string;
+  counters: { actions: number; arriving: number; leaving: number };
+  board: BoardRowDTO[];
+  lines: JourneySummaryDTO[];
+  upcoming: Array<{ journeyId: string; personName: string; kind: JourneyKind; anchorDate: string; daysUntil: number }>;
+  sync: SyncStatusDTO;
+}
+
+/* ───────────── Automação (CRM) ───────────── */
+
+export interface DetectionDTO {
+  id: string;
+  triggerId: string;
+  triggerName: string;
+  journeyKind: JourneyKind;
+  templateId: string;
+  entityTypeId: number;
+  entityId: number;
+  title: string;
+  personName: string | null;
+  personEmail: string | null;
+  bitrixUserId: string | null;
+  suggestedDate: string | null;
+  crmUrl: string | null;
+  detectedAt: string;
+  status: DetectionStatus;
+}
+
+export interface TriggerFieldMap {
+  date?: string;
+  name?: string;
+  email?: string;
+  bitrixUser?: string;
+}
+
+export interface TriggerDTO {
+  id: string;
+  name: string;
+  journeyKind: JourneyKind;
+  entityTypeId: number;
+  categoryId: number | null;
+  stageId: string;
+  stageName: string | null;
+  sourceName: string | null;
+  templateId: string;
+  fieldMap: TriggerFieldMap;
+  enabled: boolean;
+  lastRunAt: string | null;
+  lastError: string | null;
+}
+
+export interface CrmSourceDTO {
+  entityTypeId: number;
+  kind: "lead" | "deal" | "smart_process";
+  name: string;
+  categories: Array<{ id: number | null; name: string; stages: Array<{ id: string; name: string }> }>;
+  fields: Array<{ id: string; name: string; type: string }>;
+}
+
+/* ───────────── Instalação, sessão e ajustes ───────────── */
+
+export interface ScopeCheckDTO {
+  required: Record<RequiredScope, boolean>;
+  optional: Record<OptionalScope, boolean>;
+}
+
+export interface SetupStateDTO {
+  stage: SetupStage;
+  portal: string | null;
+  webhookOwner: UserRef | null;
+  scopes: ScopeCheckDTO | null;
+}
+
+/** Resposta pública de /api/status (sem segredos). */
+export interface StatusDTO {
+  setup: SetupStage;
+  version: string;
+  commit: string;
+}
+
+export interface MeDTO {
+  user: { id: string; name: string; email: string; role: AppRole; mustChangePassword: boolean };
+  setup: SetupStateDTO;
+}
+
+export interface SessionDTO {
+  token: string;
+  expiresAt: string;
+  me: MeDTO;
+}
+
+export interface WebhookCheckDTO {
+  /** Token curto que liga a criação do primeiro acesso a esta aba. */
+  installToken: string;
+  portal: string;
+  owner: UserRef;
+  scopes: ScopeCheckDTO;
+}
+
+export interface CollaboratorContentDTO {
+  welcomeMessage: string;
+  farewellMessage: string;
+  contacts: Array<{ label: string; value: string }>;
+  faqOnboarding: Array<{ question: string; answer: string }>;
+  faqOffboarding: Array<{ question: string; answer: string }>;
+}
+
+export interface SettingsDTO {
+  company: { name: string; timezone: string };
+  portal: string | null;
+  webhook: { masked: string; owner: UserRef; scopes: ScopeCheckDTO; verifiedAt: string } | null;
+  project: { id: string; name: string; url: string } | null;
+  defaults: Partial<Record<ParticipantRole, UserRef>>;
+  content: CollaboratorContentDTO;
+  features: { notifications: boolean; calendar: boolean; feed: boolean };
+}
+
+export interface AppUserDTO {
+  id: string;
+  name: string;
+  email: string;
+  role: AppRole;
+  active: boolean;
+  lastLoginAt: string | null;
+}
+
+export interface DiagnosticsDTO {
+  build: { version: string; commit: string; buildTime: string };
+  node: string;
+  database: { driver: string; journalMode: string; dataDir: string };
+  scheduler: { running: boolean; lastCycleAt: string | null; lastCycleMs: number | null; lastError: string | null; nextCycleAt: string | null };
+  queue: { queued: number; failed: number };
+  rateLimitedUntil: string | null;
+  recentBitrixErrors: Array<{ at: string; method: string; code: string | null }>;
+}
+
+/** Erro padrão de toda a API: mensagem em pt-BR pronta para a tela. */
+export interface ApiErrorDTO {
+  error: { code: string; message: string };
+}
