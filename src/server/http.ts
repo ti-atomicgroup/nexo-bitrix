@@ -6,6 +6,7 @@ import { getRuntime } from "./runtime";
 import { seedTemplates } from "./seeds";
 import { workspace } from "./workspace";
 import { webhookConfigurationSchema, outgoingWebhookSchema, localUserSchema } from "./models";
+import { hasBitrixScope } from "./bitrix-scopes";
 const noStore = { "Cache-Control": "no-store, private", Pragma: "no-cache", "X-Content-Type-Options": "nosniff" };
 export function json(data: unknown, headers: HeadersInit = {}) { return Response.json({ data }, { headers: { ...noStore, ...Object.fromEntries(new Headers(headers)) } }); }
 export function errorResponse(error: unknown) {
@@ -45,16 +46,16 @@ function checkOrigin(request: Request, allowPortal = false) {
   const origin = request.headers.get("Origin"), env = getRuntime().env;
   if (origin && origin !== env.appUrl && !(allowPortal && origin === env.portalUrl)) throw new AppError("ORIGIN_INVALID", "Origem do pedido não autorizada.", 403);
 }
-export async function status(request?: Request) {
+export async function status(request: Request) {
   const result: PublicStatus = { installed: false, configured: false, portalDomain: null, appUrl: "", missingEnvironment: [], version: "1.0.0", webhookConnected: false, firstAdminCreated: false, outgoingWebhookConfigured: false, aiConfigured: false };
   try {
-    const runtime = getRuntime(), env = runtime.env; if (request) pinAppOrigin(env, runtime.store, request.url, request.headers); result.appUrl = env.appUrl; result.portalDomain = env.portalDomain || null; result.aiConfigured = env.aiConfigured;
+    const runtime = getRuntime(), env = runtime.env; pinAppOrigin(env, runtime.store, request.url, request.headers); result.appUrl = env.appUrl; result.portalDomain = env.portalDomain || null; result.aiConfigured = env.aiConfigured;
     const incoming = runtime.store.get("webhook", "incoming", webhookConfigurationSchema), outgoing = runtime.store.get("webhook", "outgoing", outgoingWebhookSchema), users = runtime.store.list("localUser", localUserSchema);
     result.webhookConnected = Boolean(incoming);
     result.firstAdminCreated = users.some(user => user.role === "admin" && user.active);
     result.outgoingWebhookConfigured = Boolean(outgoing);
     result.installed = Boolean(incoming && users.length);
-    result.configured = result.installed && Boolean(outgoing) && runtime.auth.settings().setupComplete;
+    result.configured = result.installed && runtime.auth.settings().setupComplete;
     return json(result);
   }
   catch (error) { if (error instanceof AppError) return json({ ...result, missingEnvironment: [error.code] }); return errorResponse(error); }
@@ -87,7 +88,7 @@ export async function api(request: Request, resource: string, id?: string) {
       if (action === "connect-webhook") {
         if (runtime.store.list("localUser", localUserSchema).length) throw new AppError("BOOTSTRAP_CLOSED", "Esta instância já foi instalada.", 409);
         const url = z.string().max(2000).parse(input.url), verified = await runtime.bitrix.testWebhook(url);
-        const required = ["task", "crm", "sonet", "userfieldconfig"], missingScopes = required.filter(scope => !verified.scopes.includes(scope)).concat(!verified.scopes.includes("user_brief") && !verified.scopes.includes("user") ? ["user_brief"] : []);
+        const required = ["task", "crm", "sonet", "userfieldconfig"], missingScopes = required.filter(scope => !hasBitrixScope(verified.scopes, scope)).concat(!hasBitrixScope(verified.scopes, "user_brief") ? ["user_brief"] : []);
         if (missingScopes.length) throw new AppError("SCOPES_MISSING", `Recrie o webhook com permissões: ${missingScopes.join(", ")}.`, 422);
         runtime.bitrix.configureWebhook(url, verified.userId);
         const grant = runtime.auth.issueInstallGrant();

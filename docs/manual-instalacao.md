@@ -1,11 +1,13 @@
 # Manual fácil de instalação do Nexo
 
+Depois da instalação, consulte também o [guia rápido de uso](./como-usar-nexo.md), que explica como preparar modelos, abrir jornadas e acompanhar tarefas no Kanban do Bitrix24.
+
 O Nexo roda na Onnira Cloud IA. Cada cliente conecta seu próprio portal Bitrix24 por webhook. O fluxo de instalação pelo Marketplace depende da liberação de publicação pela Onnira; até lá, o responsável técnico pode publicar uma instância pela Cloud IA usando os passos de hospedagem abaixo.
 
 ## Se você vai usar o Nexo
 
 1. Abra o Nexo instalado na sua conta Onnira. Na primeira tela, escolha **Conecte seu Bitrix24**.
-2. Entre no seu portal Bitrix24 com a conta de RH que executará as tarefas. Crie um webhook REST **de entrada** em **Aplicativos → Recursos do desenvolvedor → Webhooks**, com os escopos `task`, `user_brief` (ou `user`), `crm`, `sonet` e `userfieldconfig`.
+2. Entre no seu portal Bitrix24 com a conta de RH que executará as tarefas. Crie um webhook REST **de entrada** em **Aplicativos → Recursos do desenvolvedor → Outro → Webhook de entrada**, com os escopos `task`, `user_brief` (ou `user`), `crm`, `sonet_group` e `userfieldconfig`. O escopo de projetos pode aparecer como `sonet` em algumas respostas da API.
 3. Cole a URL completa do webhook no Nexo e escolha **Validar conexão**. O Nexo identifica seu portal, testa a conta e verifica os escopos.
 4. No mesmo navegador, informe seu e-mail e crie uma senha com pelo menos 12 caracteres. Clique em **Criar acesso RH**. O Nexo reconhece automaticamente a conta Bitrix do webhook. Esta etapa deve ser concluída em até dez minutos; se expirar, valide o webhook novamente.
 5. Configure o projeto de tarefas e revise os modelos. Para receber eventos e iniciar jornadas automaticamente, siga o passo 5 deste manual.
@@ -67,7 +69,7 @@ O webhook de entrada permite que o Nexo consulte o Bitrix e crie tarefas em nome
 
 1. Entre no portal Bitrix24 que será conectado com o usuário de serviço de RH. Para o teste deste projeto, o portal é [helpbr24.bitrix24.com.br](https://helpbr24.bitrix24.com.br).
 2. Abra **Aplicativos → Recursos do desenvolvedor → Webhooks → Webhook de entrada**. Os nomes dos menus podem variar um pouco conforme a interface do portal.
-3. Conceda os escopos `task`, `user_brief` (ou `user`), `crm`, `sonet` e `userfieldconfig`. `sonet` permite preparar o projeto RH; `userfieldconfig` permite criar campos do processo.
+3. Conceda os escopos `task`, `user_brief` (ou `user`), `crm`, `sonet_group` e `userfieldconfig`. `sonet_group` permite preparar o projeto RH; `userfieldconfig` permite criar campos do processo.
 4. Crie o webhook e copie a URL completa, inclusive a parte secreta. O Bitrix só mostra essa credencial durante a criação.
 5. Em outra aba, abra a URL publicada do Nexo. No assistente, cole a URL completa do webhook de entrada e escolha **Validar conexão**.
 6. Quando a validação passar, crie o primeiro acesso RH com e-mail e senha. O Nexo vincula automaticamente o usuário Bitrix que criou o webhook.
@@ -102,7 +104,7 @@ Webhook de entrada significa **Nexo chama o Bitrix**. Webhook de saída signific
 | --- | --- |
 | A página não abre ou não salva a conexão | O responsável técnico deve conferir os logs e o volume persistente `/app/.data` da instância na Onnira. |
 | A criação de senha informa que a validação expirou | Valide o webhook novamente no mesmo navegador e crie a senha em até dez minutos. |
-| `SCOPES_MISSING` | Recrie o webhook de entrada com `task`, `user_brief` ou `user`, `crm`, `sonet` e `userfieldconfig`; atualize a URL no Nexo. |
+| `SCOPES_MISSING` | Recrie o webhook de entrada com `task`, `user_brief` ou `user`, `crm`, `sonet_group` e `userfieldconfig`; atualize a URL no Nexo. |
 | Bitrix retorna 403 ou acesso negado | Confira permissões do usuário que criou o webhook. O Bitrix aplica as permissões dessa conta às operações do Nexo. |
 | Início automático não acontece | Confira a URL `/api/bitrix/events`, assinatura do evento, token de saída e regra que associa a etapa de aprovação a um modelo. |
 | Dados somem após republicar | Ative e preserve o volume persistente em `/app/.data`, incluindo banco e chave da instância. |

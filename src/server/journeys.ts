@@ -327,7 +327,10 @@ export class Journeys {
       }
       if (await this.sourceCancelled(userId, journey, process)) return this.get(id);
       await this.bitrix.call(userId, "crm.item.update", { entityTypeId: process.entityTypeId, id: journey.sourceItemId, fields: { stageId: process.inProgressStageId } });
-      return this.save({ ...journey, status: "active" });
+      const active = this.save({ ...journey, status: "active" });
+      this.store.finishJob(`journey:${id}`);
+      this.store.remove("issue", `job:journey:${id}`);
+      return active;
     } finally { clearInterval(heartbeat); this.store.release(`journey:${id}`, owner); }
   }
   private async checklist(userId: string, taskId: string) {
@@ -353,8 +356,11 @@ export class Journeys {
     let stageTitle = task.bitrixStageTitle;
     if (stageId && groupId) {
       const result = record(await this.bitrix.call(userId, "task.stages.get", { entityId: Number(groupId) }));
-      const stage = record(result[stageId]);
-      if (typeof stage.TITLE === "string") stageTitle = stage.TITLE;
+      const stageValue = result[stageId] ?? (stageId === "0" ? Object.values(result).map(record).sort((a, b) => Number(a.SORT ?? 0) - Number(b.SORT ?? 0))[0] : undefined);
+      if (stageValue) {
+        const stage = record(stageValue);
+        if (typeof stage.TITLE === "string") stageTitle = stage.TITLE;
+      }
     }
     return { ...task, assignee, dueAt, bitrixStageId: stageId, bitrixStageTitle: stageTitle, status: taskStatus(text(remote.status)), syncState: "synced", checklist, errorMessage: undefined };
   }

@@ -121,6 +121,8 @@ export class Worker {
         if (journey.status === "creating" || journey.tasks.some(task => task.syncState !== "synced" && !task.remoteDeleted)) await this.journeys.runJourney(journey.id);
         else await this.journeys.reconcileJourney(journey.id, userId);
         this.store.remove("issue", `sync:${journey.id}`);
+        this.store.remove("issue", `job:journey:${journey.id}`);
+        this.store.finishJob(`journey:${journey.id}`);
       } catch (error) {
         if (this.globalError(error)) throw error;
         hasErrors = true;

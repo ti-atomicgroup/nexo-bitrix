@@ -63,6 +63,7 @@ async function setup() {
     approvedIds: number[] = [];
   const hooks: { afterSpaCommit?: () => Promise<void> } = {};
   let uncertain = false,
+    initialStageZero = false,
     nextId = 10;
   const transport: typeof fetch = async (input, init) => {
     if (String(input).includes("oauth.bitrix.info"))
@@ -147,7 +148,7 @@ async function setup() {
         status: "2",
         responsibleId: String(fields.RESPONSIBLE_ID),
         groupId: "52",
-        stageId: "1",
+        stageId: initialStageZero ? "0" : "1",
       });
       if (uncertain) {
         uncertain = false;
@@ -301,6 +302,9 @@ async function setup() {
     makeUncertain: () => {
       uncertain = true;
     },
+    makeInitialStageZero: () => {
+      initialStageZero = true;
+    },
   };
 }
 const input = {
@@ -330,6 +334,19 @@ it("concorrência e replay da origem criam uma única jornada com snapshot", asy
   const reopened = new Journeys(store, service.auth, service.bitrix);
   await reopened.runJourney(first.id);
   expect(tasks.size).toBe(2);
+});
+it("sincroniza tarefas Bitrix que começam na coluna padrão de ID zero", async () => {
+  const { service, session, tasks, store, makeInitialStageZero } = await setup();
+  makeInitialStageZero();
+  const journey = await service.create(session, input);
+  store.enqueue(`journey:${journey.id}`, "journey", { journeyId: journey.id });
+  service.issue(`job:journey:${journey.id}`, "Operação pendente", "Falha anterior", true);
+  await expect(service.runJourney(journey.id)).resolves.toMatchObject({ status: "active" });
+  expect(tasks.size).toBe(2);
+  expect(service.get(journey.id).tasks.every(task => task.syncState === "synced")).toBe(true);
+  expect(service.get(journey.id).tasks[0]).toMatchObject({ bitrixStageId: "0", bitrixStageTitle: "A fazer" });
+  expect(store.get("issue", `job:journey:${journey.id}`, z.object({ id: z.string() }).passthrough())).toBeNull();
+  expect(store.sqlite.prepare("select state from jobs where id=?").get(`journey:${journey.id}`)).toEqual({ state: "done" });
 });
 it("congela trilha aprovada pelo RH e rejeita atividade fora do modelo", async () => {
   const { service, session, template } = await setup();
@@ -890,11 +907,20 @@ it("issue de sincronização desaparece quando o acesso remoto se recupera", asy
   expect(
     service.issues().some((issue) => issue.id === `sync:${created.id}`),
   ).toBe(true);
+  store.sqlite.prepare("update jobs set state='pending',available_at=? where id=?").run(Date.now(), `journey:${created.id}`);
+  const failedJob = store.nextJobs().find(job => job.id === `journey:${created.id}`);
+  if (!failedJob) throw new Error("missing queued journey job");
+  store.failJob(failedJob, "INTERNAL", false);
+  service.issue(`job:journey:${created.id}`, "Operação pendente", "Falha anterior", false);
   access.empty = false;
   await worker.reconcile();
   expect(
     service.issues().some((issue) => issue.id === `sync:${created.id}`),
   ).toBe(false);
+  expect(
+    service.issues().some((issue) => issue.id === `job:journey:${created.id}`),
+  ).toBe(false);
+  expect(store.sqlite.prepare("select state from jobs where id=?").get(`journey:${created.id}`)).toEqual({ state: "done" });
 });
 it("aprovação concorrente ao retorno da criação manual usa o mesmo vínculo", async () => {
   const { service, store, auth, bitrix, session, remoteItem, hooks } =

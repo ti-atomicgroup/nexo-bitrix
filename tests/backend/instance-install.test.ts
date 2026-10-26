@@ -48,7 +48,7 @@ describe("instalação com somente webhook e senha", () => {
     const store = new Store(join(dir, "nexo.sqlite"));
     const bitrix = new BitrixClient(store, env, async (input) => {
       const url = String(input);
-      if (url.includes("profile.json")) return Response.json({ result: { ID: "42", NAME: "Ana", LAST_NAME: "RH", ACTIVE: true } });
+      if (url.includes("user.current.json")) return Response.json({ result: { ID: "42", NAME: "Ana", LAST_NAME: "RH", ACTIVE: true } });
       if (url.includes("scope.json")) return Response.json({ result: ["task", "crm", "userfieldconfig", "user_brief"] });
       if (url.includes("user.get.json")) return Response.json({ result: [{ ID: "42", NAME: "Ana", LAST_NAME: "RH", ACTIVE: true }] });
       throw new Error(`Chamada inesperada: ${url}`);

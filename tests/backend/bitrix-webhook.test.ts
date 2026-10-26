@@ -16,7 +16,7 @@ it("valida webhook, identifica a conta e guarda a URL cifrada", async () => {
   const calls: string[] = [];
   const { env, store, client } = setup(async (input) => {
     const url = String(input); calls.push(url);
-    if (url.endsWith("/profile.json")) return Response.json({ result: { ID: "42", NAME: "RH Serviço", ACTIVE: true } });
+    if (url.endsWith("/user.current.json")) return Response.json({ result: { ID: "42", NAME: "RH Serviço", ACTIVE: true } });
     if (url.endsWith("/scope.json")) return Response.json({ result: ["task", "user_brief", "crm", "userfieldconfig"] });
     throw new Error(`unexpected request ${url}`);
   });
@@ -24,7 +24,7 @@ it("valida webhook, identifica a conta e guarda a URL cifrada", async () => {
   expect(result).toEqual({ userId: "42", userName: "RH Serviço", scopes: ["task", "user_brief", "crm", "userfieldconfig"] });
   client.configureWebhook("https://acme.bitrix24.com/rest/42/secret-code/", result.userId);
   expect(JSON.stringify(store.get("webhook", "incoming", (await import("../../src/server/models")).webhookConfigurationSchema))).not.toContain("secret-code");
-  expect(calls).toEqual(["https://acme.bitrix24.com/rest/42/secret-code/profile.json", "https://acme.bitrix24.com/rest/42/secret-code/scope.json"]);
+  expect(calls).toEqual(["https://acme.bitrix24.com/rest/42/secret-code/user.current.json", "https://acme.bitrix24.com/rest/42/secret-code/scope.json"]);
   expect(env.portalUrl).toBe("https://acme.bitrix24.com");
 });
 it("fixa o portal do cliente ao conectar e recupera esse portal após reinício", async () => {

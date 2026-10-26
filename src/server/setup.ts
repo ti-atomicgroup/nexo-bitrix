@@ -9,7 +9,8 @@ import { integer, record, text } from "./models";
 import { Store } from "./store";
 import { Journeys } from "./journeys";
 import { rulesSchema, settingsSchema, userId } from "./validation";
-import { outgoingWebhookSchema, webhookConfigurationSchema } from "./models";
+import { webhookConfigurationSchema } from "./models";
+import { hasBitrixScope } from "./bitrix-scopes";
 export class Setup {
   constructor(readonly store: Store, readonly auth: Auth, readonly bitrix: BitrixClient, readonly journeys: Journeys) {}
   async triggerSources(session: SessionInfo) {
@@ -21,9 +22,9 @@ export class Setup {
     const scopes = z.array(z.string()).parse(await this.bitrix.call(session.user.id, "scope", {}));
     const methods = z.array(z.string()).parse(await this.bitrix.call(session.user.id, "methods", {}));
     const requiredScopes = ["task", "user_brief", "crm", "sonet"];
-    const missingScopes = requiredScopes.filter(scope => !scopes.includes(scope) && !(scope === "user_brief" && scopes.includes("user")));
+    const missingScopes = requiredScopes.filter(scope => !hasBitrixScope(scopes, scope));
     const webhook = this.store.get("webhook", "incoming", webhookConfigurationSchema);
-    return { scopes, missingScopes, canProvision: Boolean(webhook) && scopes.includes("userfieldconfig") && scopes.includes("crm") && scopes.includes("sonet") && session.canConfigure, methods: methods.filter(method => ["crm.type.add", "crm.item.add", "tasks.task.add", "task.checklistitem.add", "userfieldconfig.add", "sonet_group.create", "sonet_group.get"].includes(method)) };
+    return { scopes, missingScopes, canProvision: Boolean(webhook) && hasBitrixScope(scopes, "userfieldconfig") && hasBitrixScope(scopes, "crm") && hasBitrixScope(scopes, "sonet") && session.canConfigure, methods: methods.filter(method => ["crm.type.add", "crm.item.add", "tasks.task.add", "task.checklistitem.add", "userfieldconfig.add", "sonet_group.create", "sonet_group.get"].includes(method)) };
   }
   async discovery(session: SessionInfo, kind: string, entityTypeId?: number, categoryId?: number): Promise<DiscoveryOption[]> {
     this.auth.requireManage(session);
@@ -81,9 +82,8 @@ export class Setup {
         if (mapping.bitrixUserField && !definition.fields.some(field => field.id === mapping.bitrixUserField && ["employee", "user"].includes(field.type ?? ""))) throw new AppError("RULE_USER_FIELD", `O campo de usuário Bitrix do gatilho ${rule.name} não é válido.`);
       }
     }
-    const hasAssignees = templates.every(template => template.stages.every(stage => stage.activities.every(activity => activity.assigneeRole === "colaborador" || Boolean(next.defaultAssignees[activity.assigneeRole]))));
     const sameProcess = JSON.stringify(current.process) === JSON.stringify(next.process);
-    const operational = Boolean(next.process && next.automationUserId && templates.length && hasAssignees && sameProcess && next.automationUserId === current.automationUserId);
+    const operational = Boolean(next.process && next.automationUserId && templates.length && sameProcess && next.automationUserId === current.automationUserId);
     const settings: Settings = { ...next, portalDomain: current.portalDomain, applicationClientId: "webhook-only", setupComplete: current.setupComplete && operational };
     this.store.transaction(() => {
       this.store.put("settings", "current", settings); this.store.put("rules", "current", rules);
@@ -98,7 +98,7 @@ export class Setup {
     const user = session.user.id;
     try {
       const capabilities = await this.discover(session);
-      if (!capabilities.canProvision || capabilities.missingScopes.length) throw new AppError("SCOPES_MISSING", "Habilite task, user_brief, crm, sonet e userfieldconfig no aplicativo Bitrix24.", 422);
+      if (!capabilities.canProvision || capabilities.missingScopes.length) throw new AppError("SCOPES_MISSING", "Habilite task, user_brief, crm, sonet_group e userfieldconfig no webhook Bitrix24.", 422);
       const settingsBeforeProvision = this.auth.settings();
       if (!settingsBeforeProvision.rhProject) {
         const projectName = "Nexo · RH";
@@ -112,7 +112,7 @@ export class Setup {
           this.store.put("settings", "current", { ...this.auth.settings(), rhProject });
         } catch (error) {
           if (error instanceof AppError) throw error;
-          throw new AppError("RH_PROJECT_CREATE", "Não foi possível criar o projeto privado Nexo · RH. Confirme o escopo sonet e a permissão da conta do webhook para criar projetos.", 422);
+          throw new AppError("RH_PROJECT_CREATE", "Não foi possível criar o projeto privado Nexo · RH. Confirme o escopo sonet_group e a permissão da conta do webhook para criar projetos.", 422);
         }
       }
       const title = "Nexo · Movimentações de Pessoas";
@@ -140,15 +140,17 @@ export class Setup {
       const dateField = Object.keys(fields).find(key => record(fields[key]).upperName === fieldNames.date);
       if (!employeeField || !dateField) throw new AppError("FIELDS_NOT_DISCOVERED", "O Bitrix24 não retornou os campos criados em crm.item.fields. Atualize a descoberta.", 422);
       const stageEntity = `DYNAMIC_${entityTypeId}_STAGE_${categoryId}`, prefix = `DT${entityTypeId}_${categoryId}:`;
-      const stageDefinitions = [{ key: "NEXO_ONBOARD", name: "Onboarding aprovado", color: "#10b981" }, { key: "NEXO_OFFBOARD", name: "Offboarding aprovado", color: "#f59e0b" }, { key: "NEXO_PROGRESS", name: "Em andamento", color: "#3b82f6" }, { key: "NEXO_DONE", name: "Concluído", color: "#059669" }, { key: "NEXO_CANCEL", name: "Cancelado", color: "#64748b" }];
+      const stageDefinitions = [{ key: "NEXO_ONBOARD", name: "Onboarding aprovado", color: "#10b981" }, { key: "NEXO_OFFBOARD", name: "Offboarding aprovado", color: "#f59e0b" }, { key: "NEXO_PROGRESS", name: "Em andamento", color: "#3b82f6" }];
       const stages = (await this.bitrix.list(user, "crm.status.list", { filter: { ENTITY_ID: stageEntity } })).map(record);
+      const completedStage = stages.find(stage => stage.SEMANTICS === "S"), cancelledStage = stages.find(stage => stage.SEMANTICS === "F");
+      if (!completedStage || !cancelledStage) throw new AppError("FINAL_STAGES_MISSING", "O funil do processo precisa ter uma etapa final de sucesso e uma de cancelamento.", 422);
       for (let index = 0; index < stageDefinitions.length; index++) {
         const definition = stageDefinitions[index]; if (!definition) continue;
         const statusId = `${prefix}${definition.key}`;
         if (stages.some(stage => stage.STATUS_ID === statusId)) continue;
         await this.journeys.creation(`provision:stage:${statusId}`, async () => { const found = (await this.bitrix.list(user, "crm.status.list", { filter: { ENTITY_ID: stageEntity } })).map(record).find(stage => stage.STATUS_ID === statusId); return found ? text(found.ID) : null; }, async () => text(await this.bitrix.call(user, "crm.status.add", { fields: { ENTITY_ID: stageEntity, STATUS_ID: statusId, NAME: definition.name, SORT: (index + 1) * 10, COLOR: definition.color } })));
       }
-      const mapping: ProcessMapping = { entityTypeId, categoryId, employeeField, dateField, onboardingStageId: `${prefix}NEXO_ONBOARD`, offboardingStageId: `${prefix}NEXO_OFFBOARD`, inProgressStageId: `${prefix}NEXO_PROGRESS`, completedStageId: `${prefix}NEXO_DONE`, cancelledStageId: `${prefix}NEXO_CANCEL` };
+      const mapping: ProcessMapping = { entityTypeId, categoryId, employeeField, dateField, onboardingStageId: `${prefix}NEXO_ONBOARD`, offboardingStageId: `${prefix}NEXO_OFFBOARD`, inProgressStageId: `${prefix}NEXO_PROGRESS`, completedStageId: text(completedStage.STATUS_ID), cancelledStageId: text(cancelledStage.STATUS_ID) };
       this.store.put("settings", "current", { ...this.auth.settings(), process: mapping, setupComplete: false });
       this.journeys.audit("setup.provisioned", "Processo, campos e etapas Nexo preparados no Bitrix24.", session.user.name);
       return mapping;
@@ -162,14 +164,12 @@ export class Setup {
     if (!settings.process || !settings.automationUserId) throw new AppError("SETUP_INCOMPLETE", "Configure o processo e autorize uma conta de automação.", 409);
     const templates = this.store.list("template", savedTemplateSchema);
     if (!templates.length) throw new AppError("TEMPLATE_REQUIRED", "Crie pelo menos um modelo de jornada.", 409);
-    for (const activity of templates.flatMap(template => template.stages.flatMap(stage => stage.activities))) if (activity.assigneeRole !== "colaborador" && !settings.defaultAssignees[activity.assigneeRole]) throw new AppError("ASSIGNEE_REQUIRED", `Defina o responsável padrão de ${activity.assigneeRole}.`, 409);
     const automation = await this.bitrix.user(settings.automationUserId, settings.automationUserId);
     if (!automation.active) throw new AppError("AUTOMATION_INACTIVE", "A conta de automação está inativa.", 409);
     const rules = this.store.get("rules", "current", rulesSchema) ?? [];
     await this.configure(session, settings, rules);
-    if (!this.store.get("webhook", "outgoing", outgoingWebhookSchema)) throw new AppError("OUTGOING_WEBHOOK_REQUIRED", "Configure o webhook de saída no Bitrix24 e valide o token no Nexo.", 409);
     const done = { ...this.auth.settings(), setupComplete: true }; this.store.put("settings", "current", done);
-    this.journeys.audit("setup.finished", "Instalação validada e eventos registrados.", session.user.name);
+    this.journeys.audit("setup.finished", "Instalação validada. A conciliação periódica está ativa.", session.user.name);
     return done;
   }
 }

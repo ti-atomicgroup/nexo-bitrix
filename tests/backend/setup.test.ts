@@ -14,7 +14,10 @@ afterEach(() => { for (const resource of resources.splice(0)) { resource.store.c
 it("provisiona IDs dinâmicos e usa CRM_<id interno>, preservando categoria zero", async () => {
   const env = validateEnvironment({ NEXO_ENCRYPTION_KEY: "ab".repeat(32), NEXO_SETUP_TOKEN: "setup-secret-long-enough", NEXO_APP_URL: "https://nexo.example.com", BITRIX_PORTAL_URL: "https://acme.bitrix24.com" });
   const dir = mkdtempSync(join(tmpdir(), "nexo-provision-")), store = new Store(join(dir, "nexo.db")); resources.push({ store, dir });
-  const types: Record<string, unknown>[] = [], fields: Record<string, unknown>[] = [], stages: Record<string, unknown>[] = [];
+  const types: Record<string, unknown>[] = [], fields: Record<string, unknown>[] = [], stages: Record<string, unknown>[] = [
+    { ID: "90", STATUS_ID: "DT1098_0:SUCCESS", NAME: "Bem sucedido", SORT: "40", SEMANTICS: "S" },
+    { ID: "91", STATUS_ID: "DT1098_0:FAIL", NAME: "Mal sucedido", SORT: "50", SEMANTICS: "F" },
+  ];
   const groups: Record<string, unknown>[] = [];
   const fieldMetadata: Record<string, unknown> = {};
   const transport: typeof fetch = async (input, init) => {
@@ -24,7 +27,7 @@ it("provisiona IDs dinâmicos e usa CRM_<id interno>, preservando categoria zero
     if (method === "user.admin") return Response.json({ result: true });
     if (method === "app.info") return Response.json({ result: { ID: "7", CODE: "local.nexo" } });
     if (method === "user.get") return Response.json({ result: [{ ID: String(body.ID), NAME: "Admin", ACTIVE: true }] });
-    if (method === "scope") return Response.json({ result: ["task", "user_brief", "crm", "userfieldconfig", "sonet"] });
+    if (method === "scope") return Response.json({ result: ["task", "user_brief", "crm", "userfieldconfig", "sonet_group"] });
     if (method === "methods") return Response.json({ result: ["crm.type.add", "userfieldconfig.add", "event.bind", "tasks.task.add", "task.checklistitem.add"] });
     if (method === "crm.type.list") return Response.json({ result: { types } });
     if (method === "crm.type.add") { const entry = { ...z.record(z.string(), z.unknown()).parse(body.fields), id: 23, entityTypeId: 1098 }; types.push(entry); return Response.json({ result: { type: entry } }); }
@@ -51,7 +54,7 @@ it("provisiona IDs dinâmicos e usa CRM_<id interno>, preservando categoria zero
   bitrix.configureWebhook(`https://${env.portalDomain}/rest/1/test-secret/`, "1");
   const { session } = await auth.bootstrapLocalAdmin(env.setupToken, "rh@example.com", "Senha-de-teste-segura-2026", "1");
   const mapping = await setup.provision(session);
-  expect(mapping).toMatchObject({ entityTypeId: 1098, categoryId: 0, employeeField: "ufCrm23NexoEmployee", dateField: "ufCrm23NexoDate", onboardingStageId: "DT1098_0:NEXO_ONBOARD" });
+  expect(mapping).toMatchObject({ entityTypeId: 1098, categoryId: 0, employeeField: "ufCrm23NexoEmployee", dateField: "ufCrm23NexoDate", onboardingStageId: "DT1098_0:NEXO_ONBOARD", completedStageId: "DT1098_0:SUCCESS", cancelledStageId: "DT1098_0:FAIL" });
   expect(await setup.triggerSources(session)).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "crm_lead", entityTypeId: 1 }), expect.objectContaining({ kind: "crm_deal", entityTypeId: 2 }), expect.objectContaining({ kind: "smart_process", entityTypeId: 1098 })]));
   expect(auth.settings().rhProject).toMatchObject({ id: "52", name: "Nexo · RH" });
   expect(await setup.discovery(session, "categories", 1098)).toEqual([{ id: "0", name: "Geral", type: "category" }]);

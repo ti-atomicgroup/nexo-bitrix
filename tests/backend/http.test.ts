@@ -1,8 +1,15 @@
 import { afterEach, expect, it, vi } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { api, status } from "../../src/server/http";
-afterEach(() => vi.unstubAllEnvs());
+import { getRuntime } from "../../src/server/runtime";
+let dataDir = "";
+afterEach(() => { if (dataDir) getRuntime().store.close(); vi.unstubAllEnvs(); if (dataDir) rmSync(dataDir, { recursive: true, force: true }); dataDir = ""; });
 it("abre o instalador sem variáveis de instalação fornecidas pelo cliente", async () => {
+  dataDir = mkdtempSync(join(tmpdir(), "nexo-http-"));
   vi.stubEnv("NEXO_ENCRYPTION_KEY", ""); vi.stubEnv("NEXO_SETUP_TOKEN", ""); vi.stubEnv("NEXO_APP_URL", ""); vi.stubEnv("BITRIX_PORTAL_URL", "");
+  vi.stubEnv("NEXO_DATA_DIR", dataDir);
   const response = await status(new Request("http://localhost:3000/api/status"));
   expect(response.status).toBe(200);
   expect(await response.json()).toMatchObject({ data: { installed: false, configured: false, missingEnvironment: [], appUrl: "http://localhost:3000" } });

@@ -2,7 +2,7 @@
 
 Onboarding e offboarding hospedados na Onnira Cloud IA e conectados ao Bitrix24 por webhooks, com modelos configuráveis, tarefas e checklists nativos, início manual ou por aprovação de RH e Radar de Prontidão.
 
-**Quer usar?** Siga o [manual fácil de instalação](docs/manual-instalacao.md). O cliente conecta seu portal pelo assistente do Nexo. A publicação no Marketplace da Onnira depende de acesso de publicador; o repositório documenta também a publicação técnica de uma instância Cloud IA.
+**Quer usar?** Siga o [manual fácil de instalação](docs/manual-instalacao.md) e depois o [guia rápido de uso](docs/como-usar-nexo.md). O cliente conecta seu portal pelo assistente do Nexo. A publicação no Marketplace da Onnira depende de acesso de publicador; o repositório documenta também a publicação técnica de uma instância Cloud IA.
 
 ## Executar localmente
 

@@ -23,7 +23,7 @@ export class BitrixClient {
 
   async testWebhook(url: string): Promise<{ userId: string; userName: string; scopes: string[] }> {
     const parsed = parseIncomingWebhookUrl(url, this.env);
-    const user = parseUser((await this.webhookRequest(parsed, "profile", {})).result);
+    const user = parseUser((await this.webhookRequest(parsed, "user.current", {})).result);
     const scopes = z.array(z.string()).parse((await this.webhookRequest(parsed, "scope", {})).result);
     if (!user.active) throw new AppError("WEBHOOK_USER_INACTIVE", "A conta que criou o webhook está inativa.", 403);
     return { userId: user.id, userName: user.name, scopes };
