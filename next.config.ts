@@ -29,6 +29,10 @@ const contentSecurityPolicy = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Build enxuto: o plano Inicial da Onnira tem 512 MB de memória.
+  productionBrowserSourceMaps: false,
+  enablePrerenderSourceMaps: false,
+  experimental: { webpackMemoryOptimizations: true, webpackBuildWorker: true, serverSourceMaps: false },
   // A checagem de tipos roda em `npm run typecheck`; no build ela estoura a memória de 512 MB da Onnira.
   typescript: { ignoreBuildErrors: true },
   env: {
