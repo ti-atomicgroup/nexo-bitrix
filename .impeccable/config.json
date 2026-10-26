@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "border-accent-on-rounded",
+        "value": "*",
+        "files": [
+          "src/components/ui/dialog.module.css"
+        ],
+        "createdAt": "2026-10-26T16:14:29.918Z",
+        "reason": "lead (decisão de design, não do usuário): a faixa grossa fica só no topo e os cantos do topo são retos; apenas os cantos de baixo usam border-bottom-*-radius, então a faixa não curva"
+      }
+    ]
+  }
+}

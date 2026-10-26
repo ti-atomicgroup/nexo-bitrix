@@ -12,3 +12,5 @@ playwright-report/
 *.log
 .cache/
 Historico_conversa_*
+.impeccable/hook.cache.json
+.impeccable/config.local.json
