@@ -15,7 +15,7 @@ import { api, toApiError, type JourneyActionBody } from "@/lib/api-client";
 import { anchorLabel, anchorPhrase, firstName, formatDateMedium, formatMoment } from "@/lib/format";
 import type { JourneyDTO } from "@/shared/contracts";
 import { JOURNEY_KIND_LABEL, JOURNEY_STATUS_LABEL } from "@/shared/enums";
-import { JOURNEY_STATUS_TONE, kindTone, RISK_CHIP } from "../labels";
+import { JOURNEY_STATUS_TONE, kindTone, profileSuffix, RISK_CHIP } from "../labels";
 import styles from "./journey-header.module.css";
 
 const REASON_LABEL = { voluntary: "Voluntária", involuntary: "Involuntária" } as const;
@@ -70,6 +70,7 @@ export function JourneyHeader({ journey, today, onChanged }: { journey: JourneyD
             <Chip tone={JOURNEY_STATUS_TONE[summary.status]}>{JOURNEY_STATUS_LABEL[summary.status]}</Chip>
             {summary.status === "active" ? <Chip tone={risk.tone}>{risk.label}</Chip> : null}
           </div>
+          {summary.status === "active" && summary.risk !== "ok" && summary.riskReason ? <p className={styles.riskReason}>{summary.riskReason}</p> : null}
         </div>
         {open ? (
           <div className={styles.actions}>
@@ -110,7 +111,7 @@ export function JourneyHeader({ journey, today, onChanged }: { journey: JourneyD
         <div className={styles.fact}>
           <dt>Trilha</dt>
           <dd className={styles.text}>{summary.templateName}</dd>
-          {summary.profile ? <dd className={styles.sub}>{summary.profile}</dd> : null}
+          {profileSuffix(summary.templateName, summary.profile) ? <dd className={styles.sub}>{summary.profile}</dd> : null}
         </div>
         <div className={styles.fact}>
           <dt>Próxima parada</dt>

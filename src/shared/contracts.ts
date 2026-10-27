@@ -221,6 +221,8 @@ export interface JourneySummaryDTO {
   line: LineStationDTO[];
   nextStop: { label: string; at: string } | null;
   risk: JourneyRisk;
+  /** Por que o selo não está "Em dia" (ex.: "“Preparar acessos” vence em menos de 2 dias"). */
+  riskReason?: string | null;
 }
 
 export interface JourneyStageDTO {

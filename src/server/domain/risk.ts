@@ -13,21 +13,33 @@ export function isOverdue(activity: ActivityRow, now: Date = new Date()): boolea
   return !Number.isNaN(due) && due < now.getTime();
 }
 
-export function journeyRisk(activities: ActivityRow[], now: Date = new Date()): JourneyRisk {
-  let attention = false;
-  for (const activity of activities) {
+/** Risco da jornada e o motivo em uma frase ("“Preparar acessos” está atrasada"), para o selo não ficar sem explicação. */
+export function journeyRiskDetail(activities: ActivityRow[], now: Date = new Date()): { risk: JourneyRisk; reason: string | null } {
+  const late: ActivityRow[] = [];
+  const reasons: string[] = [];
+  const byDue = [...activities].sort((a, b) => Date.parse(a.dueAt) - Date.parse(b.dueAt));
+  for (const activity of byDue) {
     if (activity.status === "cancelled") continue;
-    if (activity.syncState === "error" || activity.syncState === "uncertain") attention = true;
+    if (activity.syncState === "error") reasons.push(`“${activity.title}” não chegou ao Bitrix24`);
+    else if (activity.syncState === "uncertain") reasons.push(`“${activity.title}” ainda não foi confirmada no Bitrix24`);
     if (activity.status === "done") continue;
     if (isOverdue(activity, now)) {
-      if (activity.required) return "critical";
-      attention = true;
+      if (activity.required) late.push(activity);
+      else reasons.push(`“${activity.title}” está atrasada (opcional)`);
       continue;
     }
-    if (activity.bitrixMissing) attention = true;
-    if (Date.parse(activity.dueAt) - now.getTime() <= ATTENTION_WINDOW_MS) attention = true;
+    if (activity.bitrixMissing) reasons.push(`A tarefa “${activity.title}” sumiu do Bitrix24`);
+    if (Date.parse(activity.dueAt) - now.getTime() <= ATTENTION_WINDOW_MS) reasons.push(`“${activity.title}” vence em menos de 2 dias`);
   }
-  return attention ? "attention" : "ok";
+  if (late.length) {
+    const more = late.length - 1;
+    return { risk: "critical", reason: `“${late[0]!.title}” está atrasada${more ? ` e mais ${more === 1 ? "1 obrigatória" : `${more} obrigatórias`}` : ""}` };
+  }
+  return reasons.length ? { risk: "attention", reason: reasons[0]! } : { risk: "ok", reason: null };
+}
+
+export function journeyRisk(activities: ActivityRow[], now: Date = new Date()): JourneyRisk {
+  return journeyRiskDetail(activities, now).risk;
 }
 
 const byDue = (a: ActivityRow, b: ActivityRow) => Date.parse(a.dueAt) - Date.parse(b.dueAt);

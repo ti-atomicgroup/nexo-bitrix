@@ -41,6 +41,15 @@ export const SYNC_NOTE: Partial<Record<SyncState, string>> = {
   uncertain: "Conferindo no Bitrix24",
 };
 
+/** Perfil só quando acrescenta algo ao nome da trilha ("Onboarding · Vendas" já diz "Vendas"). */
+export function profileSuffix(templateName: string, profile: string): string | null {
+  const clean = (value: string) => value.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
+  const name = clean(templateName);
+  const extra = clean(profile);
+  if (!extra || name === extra || name.endsWith(` ${extra}`) || name.includes(`· ${extra}`)) return null;
+  return profile.trim();
+}
+
 /** Duração de uma trilha: "de 5 dias antes a 90 dias depois". */
 export function spanText(span: TemplateSummaryDTO["span"]): string {
   const part = (days: number) => (days === 0 ? "o próprio dia" : days < 0 ? `${plural(-days, "dia", "dias")} antes` : `${plural(days, "dia", "dias")} depois`);

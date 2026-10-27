@@ -65,6 +65,11 @@ export function journeyRisk(activities: ActivityRow[], now: Date = new Date()): 
   return risk.journeyRisk(activities, now);
 }
 
+/** Motivo do selo de risco em uma frase; nulo quando está em dia. */
+export function journeyRiskReason(activities: ActivityRow[], now: Date = new Date()): string | null {
+  return risk.journeyRiskDetail(activities, now).reason;
+}
+
 /** O que impede concluir a jornada: obrigatórias pendentes, aprovações e inventário ainda com a pessoa (saída). */
 export function completionCheck(journey: JourneyRow, activities: ActivityRow[], activeLedger: LedgerRow[]): CompletionCheckDTO {
   return completion.completionCheck(journey, activities, activeLedger);

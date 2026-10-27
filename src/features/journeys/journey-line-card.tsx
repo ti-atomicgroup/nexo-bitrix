@@ -1,4 +1,4 @@
-import { CircleDot } from "lucide-react";
+import { AlertTriangle, CircleDot } from "lucide-react";
 import Link from "next/link";
 import { LineTrack } from "@/components/lines/line-track";
 import { Avatar } from "@/components/ui/avatar";
@@ -8,7 +8,7 @@ import { anchorPhrase, formatMoment } from "@/lib/format";
 import type { JourneySummaryDTO } from "@/shared/contracts";
 import { JOURNEY_STATUS_LABEL } from "@/shared/enums";
 import styles from "./journey-line-card.module.css";
-import { JOURNEY_STATUS_TONE, kindTone, RISK_CHIP } from "./labels";
+import { JOURNEY_STATUS_TONE, kindTone, profileSuffix, RISK_CHIP } from "./labels";
 
 /** Uma pessoa, uma linha: estações, "você está aqui", próxima parada e risco. O cartão inteiro abre a jornada. */
 export function JourneyLineCard({ journey, today, headingLevel = 3 }: { journey: JourneySummaryDTO; today: string; headingLevel?: 2 | 3 }) {
@@ -27,7 +27,7 @@ export function JourneyLineCard({ journey, today, headingLevel = 3 }: { journey:
           </Heading>
           <p className={styles.meta}>
             {journey.templateName}
-            {journey.profile ? ` · ${journey.profile}` : ""}
+            {profileSuffix(journey.templateName, journey.profile) ? ` · ${journey.profile}` : ""}
           </p>
         </div>
         <div className={styles.badges}>
@@ -51,6 +51,14 @@ export function JourneyLineCard({ journey, today, headingLevel = 3 }: { journey:
         <p className={styles.progress}>
           <strong>{journey.progress.done}</strong> de {journey.progress.total} atividades
         </p>
+        {journey.status === "active" && journey.risk !== "ok" && journey.riskReason ? (
+          <p className={cx(styles.riskReason, journey.risk === "critical" && styles.riskCritical)}>
+            <AlertTriangle className={styles.nextIcon} size={16} strokeWidth={2.25} aria-hidden="true" />
+            <span>
+              {risk.label}: {journey.riskReason}
+            </span>
+          </p>
+        ) : null}
       </div>
     </article>
   );

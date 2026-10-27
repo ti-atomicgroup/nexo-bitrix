@@ -21,6 +21,8 @@ export function activityChip(activity: ActivityDTO): { tone: ChipTone; label: st
 /** Aviso de sincronização ao lado da atividade (nunca só cor: ícone + texto). */
 export function syncNote(activity: ActivityDTO): { text: string; error: boolean } | null {
   if (activity.bitrixMissing) return { text: "Tarefa apagada no Bitrix24", error: true };
+  // Atividade ainda não liberada nunca foi ao Bitrix24: o chip "Ainda não liberada" já diz tudo.
+  if (activity.status === "locked" && activity.syncState === "local") return null;
   const text = SYNC_NOTE[activity.syncState];
   return text ? { text, error: activity.syncState === "error" } : null;
 }

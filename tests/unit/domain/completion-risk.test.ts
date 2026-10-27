@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { completionCheck, journeyProgress } from "@/server/domain/completion";
-import { isOverdue, journeyRisk, nextStop } from "@/server/domain/risk";
+import { isOverdue, journeyRisk, journeyRiskDetail, nextStop } from "@/server/domain/risk";
 import { makeActivity, makeJourney, makeLedger } from "../../fakes/builders";
 
 const now = new Date("2026-10-30T12:00:00Z");
@@ -65,6 +65,21 @@ describe("prazos e risco", () => {
     expect(journeyRisk([makeActivity({ dueAt: later, bitrixMissing: true })], now)).toBe("attention");
     expect(journeyRisk([makeActivity({ dueAt: later })], now)).toBe("ok");
     expect(journeyRisk([makeActivity({ dueAt: "2026-10-01T18:00:00-03:00", status: "done" })], now)).toBe("ok");
+  });
+
+  it("o selo vem com o motivo em uma frase", () => {
+    const later = "2026-11-20T18:00:00-03:00";
+    const reason = (activities: Parameters<typeof journeyRiskDetail>[0]) => journeyRiskDetail(activities, now).reason;
+    expect(
+      reason([
+        makeActivity({ title: "Preparar acessos", dueAt: "2026-10-28T18:00:00-03:00" }),
+        makeActivity({ title: "Assinar contrato", dueAt: "2026-10-29T18:00:00-03:00" }),
+      ]),
+    ).toBe("“Preparar acessos” está atrasada e mais 1 obrigatória");
+    expect(reason([makeActivity({ title: "Envie seus documentos", dueAt: "2026-10-31T18:00:00-03:00" })])).toBe("“Envie seus documentos” vence em menos de 2 dias");
+    expect(reason([makeActivity({ title: "Criar conta", dueAt: later, syncState: "error" })])).toBe("“Criar conta” não chegou ao Bitrix24");
+    expect(reason([makeActivity({ title: "Criar conta", dueAt: later, bitrixMissing: true })])).toBe("A tarefa “Criar conta” sumiu do Bitrix24");
+    expect(reason([makeActivity({ dueAt: later })])).toBeNull();
   });
 
   it("próxima parada: atividade aberta mais próxima ou a próxima etapa por data", () => {

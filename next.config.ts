@@ -3,9 +3,12 @@ import { execSync } from "node:child_process";
 
 const production = process.env.NODE_ENV === "production";
 
+/** Commit do build; "+ alterações" quando o build sai de arquivos ainda não commitados (ex.: build local). */
 function gitCommit(): string {
+  const git = (command: string) => execSync(command, { stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
   try {
-    return execSync("git rev-parse --short HEAD", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+    const commit = git("git rev-parse --short HEAD");
+    return git("git status --porcelain --untracked-files=no") ? `${commit} + alterações` : commit;
   } catch {
     return "desconhecido";
   }

@@ -54,6 +54,7 @@ export function domainFake(): typeof Domain {
     nextStop: () => null,
     isOverdue,
     journeyRisk: (activities, now = new Date()) => (activities.some((activity) => activity.required && isOverdue(activity, now)) ? "critical" : "ok"),
+    journeyRiskReason: () => null,
     completionCheck: (_journey, activities, ledger) => {
       const blockers = [
         ...activities.filter((activity) => activity.required && !finished(activity)).map((activity) => `Concluir "${activity.title}"`),

@@ -98,6 +98,22 @@
   color: var(--ink);
 }
 
+.riskReason {
+  flex-basis: 100%;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  color: var(--ink);
+}
+
+.riskReason .nextIcon {
+  color: var(--orange-ink);
+}
+
+.riskCritical .nextIcon {
+  color: var(--red);
+}
+
 @media (max-width: 640px) {
   .card {
     padding: var(--space-4);

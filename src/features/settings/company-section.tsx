@@ -105,6 +105,17 @@ export function CompanySection({ settings, isAdmin, onSaved }: { settings: Setti
               />
             );
           })}
+          <Checkbox
+            label="Documentos pelo link"
+            description={
+              settings.documentsEnabled
+                ? "O colaborador envia os documentos pedidos na trilha e eles vão para o Drive do projeto. Liga sozinho com a permissão Drive."
+                : "Para ligar, marque a permissão Drive (disk) no webhook e troque o webhook acima. Sem ela, os documentos aparecem só como lista."
+            }
+            checked={Boolean(settings.documentsEnabled)}
+            disabled
+            readOnly
+          />
         </fieldset>
       </div>
     </Panel>

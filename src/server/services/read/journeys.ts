@@ -2,7 +2,7 @@ import "server-only";
 import { z } from "zod";
 import type { ActivityDocumentDTO, ActivityDTO, CollaboratorLinkDTO, JourneyDTO, JourneySummaryDTO, PersonDTO, UserRef } from "@/shared/contracts";
 import { JOURNEY_KINDS, JOURNEY_STATUSES, type JourneyKind, type JourneyStatus } from "@/shared/enums";
-import { completionCheck, isOverdue, journeyProgress, journeyRisk, nextStop, stagesState, type StageState } from "@/server/domain";
+import { completionCheck, isOverdue, journeyProgress, journeyRisk, journeyRiskReason, nextStop, stagesState, type StageState } from "@/server/domain";
 import { getActivity, listActivities, listActivitiesByJourneyIds, type ActivityRow } from "../../db/repos/activities";
 import { listAudit } from "../../db/repos/audit";
 import { listDocumentsByActivity } from "../../db/repos/documents";
@@ -70,6 +70,7 @@ export function buildJourneySummary(
     line: stages.map(({ position, name, state }) => ({ position, name, state })),
     nextStop: finished ? null : nextStop(journey, activities, timezone, now),
     risk: finished ? "ok" : journeyRisk(activities, now),
+    riskReason: finished ? null : journeyRiskReason(activities, now),
   };
 }
 
