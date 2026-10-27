@@ -2,6 +2,7 @@ import "server-only";
 import type { Db } from "./driver";
 import { migration001 } from "./migrations/001-init";
 import { migration002 } from "./migrations/002-documents";
+import { migration003 } from "./migrations/003-stage-deadline";
 
 export interface Migration {
   id: number;
@@ -10,7 +11,7 @@ export interface Migration {
 }
 
 /** Ordem de aplicação. Novas migrações entram no fim, com id crescente; nunca editar uma já publicada. */
-export const MIGRATIONS: Migration[] = [migration001, migration002];
+export const MIGRATIONS: Migration[] = [migration001, migration002, migration003];
 
 export function migrate(db: Db, migrations: Migration[] = MIGRATIONS): number[] {
   db.exec("CREATE TABLE IF NOT EXISTS schema_migrations (id INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL)");

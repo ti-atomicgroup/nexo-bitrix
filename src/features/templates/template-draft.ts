@@ -55,6 +55,8 @@ export interface StageDraft {
   releaseMode: ReleaseMode;
   releaseOffsetDays: number;
   releaseOffsetUnit: OffsetUnit;
+  /** Data-limite de "quando a etapa anterior terminar"; nulo = sem limite. */
+  releaseLatestOffsetDays: number | null;
   activities: ActivityDraft[];
 }
 
@@ -100,6 +102,7 @@ export function emptyStage(first: boolean): StageDraft {
     releaseMode: first ? "start" : "after_previous",
     releaseOffsetDays: 0,
     releaseOffsetUnit: "calendar",
+    releaseLatestOffsetDays: null,
     activities: [emptyActivity()],
   };
 }
@@ -149,6 +152,7 @@ export function draftFrom(template: TemplateDTO): TemplateDraft {
         releaseMode: stage.releaseMode,
         releaseOffsetDays: stage.releaseOffsetDays,
         releaseOffsetUnit: stage.releaseOffsetUnit,
+        releaseLatestOffsetDays: stage.releaseLatestOffsetDays ?? null,
         activities: [...stage.activities].sort((a, b) => a.position - b.position).map(activityFrom),
       })),
   };
@@ -189,6 +193,7 @@ export function toBody(draft: TemplateDraft): TemplateBody {
       releaseMode: stage.releaseMode,
       releaseOffsetDays: stage.releaseMode === "offset" ? stage.releaseOffsetDays : 0,
       releaseOffsetUnit: stage.releaseOffsetUnit,
+      releaseLatestOffsetDays: stage.releaseMode === "after_previous" ? stage.releaseLatestOffsetDays : null,
       activities: stage.activities.map((activity) => {
         const taken = new Set(activity.checklist.map((item) => item.key).filter(Boolean));
         const documentKeys = new Set(activity.documents.map((document) => document.key).filter(Boolean));

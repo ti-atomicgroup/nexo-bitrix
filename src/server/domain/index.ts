@@ -32,9 +32,14 @@ export function dueAt(anchorDate: string, offsetDays: number, unit: OffsetUnit, 
   return dates.dueAt(anchorDate, offsetDays, unit, time, timezone);
 }
 
-/** Quando uma etapa por data é liberada (08:00 local do dia calculado). Nulo para "start" e "after_previous". */
+/** Quando a etapa libera pelo calendário (08:00 local): etapa por data ou data-limite de "depois da anterior"; senão nulo. */
 export function stageReleaseAt(stage: TemplateStageDTO, anchorDate: string, timezone: string): string | null {
   return release.stageReleaseAt(stage, anchorDate, timezone);
+}
+
+/** Etapas "depois da anterior" seguradas por obrigatórias que faltam na etapa anterior (para o painel Hoje). */
+export function blockedStages(journey: JourneyRow, activities: ActivityRow[]): Array<{ stage: TemplateStageDTO; blockers: ActivityRow[] }> {
+  return release.blockedStages(journey, activities);
 }
 
 /** Estado das estações da linha a partir do snapshot da trilha e das atividades da jornada. */

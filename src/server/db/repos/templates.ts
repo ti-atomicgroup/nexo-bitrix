@@ -61,6 +61,7 @@ function loadStages(templateId: string): TemplateStageDTO[] {
     releaseMode: stage.release_mode as ReleaseMode,
     releaseOffsetDays: Number(stage.release_offset_days),
     releaseOffsetUnit: stage.release_offset_unit as OffsetUnit,
+    releaseLatestOffsetDays: stage.release_mode === "after_previous" && stage.release_latest_offset_days !== null ? Number(stage.release_latest_offset_days) : null,
     activities: db.prepare("SELECT * FROM template_activities WHERE stage_id = ? ORDER BY position").all(String(stage.id)).map(mapActivity),
   }));
 }
@@ -85,7 +86,7 @@ function summarize(template: TemplateRow, stages: TemplateStageDTO[]): TemplateS
 function insertStages(templateId: string, stages: TemplateInput["stages"]): void {
   const db = getDb();
   const insertStage = db.prepare(
-    "INSERT INTO template_stages (id, template_id, position, name, description, release_mode, release_offset_days, release_offset_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO template_stages (id, template_id, position, name, description, release_mode, release_offset_days, release_offset_unit, release_latest_offset_days) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
   );
   const insertActivity = db.prepare(`
     INSERT INTO template_activities (id, stage_id, position, title, instructions, kind, role, due_offset_days, due_offset_unit, due_time,
@@ -94,7 +95,8 @@ function insertStages(templateId: string, stages: TemplateInput["stages"]): void
       @required, @visibility, @requiresApproval, @ledgerRole, @checklist, @links, @documents)`);
   stages.forEach((stage, stageIndex) => {
     const stageId = newId();
-    insertStage.run(stageId, templateId, stageIndex, stage.name, stage.description ?? "", stage.releaseMode, stage.releaseOffsetDays ?? 0, stage.releaseOffsetUnit ?? "calendar");
+    const latest = stage.releaseMode === "after_previous" ? (stage.releaseLatestOffsetDays ?? null) : null;
+    insertStage.run(stageId, templateId, stageIndex, stage.name, stage.description ?? "", stage.releaseMode, stage.releaseOffsetDays ?? 0, stage.releaseOffsetUnit ?? "calendar", latest);
     stage.activities.forEach((activity, activityIndex) => {
       insertActivity.run({
         id: newId(),

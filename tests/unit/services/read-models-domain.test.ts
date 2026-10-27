@@ -62,6 +62,18 @@ describe("modelos de leitura com o domínio real", () => {
     expect(today.lines[0]).toMatchObject({ risk: "critical", line: [{ state: "current" }, { state: "upcoming" }, { state: "upcoming" }] });
   });
 
+  it("painel de hoje: a atrasada que segura a etapa \"depois da anterior\" diz qual etapa está travada", () => {
+    const journey = seedJourney({ person: seedBitrixPerson("51", "Carla Dias"), template: seedTemplate("onboarding"), anchorDate: "2026-10-20" });
+    const [, stuck] = seedActivities([
+      activityRow({ journeyId: journey.id, stagePosition: 0, role: "ti", status: "done", title: "Criar acessos", dueAt: "2026-10-18T18:00:00-03:00" }),
+      activityRow({ journeyId: journey.id, stagePosition: 1, role: "colaborador", visibility: "employee", title: "Conhecer o time", dueAt: "2026-10-22T18:00:00-03:00" }),
+      activityRow({ journeyId: journey.id, stagePosition: 2, role: "gestor", status: "locked", releasedAt: null, title: "Conversa de 30 dias", dueAt: "2026-11-19T18:00:00-03:00" }),
+    ]);
+    const user = createUser({ name: "Marina Souza", email: "marina@empresa.com.br", passwordHash: "x", role: "rh" });
+    const row = buildToday(user, NOW).board.find((item) => item.id === `risk:${stuck!.id}`);
+    expect(row).toMatchObject({ status: { tone: "late", label: "Trava a próxima etapa" }, reason: expect.stringContaining("Trava a etapa “Primeiro mês”.") });
+  });
+
   it("página do colaborador: só a etapa com atividade visível, ainda não liberada", () => {
     const { journey, mine } = seed();
     const link = createCollaboratorLink(journey.id, RH);

@@ -121,6 +121,11 @@ export interface TemplateStageDTO {
   releaseMode: ReleaseMode;
   releaseOffsetDays: number;
   releaseOffsetUnit: OffsetUnit;
+  /**
+   * Só em "quando a etapa anterior terminar": data-limite (dias a partir da data-âncora, na mesma unidade). Nessa data a
+   * etapa libera mesmo que a anterior não tenha terminado. Nulo/ausente = espera a anterior sem limite.
+   */
+  releaseLatestOffsetDays?: number | null;
   activities: TemplateActivityDTO[];
 }
 
@@ -187,8 +192,10 @@ export interface ActivityDTO {
   syncState: SyncState;
   syncError: string | null;
   releasedAt: string | null;
-  /** Quando a etapa ainda está bloqueada: previsão de liberação. */
+  /** Quando a etapa ainda está bloqueada: previsão de liberação (em "depois da anterior", a data-limite). */
   releasesAt: string | null;
+  /** Como a etapa da atividade libera (para dizer "depois da etapa anterior ou em 3 dias"). */
+  releaseMode?: ReleaseMode;
   doneAt: string | null;
   doneSource: "bitrix" | "nexo" | "link" | null;
 }

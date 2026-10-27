@@ -2,6 +2,7 @@
 
 import { ArrowDown, ArrowUp, BookOpen, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -67,7 +68,7 @@ export function StageEditor({ stage, index, count, journeyKind, errors, onChange
           value={stage.releaseMode}
           onChange={(event) => {
             const releaseMode = event.target.value as ReleaseMode;
-            set({ releaseMode, releaseOffsetDays: releaseMode === "offset" ? stage.releaseOffsetDays || -5 : 0 });
+            set({ releaseMode, releaseOffsetDays: releaseMode === "offset" ? stage.releaseOffsetDays || -5 : 0, releaseLatestOffsetDays: null });
           }}
           error={err("releaseMode")}
           options={[
@@ -86,6 +87,26 @@ export function StageEditor({ stage, index, count, journeyKind, errors, onChange
               onChange={(releaseOffsetDays, releaseOffsetUnit) => set({ releaseOffsetDays, releaseOffsetUnit })}
               error={err("releaseOffsetDays")}
             />
+          </div>
+        ) : null}
+        {stage.releaseMode === "after_previous" ? (
+          <div className={styles.wide}>
+            <Checkbox
+              label="Liberar numa data-limite mesmo que a etapa anterior não termine"
+              description="Assim uma tarefa esquecida não segura o resto da jornada."
+              checked={stage.releaseLatestOffsetDays !== null}
+              onChange={(event) => set({ releaseLatestOffsetDays: event.target.checked ? 7 : null })}
+            />
+            {stage.releaseLatestOffsetDays !== null ? (
+              <OffsetInput
+                legend="No máximo em"
+                days={stage.releaseLatestOffsetDays}
+                unit={stage.releaseOffsetUnit}
+                anchorWord={anchor}
+                onChange={(releaseLatestOffsetDays, releaseOffsetUnit) => set({ releaseLatestOffsetDays, releaseOffsetUnit })}
+                error={err("releaseLatestOffsetDays")}
+              />
+            ) : null}
           </div>
         ) : null}
         <Textarea label="Descrição" optional rows={2} value={stage.description} onChange={(event) => set({ description: event.target.value })} className={styles.wide} />

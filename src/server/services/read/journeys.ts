@@ -149,6 +149,7 @@ function buildActivityDTO(activity: ActivityRow, stage: StageState | undefined, 
     syncError: activity.syncError ? redactText(activity.syncError) : null,
     releasedAt: activity.releasedAt,
     releasesAt: activity.status === "locked" ? (stage?.releasesAt ?? null) : null,
+    ...(stage ? { releaseMode: stage.releaseMode } : {}),
     doneAt: activity.doneAt,
     doneSource: activity.doneSource,
   };

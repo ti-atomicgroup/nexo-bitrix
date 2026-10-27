@@ -1,7 +1,7 @@
 import "server-only";
 import type { BoardRowDTO, TodayDTO } from "@/shared/contracts";
 import { ROLE_LABEL, type ActivityRole, type ActivityStatus } from "@/shared/enums";
-import { daysUntil, isOverdue, todayIn } from "@/server/domain";
+import { blockedStages, daysUntil, isOverdue, todayIn } from "@/server/domain";
 import { listActivitiesByJourneyIds, type ActivityRow } from "../../db/repos/activities";
 import { listDetections } from "../../db/repos/detections";
 import { listJourneys, type JourneyRow } from "../../db/repos/journeys";
@@ -177,13 +177,26 @@ function riskRow(activity: ActivityRow, line: Line, ctx: Ctx): Row | null {
   };
 }
 
+/**
+ * Atividade atrasada que segura uma etapa "quando a anterior terminar": a linha diz qual etapa está travada,
+ * para o RH cobrar primeiro o que destrava a jornada.
+ */
+function markBlocking(row: Row, stageName: string | undefined): Row {
+  if (!stageName || !row.when.overdue) return row;
+  return { ...row, reason: `Trava a etapa “${stageName}”. ${row.reason}`, status: { tone: "late", label: "Trava a próxima etapa" } };
+}
+
 function activityRows(line: Line, ctx: Ctx): Row[] {
+  const blocking = new Map<string, string>();
+  for (const { stage, blockers } of blockedStages(line.journey, line.activities)) {
+    for (const blocker of blockers) blocking.set(blocker.id, stage.name);
+  }
   const rows: Row[] = [];
   for (const activity of line.activities) {
     const row =
       syncRow(activity, line) ??
       (line.journey.status === "active" ? (approvalRow(activity, line, ctx) ?? hrRow(activity, line, ctx) ?? riskRow(activity, line, ctx)) : null);
-    if (row) rows.push(row);
+    if (row) rows.push(row.kind === "sync_error" ? row : markBlocking(row, blocking.get(activity.id)));
   }
   return rows;
 }

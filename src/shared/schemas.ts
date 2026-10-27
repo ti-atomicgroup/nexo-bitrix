@@ -109,6 +109,8 @@ export const templateStageInput = z.object({
   releaseMode: z.enum(RELEASE_MODES),
   releaseOffsetDays: z.number().int().min(-365).max(365).default(0),
   releaseOffsetUnit: z.enum(OFFSET_UNITS).default("calendar"),
+  /** Data-limite de "quando a etapa anterior terminar" (dias a partir da data-âncora); nulo = sem limite. */
+  releaseLatestOffsetDays: z.number().int().min(-365).max(365).nullable().default(null),
   activities: z.array(templateActivityInput).min(1, "Cada etapa precisa de pelo menos uma atividade.").max(40),
 });
 

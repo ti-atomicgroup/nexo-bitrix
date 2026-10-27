@@ -56,7 +56,9 @@ export function activityTiming(activity: ActivityDTO, today: string, timeZone?: 
   if (activity.status === "done") return activity.doneAt ? `Feita ${relativeTo(activity.doneAt, today, timeZone)}` : "Feita";
   if (activity.status === "cancelled") return "Cancelada";
   if (activity.status === "locked") {
-    return activity.releasesAt ? `Libera ${relativeTo(activity.releasesAt, today, timeZone)}` : "Libera depois da etapa anterior";
+    if (!activity.releasesAt) return "Libera depois da etapa anterior";
+    const when = relativeTo(activity.releasesAt, today, timeZone);
+    return activity.releaseMode === "after_previous" ? `Libera depois da etapa anterior ou ${when}` : `Libera ${when}`;
   }
   const clock = wallClock(activity.dueAt, timeZone);
   if (!clock) return "";

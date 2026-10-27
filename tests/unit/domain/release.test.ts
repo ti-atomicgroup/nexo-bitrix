@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { stageReleaseAt, stagesState, stagesToRelease } from "@/server/domain/release";
+import { blockedStages, stageReleaseAt, stagesState, stagesToRelease } from "@/server/domain/release";
 import { makeActivity, makeJourney, sampleOnboarding } from "../../fakes/builders";
 
 const SP = "America/Sao_Paulo";
@@ -66,5 +66,49 @@ describe("stagesState", () => {
   it("mostra todas como concluídas quando a jornada foi concluída", () => {
     const state = stagesState(makeJourney({ status: "completed" }), rows([]), SP);
     expect(state.every((stage) => stage.state === "done")).toBe(true);
+  });
+});
+
+describe("data-limite de \"quando a etapa anterior terminar\"", () => {
+  /** Etapa 2 ("depois da anterior") com limite de 3 dias úteis depois da data-âncora (2026-11-02, segunda). */
+  const withDeadline = () => {
+    const template = sampleOnboarding();
+    template.stages[2] = { ...template.stages[2]!, releaseOffsetUnit: "business", releaseLatestOffsetDays: 3 };
+    return makeJourney({ snapshot: template });
+  };
+  const open = { status: "open" as const, releasedAt: "x" };
+  const done = { status: "done" as const, releasedAt: "x" };
+
+  it("tem data de liberação e libera nela mesmo com a anterior aberta", () => {
+    const journey = withDeadline();
+    expect(stageReleaseAt(journey.snapshot.stages[2]!, journey.anchorDate, SP)).toBe("2026-11-05T08:00:00-03:00");
+    const stuck = rows([done, done, open, open]);
+    expect(stagesToRelease(journey, stuck, SP, new Date("2026-11-05T10:59:00Z"))).toEqual([]);
+    expect(stagesToRelease(journey, stuck, SP, new Date("2026-11-05T11:00:00Z"))).toEqual([2]);
+    // Antes da data, terminar a anterior continua liberando na hora.
+    expect(stagesToRelease(journey, rows([done, done, open, done]), SP, new Date("2026-11-03T12:00:00Z"))).toEqual([2]);
+  });
+
+  it("a linha mostra a data-limite como previsão", () => {
+    const state = stagesState(withDeadline(), rows([done, done, open, open]), SP);
+    expect(state[2]).toMatchObject({ releaseMode: "after_previous", releasesAt: "2026-11-05T08:00:00-03:00" });
+  });
+});
+
+describe("blockedStages", () => {
+  const open = { status: "open" as const, releasedAt: "x" };
+  const done = { status: "done" as const, releasedAt: "x" };
+
+  it("aponta as obrigatórias da anterior que seguram a etapa \"depois da anterior\"", () => {
+    const blocked = blockedStages(makeJourney(), rows([done, done, open, open]));
+    expect(blocked.map(({ stage, blockers }) => [stage.name, blockers.map((activity) => activity.title)])).toEqual([
+      [makeJourney().snapshot.stages[2]!.name, ["Boas-vindas do gestor"]],
+    ]);
+  });
+
+  it("nada a apontar quando a anterior ainda não liberou, já terminou ou a jornada está pausada", () => {
+    expect(blockedStages(makeJourney(), rows([open, open, open]))).toEqual([]);
+    expect(blockedStages(makeJourney(), rows([done, done, open, done]))).toEqual([]);
+    expect(blockedStages(makeJourney({ status: "paused" }), rows([done, done, open, open]))).toEqual([]);
   });
 });

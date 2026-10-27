@@ -32,6 +32,7 @@ export function domainFake(): typeof Domain {
     daysUntil: (date, timezone, now = new Date()) => dayDiff(todayIn(timezone, now), date),
     dueAt: (anchorDate, _offset, _unit, time) => `${anchorDate}T${time}:00-03:00`,
     stageReleaseAt: () => null,
+    blockedStages: () => [],
     stagesState: (journey, activities) =>
       journey.snapshot.stages.map((stage) => {
         const items = activities.filter((activity) => activity.stagePosition === stage.position);

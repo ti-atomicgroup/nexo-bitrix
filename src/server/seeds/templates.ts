@@ -200,6 +200,9 @@ function onboarding(name: string, profile: string, description: string, extras: 
         name: "Primeiras semanas",
         description: "Adaptação com acompanhamento do gestor e do buddy.",
         releaseMode: "after_previous" as const,
+        // Uma tarefa esquecida no 1º dia não segura o acompanhamento: libera no máximo 2 dias úteis depois.
+        releaseOffsetUnit: "business" as const,
+        releaseLatestOffsetDays: 2,
         activities: [cultureGuide(), buddyFirstWeek(), firstImpressionSurvey(), oneOnOne30(), ...(extras.weeks ?? [])],
       },
       {

@@ -30,7 +30,11 @@ function stageMeta(stage: JourneyStageDTO, today: string): string {
   const done = stage.activities.filter((activity) => activity.status === "done").length;
   if (stage.state === "done") return `Etapa concluída · ${plural(total, "atividade", "atividades")}`;
   if (stage.state === "current") return `${done} de ${plural(total, "atividade feita", "atividades feitas")}`;
-  if (stage.releasesAt) return `Libera ${relativeTo(stage.releasesAt, today)}`;
+  if (stage.releasesAt) {
+    return stage.releaseMode === "after_previous"
+      ? `Libera quando a etapa anterior terminar ou ${relativeTo(stage.releasesAt, today)}, o que vier primeiro`
+      : `Libera ${relativeTo(stage.releasesAt, today)}`;
+  }
   return stage.releaseMode === "after_previous" ? "Libera quando a etapa anterior terminar" : "Libera no início da jornada";
 }
 
