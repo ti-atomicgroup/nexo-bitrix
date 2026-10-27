@@ -18,7 +18,7 @@ vi.mock("@/server/domain", async () => (await import("./support/domain-fake")).d
  */
 const API_DIR = fileURLToPath(new URL("../../src/app/api", import.meta.url));
 const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
-const PUBLIC = new Set(["health", "probe", "status", "setup/connect", "setup/account", "auth/login"]);
+const PUBLIC = new Set(["health", "probe", "status", "setup/connect", "setup/account", "auth/login", "tasks/[taskId]"]);
 
 type Method = (typeof METHODS)[number];
 interface RouteEntry {
@@ -134,6 +134,7 @@ describe("inventário de rotas da API", () => {
     const publicInTable = Object.values(API_ROUTES)
       .filter((spec) => spec.auth === "public" || spec.auth === "install")
       .map((spec) => spec.path.split("?")[0]!.replace(/^\/api\//, ""));
-    expect(new Set(publicInTable)).toEqual(new Set([...PUBLIC].filter((route) => route !== "probe")));
+    const publicRoutes = [...PUBLIC].filter((route) => route !== "probe").map((route) => route.replace(/\[([^\]]+)\]/g, ":$1"));
+    expect(new Set(publicInTable)).toEqual(new Set(publicRoutes));
   });
 });

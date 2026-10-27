@@ -5,15 +5,17 @@ import { POST as accountRoute } from "@/app/api/setup/account/route";
 import { POST as connectRoute } from "@/app/api/setup/connect/route";
 import { POST as prepareRoute } from "@/app/api/setup/prepare/route";
 import { GET as statusRoute } from "@/app/api/status/route";
+import { GET as taskRoute } from "@/app/api/tasks/[taskId]/route";
 import { listAudit } from "@/server/db/repos/audit";
 import { getInstallGrant, getSetupStage, getWebhookRecord, setInstallGrant, setSetupStage } from "@/server/db/repos/settings";
 import { countUsers } from "@/server/db/repos/users";
 import * as engine from "@/server/engine";
 import { encrypt, hashToken, newToken, resetInstanceKeyForTests } from "@/server/security/crypto";
 import { resetRateLimitsForTests } from "@/server/security/rate-limit";
-import type { MeDTO, SessionDTO, SettingsDTO, SetupStateDTO, StatusDTO, WebhookCheckDTO } from "@/shared/contracts";
+import { resetTasksForTests } from "@/server/services/tasks";
+import type { MeDTO, SessionDTO, SettingsDTO, SetupStateDTO, StatusDTO, TaskStatusDTO, WebhookCheckDTO } from "@/shared/contracts";
 import { useTestDb } from "../support/db";
-import { call, type ApiErrorBody } from "./support/seed";
+import { call, type ApiErrorBody, type CallResult } from "./support/seed";
 
 vi.mock("@/server/engine", async () => (await import("./support/engine-mock")).engineMock());
 
@@ -30,6 +32,7 @@ beforeEach(() => {
   cleanup = useTestDb().cleanup;
   resetRateLimitsForTests();
   resetInstanceKeyForTests();
+  resetTasksForTests();
   logs = [];
   responses.length = 0;
   vi.spyOn(console, "log").mockImplementation((line: unknown) => void logs.push(String(line)));
@@ -51,10 +54,24 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** Consulta o trabalho (como a tela faz) até terminar: devolve o resultado com 200 ou a resposta de erro do trabalho. */
+async function settle<T>(started: CallResult<{ taskId: string } & ApiErrorBody>): Promise<CallResult<T & ApiErrorBody>> {
+  if (started.status !== 202) return started as unknown as CallResult<T & ApiErrorBody>;
+  const taskId = started.body.taskId;
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const polled = await call<TaskStatusDTO<T> & ApiErrorBody, "taskId">(taskRoute, { path: `/api/tasks/${taskId}`, params: { taskId } });
+    responses.push(polled.text);
+    if (polled.status !== 200) return polled as unknown as CallResult<T & ApiErrorBody>;
+    if (polled.body.state === "done") return { ...polled, body: polled.body.result as T & ApiErrorBody };
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  throw new Error("o trabalho não terminou");
+}
+
 async function connect(webhookUrl = WEBHOOK) {
-  const result = await call<WebhookCheckDTO & ApiErrorBody>(connectRoute, { path: "/api/setup/connect", body: { webhookUrl } });
-  responses.push(result.text);
-  return result;
+  const started = await call<{ taskId: string } & ApiErrorBody>(connectRoute, { path: "/api/setup/connect", body: { webhookUrl } });
+  responses.push(started.text);
+  return settle<WebhookCheckDTO>(started);
 }
 
 async function createAccount(installToken: string) {
@@ -150,13 +167,53 @@ describe("instalação", () => {
     const anonymous = await call(prepareRoute, { path: "/api/setup/prepare", body: {} });
     expect(anonymous.status).toBe(401);
 
-    const result = await call<SetupStateDTO>(prepareRoute, { path: "/api/setup/prepare", token: session.token, body: { companyName: "Atomic" } });
+    const started = await call<{ taskId: string } & ApiErrorBody>(prepareRoute, { path: "/api/setup/prepare", token: session.token, body: { companyName: "Atomic" } });
+    expect(started.status).toBe(202);
+    const result = await settle<SetupStateDTO>(started);
     expect(result.status).toBe(200);
     expect(result.body).toMatchObject({ stage: "ready", portal: "empresa.bitrix24.com.br" });
     expect(engine.prepareWorkspace).toHaveBeenCalledWith(
       { companyName: "Atomic", timezone: "America/Sao_Paulo", projectName: "Nexo · Jornadas", defaults: {} },
       { type: "user", id: session.me.user.id, name: ACCOUNT.name },
     );
+  });
+
+  it("conectar responde 202 na hora e a consulta acompanha até o fim; o resultado sai uma vez só", async () => {
+    let release: () => void = () => undefined;
+    vi.mocked(engine.verifyWebhook).mockImplementation(async () => {
+      await new Promise<void>((resolve) => (release = resolve));
+      return { portal: "empresa.bitrix24.com.br", owner: OWNER, scopes: ["task", "user", "crm", "sonet_group"], encryptedUrl: encrypt(WEBHOOK) };
+    });
+    const started = await call<{ taskId: string }>(connectRoute, { path: "/api/setup/connect", body: { webhookUrl: WEBHOOK } });
+    expect(started.status).toBe(202);
+    expect(started.body.taskId).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    const poll = () => call<TaskStatusDTO<WebhookCheckDTO> & ApiErrorBody, "taskId">(taskRoute, { path: "/api/tasks/x", params: { taskId: started.body.taskId } });
+    expect((await poll()).body).toEqual({ state: "running" });
+    expect(getSetupStage()).toBe("connect");
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const done = await poll();
+    expect(done.body).toMatchObject({ state: "done", result: { portal: "empresa.bitrix24.com.br" } });
+    expect(getSetupStage()).toBe("account");
+    expect((await poll()).status).toBe(404);
+    const unknown = await call<ApiErrorBody, "taskId">(taskRoute, { path: "/api/tasks/x", params: { taskId: newToken() } });
+    expect(unknown.body.error.code).toBe("TASK_NOT_FOUND");
+  });
+
+  it("dois cliques em preparar acompanham o mesmo trabalho", async () => {
+    const { body: check } = await connect();
+    const { body: session } = await createAccount(check.installToken);
+    let release: () => void = () => undefined;
+    vi.mocked(engine.prepareWorkspace).mockImplementation(async () => {
+      await new Promise<void>((resolve) => (release = resolve));
+      setSetupStage("ready");
+    });
+    const first = await call<{ taskId: string }>(prepareRoute, { path: "/api/setup/prepare", token: session.token, body: { companyName: "Atomic" } });
+    const second = await call<{ taskId: string }>(prepareRoute, { path: "/api/setup/prepare", token: session.token, body: { companyName: "Atomic" } });
+    expect(second.body.taskId).toBe(first.body.taskId);
+    release();
+    expect((await settle<SetupStateDTO>(first as CallResult<{ taskId: string } & ApiErrorBody>)).body).toMatchObject({ stage: "ready" });
+    expect(engine.prepareWorkspace).toHaveBeenCalledTimes(1);
   });
 
   it("o segredo do webhook nunca aparece em resposta nem em log", async () => {

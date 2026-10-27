@@ -13,10 +13,12 @@ import { auditAs } from "./audit";
 import { assertRequiredScopes, scopeCheck } from "./scopes";
 import { startSession } from "./session";
 import { setupState } from "./setup-state";
+import { runningTask, startTask } from "./tasks";
 
 /**
  * Instalação em 3 passos, só enquanto não existe nenhum acesso:
  * 1) valida o webhook e entrega um token curto preso a esta aba; 2) cria o administrador; 3) prepara o Bitrix.
+ * Os passos 1 e 3 falam com o Bitrix24 e rodam em segundo plano: a rota responde 202 e a tela consulta /api/tasks/:id.
  */
 const GRANT_TTL_MS = 30 * 60 * 1000;
 const CONNECT_RULE = { limit: 20, windowMs: 10 * 60 * 1000 };
@@ -24,11 +26,16 @@ const CONNECT_RULE = { limit: 20, windowMs: 10 * 60 * 1000 };
 const alreadyInstalled = () => new AppError("ALREADY_INSTALLED", "O Nexo já foi instalado. Entre com sua conta.", 409);
 const grantInvalid = () => new AppError("INSTALL_TOKEN_INVALID", "Valide o webhook de novo para continuar a instalação.", 403);
 
-export async function connectWebhook(url: string): Promise<WebhookCheckDTO> {
+/** Passo 1: confere na hora o que não depende do Bitrix24 e começa a validação do webhook. Devolve o id do trabalho. */
+export function startConnectWebhook(url: string): string {
   if (countUsers() > 0) throw alreadyInstalled();
   if (!rateLimit("setup:connect", CONNECT_RULE).allowed) {
     throw new AppError("TOO_MANY_ATTEMPTS", "Muitas tentativas. Tente de novo em alguns minutos.", 429);
   }
+  return startTask("setup.connect", () => connectWebhook(url));
+}
+
+async function connectWebhook(url: string): Promise<WebhookCheckDTO> {
   const check = await verifyWebhook(url);
   const scopes = scopeCheck(check.scopes);
   assertRequiredScopes(scopes, { portal: check.portal, owner: check.owner });
@@ -70,8 +77,13 @@ export async function createFirstAccount(input: CreateAccountInput): Promise<Ses
   return startSession(user);
 }
 
-export async function prepare(input: PrepareInput, actor: Actor): Promise<SetupStateDTO> {
+/** Passo 3 em segundo plano. Um segundo clique enquanto a preparação roda acompanha o mesmo trabalho. */
+export function startPrepare(input: PrepareInput, actor: Actor): string {
   if (!getWebhookRecord()) throw new AppError("NOT_CONNECTED", "Conecte o Bitrix24 antes de preparar o Nexo.", 409);
+  return runningTask("setup.prepare") ?? startTask("setup.prepare", () => prepare(input, actor));
+}
+
+async function prepare(input: PrepareInput, actor: Actor): Promise<SetupStateDTO> {
   await prepareWorkspace(input, actor);
   return setupState();
 }

@@ -11,9 +11,12 @@ export const API_ROUTES = {
   status: { method: "GET", path: "/api/status", auth: "public", output: "StatusDTO" },
 
   /* Instalação (só enquanto não existe administrador) */
-  setupConnect: { method: "POST", path: "/api/setup/connect", auth: "public", input: "connectWebhookInput", output: "WebhookCheckDTO" },
+  /* Conectar e preparar falam com o Bitrix24: respondem 202 na hora e a tela consulta `task` até terminar. */
+  setupConnect: { method: "POST", path: "/api/setup/connect", auth: "public", input: "connectWebhookInput", output: "TaskStartedDTO (202) → WebhookCheckDTO" },
   setupAccount: { method: "POST", path: "/api/setup/account", auth: "install", input: "createAccountInput", output: "SessionDTO" },
-  setupPrepare: { method: "POST", path: "/api/setup/prepare", auth: "admin", input: "prepareInput", output: "SetupStateDTO" },
+  setupPrepare: { method: "POST", path: "/api/setup/prepare", auth: "admin", input: "prepareInput", output: "TaskStartedDTO (202) → SetupStateDTO" },
+  /* O id é aleatório (256 bits) e vale 15 min; o resultado é entregue uma vez. Falha volta com o erro do trabalho. */
+  task: { method: "GET", path: "/api/tasks/:taskId", auth: "public", output: "TaskStatusDTO" },
 
   /* Sessão */
   login: { method: "POST", path: "/api/auth/login", auth: "public", input: "loginInput", output: "SessionDTO" },

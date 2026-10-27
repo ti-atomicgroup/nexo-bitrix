@@ -26,6 +26,8 @@ import type {
   SetupStateDTO,
   StatusDTO,
   SyncStatusDTO,
+  TaskStartedDTO,
+  TaskStatusDTO,
   TemplateDTO,
   TemplateSummaryDTO,
   TodayDTO,
@@ -217,6 +219,51 @@ async function call<T>(name: ApiRouteName, options: RequestOptions = {}): Promis
   return payload as T;
 }
 
+/* ───────────── Trabalho em segundo plano (202 + consulta) ───────────── */
+
+const TASK_FIRST_CHECK_MS = 700;
+const TASK_POLL_MS = 1_000;
+const TASK_LIMIT_MS = 3 * 60 * 1000;
+/** Falhas de rede seguidas toleradas na consulta (a resposta do gateway pode oscilar). */
+const TASK_NETWORK_RETRIES = 3;
+
+function pause(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(new DOMException("Aborted", "AbortError"));
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        reject(new DOMException("Aborted", "AbortError"));
+      },
+      { once: true },
+    );
+  });
+}
+
+/**
+ * Começa um trabalho demorado (a rota responde 202 com o id) e consulta em chamadas curtas até o resultado.
+ * Falha do trabalho chega como `ApiError`, com a mesma mensagem de quando a chamada era direta.
+ */
+async function runTask<T>(name: ApiRouteName, options: RequestOptions): Promise<T> {
+  const { taskId } = await call<TaskStartedDTO>(name, options);
+  const deadline = Date.now() + TASK_LIMIT_MS;
+  let networkFailures = 0;
+  await pause(TASK_FIRST_CHECK_MS, options.signal);
+  for (;;) {
+    try {
+      const status = await call<TaskStatusDTO<T>>("task", { signal: options.signal, params: { taskId } });
+      if (status.state === "done") return status.result;
+      networkFailures = 0;
+    } catch (error) {
+      if (!(error instanceof ApiError && error.code === "network") || ++networkFailures > TASK_NETWORK_RETRIES) throw error;
+    }
+    if (Date.now() > deadline) throw new ApiError("task_timeout", "O Bitrix24 está demorando para responder. Tente de novo em instantes.", 0);
+    await pause(TASK_POLL_MS, options.signal);
+  }
+}
+
 /* ───────────── Tipos de entrada (formato aceito pelos esquemas, antes dos padrões) ───────────── */
 
 type In<S extends z.ZodType> = z.input<S>;
@@ -260,13 +307,14 @@ export const api = {
   status: (o?: CallOptions) => call<StatusDTO>("status", o),
 
   /* Instalação */
-  setupConnect: (body: ConnectWebhookBody, o?: CallOptions) => call<WebhookCheckDTO>("setupConnect", { ...o, body }),
+  setupConnect: (body: ConnectWebhookBody, o?: CallOptions) => runTask<WebhookCheckDTO>("setupConnect", { ...o, body }),
   setupAccount: async (body: CreateAccountBody, o?: CallOptions) => {
     const session = await call<SessionDTO>("setupAccount", { ...o, body });
     setToken(session.token);
     return session;
   },
-  setupPrepare: (body: PrepareBody, o?: CallOptions) => call<SetupStateDTO>("setupPrepare", { ...o, body }),
+  setupPrepare: (body: PrepareBody, o?: CallOptions) => runTask<SetupStateDTO>("setupPrepare", { ...o, body }),
+  task: (taskId: string, o?: CallOptions) => call<TaskStatusDTO>("task", { ...o, params: { taskId } }),
 
   /* Sessão */
   login: async (body: LoginBody, o?: CallOptions) => {

@@ -399,6 +399,13 @@ export interface SessionDTO {
   me: MeDTO;
 }
 
+/** Trabalho demorado começado pelo navegador (resposta 202): a tela consulta GET /api/tasks/:taskId até terminar. */
+export interface TaskStartedDTO {
+  taskId: string;
+}
+
+export type TaskStatusDTO<T = unknown> = { state: "running" } | { state: "done"; result: T };
+
 export interface WebhookCheckDTO {
   /** Token curto que liga a criação do primeiro acesso a esta aba. */
   installToken: string;
