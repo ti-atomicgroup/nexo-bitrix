@@ -14,6 +14,7 @@ export const JOB_KINDS = {
   notify: "notify",
   meetingCreate: "meeting.create",
   feedPost: "feed.post",
+  documentSend: "document.send",
 } as const;
 
 /** Nomes do briefing que equivalem a `activity.push` (aceitos se alguém enfileirar por eles). */

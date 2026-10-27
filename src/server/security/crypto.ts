@@ -62,6 +62,22 @@ export function decrypt(value: string, key = instanceKey()): string {
   return Buffer.concat([decipher.update(Buffer.from(payload, "base64url")), decipher.final()]).toString("utf8");
 }
 
+/** Arquivo binário cifrado: iv (12) + tag (16) + conteúdo. */
+export function encryptBytes(value: Uint8Array, key = instanceKey()): Buffer {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const payload = Buffer.concat([cipher.update(value), cipher.final()]);
+  return Buffer.concat([iv, cipher.getAuthTag(), payload]);
+}
+
+export function decryptBytes(value: Uint8Array, key = instanceKey()): Buffer {
+  const data = Buffer.from(value);
+  if (data.length < 28) throw new AppError("CIPHER_INVALID", "Arquivo cifrado inválido.", 500);
+  const decipher = createDecipheriv("aes-256-gcm", key, data.subarray(0, 12));
+  decipher.setAuthTag(data.subarray(12, 28));
+  return Buffer.concat([decipher.update(data.subarray(28)), decipher.final()]);
+}
+
 /** Token aleatório de 256 bits (sessões, link do colaborador, instalação). */
 export function newToken(): string {
   return randomBytes(32).toString("base64url");

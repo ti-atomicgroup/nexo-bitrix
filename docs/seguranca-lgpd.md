@@ -10,8 +10,20 @@
 | Inventário de acessos e equipamentos (ex.: "Notebook · 4471") | Garantir a devolução e a revogação na saída | SQLite |
 | Contas do RH no Nexo (nome, e-mail, hash da senha) | Login | SQLite (senha com scrypt) |
 | Endereço do webhook do Bitrix24 | Integração | SQLite, **cifrado** com AES-256-GCM |
+| Registro de cada documento enviado pelo link (nome do arquivo, tamanho, hash SHA-256, situação, link no Bitrix24) | Mostrar ao RH o que chegou e evitar gravar o mesmo arquivo duas vezes | SQLite |
 
-O Nexo **não** guarda CPF, RG, dados bancários, salários, documentos pessoais nem conteúdo de entrevistas.
+O Nexo **não** guarda CPF, RG, dados bancários, salários nem conteúdo de entrevistas.
+
+### Documentos enviados pelo colaborador
+
+- O RH escolhe, na trilha, quais documentos pedir. O colaborador envia cada um pelo link pessoal (PDF ou foto, até 10 MB).
+  O tipo é conferido pelo conteúdo do arquivo, não pelo nome.
+- **O arquivo mora no Bitrix24**, na pasta "Nexo · Documentos" do Drive do projeto privado, com uma subpasta por
+  jornada, e fica anexado à tarefa da atividade. Quem vê é quem tem acesso ao projeto e à tarefa no Bitrix24.
+- No Nexo, o arquivo fica **cifrado** (AES-256-GCM) na pasta de dados só até chegar ao Bitrix24, normalmente menos
+  de um minuto, e depois é apagado. Se o envio falhar (ex.: falta a permissão Drive), o arquivo continua cifrado até
+  o RH tentar de novo.
+- Limite de 20 envios a cada 10 minutos por link.
 
 ## Proteções
 

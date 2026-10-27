@@ -470,3 +470,71 @@ export async function createMeeting(client: BitrixClient, input: MeetingInput): 
 export async function postToFeed(client: BitrixClient, input: { title: string; message: string; dest?: string[] }): Promise<string> {
   return text(await client.call("log.blogpost.add", { POST_TITLE: input.title, POST_MESSAGE: input.message, DEST: input.dest ?? ["UA"] }));
 }
+
+/* ───────────── documentos no Drive (escopo disk) e anexo na tarefa (escopo task) ───────────── */
+
+/** Envio de arquivo em base64 pode passar de 20 s em conexões lentas. */
+const UPLOAD_TIMEOUT_MS = 90_000;
+
+export interface DriveObject {
+  id: string;
+  name: string;
+  /** Abre o arquivo ou a pasta no Bitrix24. */
+  detailUrl: string | null;
+}
+
+function parseDriveObject(value: unknown): DriveObject {
+  const raw = asRecord(value);
+  return { id: text(raw.ID), name: text(raw.NAME), detailUrl: optionalText(raw.DETAIL_URL) };
+}
+
+/** Pasta raiz do Drive do projeto (grupo de trabalho). Nulo se o webhook não enxerga o Drive do grupo. */
+export async function getGroupDriveRoot(client: BitrixClient, groupId: string): Promise<string | null> {
+  const storages = await client.list<Record<string, unknown>>("disk.storage.getlist", { filter: { ENTITY_TYPE: "group", ENTITY_ID: groupId } }, { maxPages: 5 });
+  const storage = storages.map(asRecord).find((item) => text(item.ENTITY_TYPE) === "group" && text(item.ENTITY_ID) === groupId);
+  const root = storage ? text(storage.ROOT_OBJECT_ID) : "";
+  return /^\d+$/.test(root) ? root : null;
+}
+
+/** Item com exatamente este nome dentro da pasta (o filtro do Bitrix compara sem diferenciar maiúsculas). */
+export async function findDriveChild(client: BitrixClient, folderId: string, name: string, type: "folder" | "file"): Promise<DriveObject | null> {
+  const items = await client.list<Record<string, unknown>>("disk.folder.getchildren", { id: Number(folderId), filter: { NAME: name } }, { maxPages: 2 });
+  const match = items.map(asRecord).find((item) => text(item.NAME) === name && text(item.TYPE) === type);
+  return match ? parseDriveObject(match) : null;
+}
+
+/** Cria a subpasta; se já existir (DISK_OBJ_22000), devolve a existente. */
+export async function ensureDriveFolder(client: BitrixClient, parentId: string, name: string): Promise<DriveObject> {
+  const existing = await findDriveChild(client, parentId, name, "folder");
+  if (existing) return existing;
+  try {
+    const created = parseDriveObject(await client.call("disk.folder.addsubfolder", { id: Number(parentId), data: { NAME: name } }));
+    if (!/^\d+$/.test(created.id)) throw invalidResponse(true);
+    return created;
+  } catch (error) {
+    if (isBitrixError(error) && error.code === "DISK_OBJ_22000") {
+      const found = await findDriveChild(client, parentId, name, "folder");
+      if (found) return found;
+    }
+    throw error;
+  }
+}
+
+/** Grava o arquivo na pasta. O nome já é único (sufixo do documento), então nunca renomeia por conflito. */
+export async function uploadDriveFile(client: BitrixClient, folderId: string, name: string, content: Uint8Array): Promise<DriveObject> {
+  const result = await client.call(
+    "disk.folder.uploadfile",
+    { id: Number(folderId), data: { NAME: name }, fileContent: [name, Buffer.from(content).toString("base64")], generateUniqueName: false },
+    { timeoutMs: UPLOAD_TIMEOUT_MS },
+  );
+  const file = parseDriveObject(result);
+  // Sem ID, o arquivo pode ter sido gravado: tratar como incerto (o motor procura pelo nome antes de reenviar).
+  if (!/^\d+$/.test(file.id)) throw invalidResponse(true);
+  return file;
+}
+
+/** Anexa um arquivo do Drive à tarefa. Devolve o id do anexo. */
+export async function attachFileToTask(client: BitrixClient, taskId: string, fileId: string): Promise<string> {
+  const result = asRecord(await client.call("tasks.task.files.attach", { taskId: Number(taskId), fileId: Number(fileId) }));
+  return text(pick(result, "attachmentId", "ATTACHMENT_ID"));
+}

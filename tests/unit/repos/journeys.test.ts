@@ -58,6 +58,7 @@ function activity(overrides: Partial<ActivityRow>): ActivityRow {
     status: "open",
     checklist: [],
     links: [],
+    documents: [],
     bitrixTaskId: null,
     bitrixStatus: null,
     bitrixMissing: false,

@@ -11,7 +11,8 @@ Tempo estimado: **5 minutos**. Você vai precisar de:
 2. Dê um nome, por exemplo **Nexo · Jornadas**.
 3. Marque as permissões:
    - **Obrigatórias:** Tarefas (`task`), Usuários (`user_brief` ou `user`), CRM (`crm`) e Grupos de trabalho (`sonet_group`).
-   - **Opcionais:** Bate-papo e notificações (`im`), Calendário (`calendar`) e Feed de notícias (`log`).
+   - **Opcionais:** Bate-papo e notificações (`im`), Calendário (`calendar`), Feed de notícias (`log`) e Drive (`disk`).
+     Sem o Drive, o link pessoal mostra os documentos pedidos só como lista, sem envio de arquivos.
 4. Clique em **Salvar** e só depois copie o **endereço do webhook**. Ele muda ao salvar.
 
 > Dica: crie o webhook com uma conta dedicada ao Nexo. As tarefas aparecem como criadas por essa conta, e o acesso

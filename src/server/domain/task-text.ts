@@ -1,5 +1,5 @@
 import "server-only";
-import type { LinkItem } from "@/shared/contracts";
+import type { DocumentRequest, LinkItem } from "@/shared/contracts";
 import type { JourneyKind } from "@/shared/enums";
 import { formatDateBr } from "./dates";
 
@@ -19,6 +19,8 @@ export interface TaskDescriptionInput {
   stageName: string;
   instructions: string;
   links: LinkItem[];
+  /** Documentos pedidos ao colaborador: chegam anexados à tarefa. */
+  documents?: DocumentRequest[];
 }
 
 /** Colchetes quebrariam a marcação [URL=…]…[/URL]. */
@@ -36,6 +38,14 @@ export function taskDescription(input: TaskDescriptionInput): string {
   if (instructions) lines.push("", "[B]O que fazer[/B]", instructions);
   if (input.links.length) {
     lines.push("", "[B]Links[/B]", ...input.links.map((link) => `[URL=${safeUrl(link.url)}]${safeLabel(link.label)}[/URL]`));
+  }
+  if (input.documents?.length) {
+    lines.push(
+      "",
+      "[B]Documentos pedidos[/B]",
+      ...input.documents.map((document) => `• ${safeLabel(document.name)}${document.required ? "" : " (opcional)"}`),
+      "O colaborador envia pelo link pessoal do Nexo. Cada arquivo vai para o Drive do projeto e é anexado a esta tarefa.",
+    );
   }
   lines.push("", "[I]Tarefa criada pelo Nexo.[/I]");
   return lines.join("\n");

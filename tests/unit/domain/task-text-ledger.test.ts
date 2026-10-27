@@ -30,6 +30,24 @@ describe("texto das tarefas", () => {
     const offboarding = taskDescription({ personName: "Ana", kind: "offboarding", anchorDate: "2026-11-02", stageName: "Saída", instructions: "", links: [] });
     expect(offboarding).toContain("Desligamento · último dia em 02/11/2026");
     expect(offboarding).not.toContain("[B]Links[/B]");
+    expect(offboarding).not.toContain("[B]Documentos pedidos[/B]");
+  });
+
+  it("lista os documentos pedidos e avisa que chegam anexados", () => {
+    const description = taskDescription({
+      personName: "Ana",
+      kind: "onboarding",
+      anchorDate: "2026-11-02",
+      stageName: "Antes do 1º dia",
+      instructions: "",
+      links: [],
+      documents: [
+        { key: "rg", name: "Documento com foto", hint: "", required: true },
+        { key: "banco", name: "Dados [bancários]", hint: "", required: false },
+      ],
+    });
+    expect(description).toContain("[B]Documentos pedidos[/B]\n• Documento com foto\n• Dados (bancários) (opcional)");
+    expect(description).toContain("anexado a esta tarefa");
   });
 });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowUp, ChevronDown, Link2, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, FilePlus2, Link2, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { ROLE_ICON } from "@/components/lines/icons";
 import { Pictogram } from "@/components/lines/pictogram";
@@ -26,7 +26,7 @@ import {
 } from "@/shared/enums";
 import styles from "./activity-editor.module.css";
 import { OffsetInput } from "./offset-input";
-import { uid, type ActivityDraft } from "./template-draft";
+import { canRequestDocuments, uid, type ActivityDraft } from "./template-draft";
 
 export interface ActivityEditorProps {
   activity: ActivityDraft;
@@ -68,6 +68,7 @@ export function ActivityEditor({ activity, journeyKind, path, errors, onChange, 
           <p className={styles.summaryMeta}>
             {ROLE_LABEL[activity.role]} · {offsetText(activity.dueOffsetDays, activity.dueOffsetUnit, anchor)}
             {activity.checklist.length ? ` · ${plural(activity.checklist.length, "item", "itens")} no checklist` : ""}
+            {canRequestDocuments(activity) && activity.documents.length ? ` · ${plural(activity.documents.length, "documento pedido", "documentos pedidos")}` : ""}
             {hasErrors ? " · tem campos para corrigir" : ""}
           </p>
         </div>
@@ -214,6 +215,47 @@ export function ActivityEditor({ activity, journeyKind, path, errors, onChange, 
               </Button>
             </div>
           </fieldset>
+
+          {canRequestDocuments(activity) ? (
+            <fieldset className={styles.list}>
+              <legend className={styles.listLegend}>Documentos pedidos</legend>
+              <p className={styles.quiet}>
+                O colaborador envia cada um pelo link pessoal (foto ou PDF). Os arquivos vão para a pasta Nexo · Documentos do projeto e ficam anexados à tarefa. Precisa da
+                permissão Drive no webhook.
+              </p>
+              {err("documents") ? <p className={styles.error}>{err("documents")}</p> : null}
+              {activity.documents.map((document, index) => {
+                const update = (patch: Partial<typeof document>) => set({ documents: activity.documents.map((entry) => (entry.uid === document.uid ? { ...entry, ...patch } : entry)) });
+                return (
+                  <div key={document.uid} className={styles.item}>
+                    <Field label={`Documento ${index + 1}`} value={document.name} onChange={(event) => update({ name: event.target.value })} error={err(`documents.${index}.name`)} />
+                    <Field
+                      label="Orientação"
+                      optional
+                      placeholder="Ex.: frente e verso"
+                      value={document.hint}
+                      onChange={(event) => update({ hint: event.target.value })}
+                      error={err(`documents.${index}.hint`)}
+                      className={styles.itemText}
+                    />
+                    <Checkbox label="Obrigatório" checked={document.required} onChange={(event) => update({ required: event.target.checked })} />
+                    <Button
+                      variant="ghost"
+                      icon={Trash2}
+                      aria-label={`Remover o documento ${index + 1}`}
+                      onClick={() => set({ documents: activity.documents.filter((entry) => entry.uid !== document.uid) })}
+                      className={styles.remove}
+                    />
+                  </div>
+                );
+              })}
+              <div>
+                <Button size="s" icon={FilePlus2} onClick={() => set({ documents: [...activity.documents, { uid: uid(), key: "", name: "", hint: "", required: true }] })}>
+                  Pedir documento
+                </Button>
+              </div>
+            </fieldset>
+          ) : null}
 
           <div className={styles.actions}>
             <Button size="s" variant="ghost" icon={ArrowUp} disabled={!canMoveUp} onClick={() => onMove(-1)}>

@@ -73,6 +73,16 @@ export interface FakeCrmItem {
   fields: Record<string, unknown>;
 }
 
+export interface FakeDriveObject {
+  id: number;
+  storageId: number;
+  /** 0 na raiz do armazenamento. */
+  parentId: number;
+  name: string;
+  type: "folder" | "file";
+  content: Buffer | null;
+}
+
 interface FakeResponse {
   status: number;
   body: Record<string, unknown>;
@@ -96,6 +106,7 @@ const SCOPE_BY_PREFIX: Array<[RegExp, string[]]> = [
   [/^im\./, ["im"]],
   [/^calendar\./, ["calendar"]],
   [/^log\./, ["log"]],
+  [/^disk\./, ["disk"]],
 ];
 
 const isoSeconds = (date: Date) => `${date.toISOString().slice(0, 19)}+00:00`;
@@ -153,6 +164,10 @@ export class FakeBitrix {
   events: Array<{ id: number; ownerId: number; name: string; from: string; to: string; attendees: number[] }> = [];
   posts: Array<{ id: number; title: string; message: string; dest: string[] }> = [];
   stageHistory: FakeStageHistory[] = [];
+  /** Drive: um armazenamento por grupo (raiz = pasta) e os objetos dentro dele. */
+  storages: Array<{ id: number; entityType: "group" | "user"; entityId: number; rootObjectId: number }> = [];
+  drive = new Map<number, FakeDriveObject>();
+  attachments: Array<{ id: number; taskId: number; fileId: number }> = [];
   crmItems = new Map<string, FakeCrmItem>();
   crmTypes: Array<{ id: number; entityTypeId: number; title: string }> = [];
   categories = new Map<number, Array<{ id: number; name: string }>>();
@@ -162,7 +177,7 @@ export class FakeBitrix {
   calls: Array<{ method: string; params: Record<string, unknown> }> = [];
 
   private faults = new Map<string, FaultKind[]>();
-  private ids = { task: 100, item: 1000, group: 10, comment: 1, history: 0, event: 1, post: 1, notify: 1, crm: 1 };
+  private ids = { task: 100, item: 1000, group: 10, comment: 1, history: 0, event: 1, post: 1, notify: 1, crm: 1, storage: 1, disk: 5000, attachment: 1 };
 
   constructor(options: { host?: string; userId?: string; secret?: string; scopes?: string[]; owner?: Partial<FakeUser> & { id?: number } } = {}) {
     this.host = options.host ?? "fake.bitrix24.com.br";
@@ -225,6 +240,21 @@ export class FakeBitrix {
 
   taskByXmlId(xmlId: string): FakeTask | undefined {
     return [...this.tasks.values()].find((task) => task.xmlId === xmlId);
+  }
+
+  /** Arquivos de uma pasta do Drive (ou de todo o Drive, sem `parentId`). */
+  driveFiles(parentId?: number): FakeDriveObject[] {
+    return [...this.drive.values()].filter((item) => item.type === "file" && (parentId === undefined || item.parentId === parentId));
+  }
+
+  driveFolder(name: string): FakeDriveObject | undefined {
+    return [...this.drive.values()].find((item) => item.type === "folder" && item.name === name);
+  }
+
+  /** Apaga o objeto e o que estiver dentro dele. */
+  deleteDriveObject(id: number): void {
+    this.drive.delete(id);
+    for (const item of [...this.drive.values()]) if (item.parentId === id) this.deleteDriveObject(item.id);
   }
 
   countCalls(method: string): number {
@@ -426,6 +456,54 @@ export class FakeBitrix {
         this.events.push({ id, ownerId: Number(params.ownerId), name: String(params.name), from: String(params.from), to: String(params.to), attendees: asList(params.attendees).map(Number) });
         return { result: id };
       }
+      case "disk.storage.getlist": {
+        const filter = asObject(params.filter);
+        const storages = this.storages.filter(
+          (storage) =>
+            (filter.ENTITY_TYPE === undefined || storage.entityType === filter.ENTITY_TYPE) &&
+            (filter.ENTITY_ID === undefined || String(storage.entityId) === String(filter.ENTITY_ID)),
+        );
+        const { page, next, total } = this.page(storages, params);
+        return {
+          result: page.map((storage) => ({ ID: String(storage.id), ENTITY_TYPE: storage.entityType, ENTITY_ID: String(storage.entityId), ROOT_OBJECT_ID: String(storage.rootObjectId) })),
+          total,
+          ...(next !== undefined ? { next } : {}),
+        };
+      }
+      case "disk.folder.getchildren": {
+        const folder = this.requireFolder(Number(params.id));
+        const name = asObject(params.filter).NAME;
+        const children = [...this.drive.values()].filter((item) => item.parentId === folder.id && (name === undefined || item.name.toLowerCase() === String(name).toLowerCase()));
+        const { page, next, total } = this.page(children, params);
+        return { result: page.map((item) => this.drivePayload(item)), total, ...(next !== undefined ? { next } : {}) };
+      }
+      case "disk.folder.addsubfolder": {
+        const folder = this.requireFolder(Number(params.id));
+        const name = String(asObject(params.data).NAME ?? "").trim();
+        if (!name) throw new FakeFailure(400, "ERROR_ARGUMENT", "NAME is required");
+        if ([...this.drive.values()].some((item) => item.parentId === folder.id && item.name === name)) {
+          throw new FakeFailure(400, "DISK_OBJ_22000", "A folder with this name already exists");
+        }
+        return { result: this.drivePayload(this.addDriveObject(folder, name, "folder", null)) };
+      }
+      case "disk.folder.uploadfile": {
+        const folder = this.requireFolder(Number(params.id));
+        const name = String(asObject(params.data).NAME ?? "").trim();
+        const [, base64] = asList(params.fileContent).map(String);
+        if (!name || !base64) throw new FakeFailure(400, "ERROR_ARGUMENT", "NAME and fileContent are required");
+        if ([...this.drive.values()].some((item) => item.parentId === folder.id && item.name === name)) {
+          throw new FakeFailure(400, "DISK_OBJ_22000", "A file with this name already exists");
+        }
+        return { result: this.drivePayload(this.addDriveObject(folder, name, "file", Buffer.from(base64, "base64"))) };
+      }
+      case "tasks.task.files.attach": {
+        const task = this.requireTask(Number(params.taskId));
+        const file = this.drive.get(Number(params.fileId));
+        if (!file || file.type !== "file") throw new FakeFailure(400, "ERROR_CORE", "Insufficient permissions");
+        const id = this.ids.attachment++;
+        this.attachments.push({ id, taskId: task.id, fileId: file.id });
+        return { result: { attachmentId: id } };
+      }
       case "log.blogpost.add": {
         const id = this.ids.post++;
         this.posts.push({ id, title: String(params.POST_TITLE ?? ""), message: String(params.POST_MESSAGE ?? ""), dest: asList(params.DEST).map(String) });
@@ -440,6 +518,30 @@ export class FakeBitrix {
     const user = this.users.get(id);
     if (!user) throw new FakeFailure(400, "ERROR_CORE", "User not found");
     return user;
+  }
+
+  private requireFolder(id: number): FakeDriveObject {
+    const folder = this.drive.get(id);
+    if (!folder || folder.type !== "folder") throw new FakeFailure(400, "ERROR_NOT_FOUND", "Could not find entity with id");
+    return folder;
+  }
+
+  private addDriveObject(parent: FakeDriveObject, name: string, type: FakeDriveObject["type"], content: Buffer | null): FakeDriveObject {
+    const item: FakeDriveObject = { id: this.ids.disk++, storageId: parent.storageId, parentId: parent.id, name, type, content };
+    this.drive.set(item.id, item);
+    return item;
+  }
+
+  private drivePayload(item: FakeDriveObject): Record<string, unknown> {
+    return {
+      ID: String(item.id),
+      NAME: item.name,
+      TYPE: item.type,
+      STORAGE_ID: String(item.storageId),
+      PARENT_ID: String(item.parentId),
+      DETAIL_URL: `${this.portal}/workgroups/group/drive/${item.id}/`,
+      ...(item.content ? { SIZE: String(item.content.length) } : {}),
+    };
   }
 
   private requireTask(id: number): FakeTask {
@@ -499,6 +601,11 @@ export class FakeBitrix {
       closed: false,
       initiatePerms: String(params.INITIATE_PERMS ?? "K"),
     });
+    // Todo grupo nasce com o seu Drive.
+    const storageId = this.ids.storage++;
+    const root: FakeDriveObject = { id: this.ids.disk++, storageId, parentId: 0, name: name, type: "folder", content: null };
+    this.drive.set(root.id, root);
+    this.storages.push({ id: storageId, entityType: "group", entityId: id, rootObjectId: root.id });
     return id;
   }
 

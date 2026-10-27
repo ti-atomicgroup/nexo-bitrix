@@ -2,8 +2,10 @@ import "server-only";
 import type { CollaboratorActivityDTO, CollaboratorLinkDTO, CollaboratorViewDTO } from "@/shared/contracts";
 import { ROLE_LABEL, type ActivityStatus } from "@/shared/enums";
 import { daysUntil, journeyProgress, stagesState } from "@/server/domain";
-import { markDoneFromLink, type Actor } from "@/server/engine";
+import { documentsEnabled, markDoneFromLink, receiveDocument, type Actor } from "@/server/engine";
 import { getActivity, listActivities, type ActivityRow } from "../db/repos/activities";
+import { listDocumentsByJourney, type DocumentRow } from "../db/repos/documents";
+import { detectFileType, MAX_DOCUMENT_BYTES } from "../domain/documents";
 import { findJourneyByLinkHash, getJourney, updateJourney, type JourneyRow } from "../db/repos/journeys";
 import { findPerson } from "../db/repos/people";
 import { getCompany, getContent } from "../db/repos/settings";
@@ -21,10 +23,13 @@ import { journeyNotFound } from "./read/journeys";
  */
 const LINK_AFTER_END_MS = 30 * 24 * 60 * 60 * 1000;
 const DONE_RULE = { limit: 30, windowMs: 10 * 60 * 1000 };
+const UPLOAD_RULE = { limit: 20, windowMs: 10 * 60 * 1000 };
 const TOKEN_SHAPE = /^[A-Za-z0-9_-]{20,200}$/;
 const PEOPLE_ROLES = ["gestor", "buddy", "rh"] as const;
 
 export type LinkDoneOutcome = "done" | "error" | "not_found";
+/** received: guardado; completed: era o último obrigatório e a atividade ficou feita. */
+export type LinkDocumentOutcome = "received" | "completed" | "too_big" | "bad_type" | "error" | "not_found";
 
 /** O link vale até 30 dias depois do fim da jornada. */
 function endOfLink(journey: JourneyRow): number | null {
@@ -74,7 +79,8 @@ function collaboratorStatus(status: ActivityStatus): CollaboratorActivityDTO["st
   return "todo";
 }
 
-function toCollaboratorActivity(activity: ActivityRow): CollaboratorActivityDTO {
+function toCollaboratorActivity(activity: ActivityRow, documents: DocumentRow[]): CollaboratorActivityDTO {
+  const received = documents.filter((document) => document.activityId === activity.id);
   return {
     id: activity.id,
     title: activity.title,
@@ -85,6 +91,14 @@ function toCollaboratorActivity(activity: ActivityRow): CollaboratorActivityDTO 
     mine: activity.role === "colaborador",
     ownerLabel: ROLE_LABEL[activity.role],
     links: activity.links,
+    ...(activity.documents.length
+      ? {
+          documents: activity.documents.map((request) => ({
+            ...request,
+            received: received.filter((document) => document.requestKey === request.key).map((document) => ({ fileName: document.fileName, receivedAt: document.receivedAt })),
+          })),
+        }
+      : {}),
   };
 }
 
@@ -104,13 +118,14 @@ export function loadCollaboratorView(token: string, now = new Date()): Collabora
   const content = getContent();
   const activities = listActivities(journey.id);
   const visible = activities.filter(isVisible);
+  const documents = visible.some((activity) => activity.documents.length) ? listDocumentsByJourney(journey.id) : [];
   // Estações sem nenhuma atividade visível ficam de fora: o nome da etapa pode ser interno.
   const stages = stagesState(journey, activities, company.timezone)
     .map((stage) => ({
       position: stage.position,
       name: stage.name,
       state: stage.state,
-      activities: visible.filter((activity) => activity.stagePosition === stage.position).map(toCollaboratorActivity),
+      activities: visible.filter((activity) => activity.stagePosition === stage.position).map((activity) => toCollaboratorActivity(activity, documents)),
     }))
     .filter((stage) => stage.activities.length > 0);
   const onboarding = journey.kind === "onboarding";
@@ -131,7 +146,12 @@ export function loadCollaboratorView(token: string, now = new Date()): Collabora
     contacts: content.contacts,
     faq: onboarding ? content.faqOnboarding : content.faqOffboarding,
     completed: journey.status === "completed",
+    uploadsEnabled: (journey.status === "active" || journey.status === "paused") && documentsEnabled(),
   };
+}
+
+export function isCollaboratorLinkActive(token: string, now = Date.now()): boolean {
+  return journeyForToken(token, now) !== null;
 }
 
 /** "Marcar como feita" do formulário sem JavaScript. Limite de 30 envios a cada 10 min por link. */
@@ -153,6 +173,28 @@ export function markDoneFromLinkToken(token: string, activityId: string, now = D
   } catch (error) {
     if (!isAppError(error)) {
       log.error("link_done_failed", { message: "Falha ao marcar a atividade como feita pelo link do colaborador.", journeyId: journey.id, activityId, error });
+    }
+    return "error";
+  }
+}
+
+/**
+ * Arquivo enviado pelo formulário sem JavaScript. Confere o link, o limite (20 envios a cada 10 min por link),
+ * o tamanho e o tipo real (PDF ou foto, pelos primeiros bytes); o motor confere a atividade e o pedido.
+ */
+export function receiveDocumentFromLinkToken(token: string, activityId: string, requestKey: string, bytes: Uint8Array, now = Date.now()): LinkDocumentOutcome {
+  const journey = journeyForToken(token, now);
+  if (!journey?.linkTokenHash) return "not_found";
+  if (!documentsEnabled()) return "error";
+  if (!rateLimit(`link-upload:${journey.linkTokenHash}`, UPLOAD_RULE, now).allowed) return "error";
+  if (bytes.length > MAX_DOCUMENT_BYTES) return "too_big";
+  const type = detectFileType(bytes);
+  if (!type) return "bad_type";
+  try {
+    return receiveDocument(journey, activityId, requestKey, { bytes, type }).completed ? "completed" : "received";
+  } catch (error) {
+    if (!isAppError(error)) {
+      log.error("link_document_failed", { message: "Falha ao receber documento pelo link do colaborador.", journeyId: journey.id, activityId, error });
     }
     return "error";
   }

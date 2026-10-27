@@ -1,10 +1,11 @@
 import "server-only";
 import { z } from "zod";
-import type { ActivityDTO, CollaboratorLinkDTO, JourneyDTO, JourneySummaryDTO, PersonDTO, UserRef } from "@/shared/contracts";
+import type { ActivityDocumentDTO, ActivityDTO, CollaboratorLinkDTO, JourneyDTO, JourneySummaryDTO, PersonDTO, UserRef } from "@/shared/contracts";
 import { JOURNEY_KINDS, JOURNEY_STATUSES, type JourneyKind, type JourneyStatus } from "@/shared/enums";
 import { completionCheck, isOverdue, journeyProgress, journeyRisk, nextStop, stagesState, type StageState } from "@/server/domain";
 import { getActivity, listActivities, listActivitiesByJourneyIds, type ActivityRow } from "../../db/repos/activities";
 import { listAudit } from "../../db/repos/audit";
+import { listDocumentsByActivity } from "../../db/repos/documents";
 import { getJourney, listJourneys, type JourneyRow } from "../../db/repos/journeys";
 import { listActiveLedger, listLedger, toLedgerItemDTO } from "../../db/repos/ledger";
 import { findPerson, findPersonByBitrixId, toPersonDTO, type PersonRow } from "../../db/repos/people";
@@ -12,7 +13,7 @@ import { getCompany, getProject, getWebhookRecord } from "../../db/repos/setting
 import { AppError } from "../../errors";
 import { blankAsUndefined } from "../../http/input";
 import { redactText } from "../../log";
-import { bitrixTaskUrl } from "../bitrix-links";
+import { bitrixPortalUrl, bitrixTaskUrl } from "../bitrix-links";
 
 /** Modelos de leitura das jornadas (só SQLite): resumo para listas, jornada completa e atividade. */
 
@@ -102,6 +103,25 @@ function assignee(activity: ActivityRow, ctx: ReadContext): UserRef | null {
   };
 }
 
+/** Documentos pedidos e os arquivos recebidos (o RH abre cada um no Drive do projeto, depois do envio). */
+function activityDocuments(activity: ActivityRow, ctx: ReadContext): ActivityDocumentDTO[] {
+  const received = listDocumentsByActivity(activity.id);
+  return activity.documents.map((request) => ({
+    ...request,
+    files: received
+      .filter((document) => document.requestKey === request.key)
+      .map((document) => ({
+        id: document.id,
+        fileName: document.fileName,
+        size: document.size,
+        receivedAt: document.receivedAt,
+        status: document.status,
+        bitrixUrl: bitrixPortalUrl(ctx.portal, document.bitrixUrl),
+        error: document.error ? redactText(document.error) : null,
+      })),
+  }));
+}
+
 function buildActivityDTO(activity: ActivityRow, stage: StageState | undefined, ctx: ReadContext): ActivityDTO {
   return {
     id: activity.id,
@@ -121,6 +141,7 @@ function buildActivityDTO(activity: ActivityRow, stage: StageState | undefined, 
     overdue: isOverdue(activity, ctx.now),
     checklist: activity.checklist,
     links: activity.links,
+    ...(activity.documents.length ? { documents: activityDocuments(activity, ctx) } : {}),
     bitrixTaskId: activity.bitrixTaskId,
     bitrixUrl: activity.bitrixMissing ? null : bitrixTaskUrl(ctx.portal, ctx.projectId, activity.bitrixTaskId),
     bitrixMissing: activity.bitrixMissing,

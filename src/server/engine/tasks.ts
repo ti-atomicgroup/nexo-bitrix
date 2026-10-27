@@ -24,6 +24,7 @@ import type { ActivityStatus } from "@/shared/enums";
 import { addCalendarDays, todayIn } from "../domain/dates";
 import { REVOKE_ROOT_TITLE } from "../domain/ledger";
 import { taskDescription, taskTitle } from "../domain/task-text";
+import { enqueuePendingAttachments } from "./documents";
 import { RetryLater } from "./job-errors";
 import { enqueueActivityJob, JOB_KINDS } from "./queue";
 import type { EngineContext } from "./runtime";
@@ -95,6 +96,7 @@ async function ensureTaskCreated(activity: ActivityRow, journey: JourneyRow, ctx
         stageName: stage?.name ?? "",
         instructions: activity.instructions,
         links: activity.links,
+        documents: activity.documents,
       }),
       responsibleId: activity.assigneeBitrixId ?? "",
       auditors: auditorsFor(journey, activity),
@@ -197,6 +199,8 @@ export async function handleTaskCreate(payload: Record<string, unknown>, ctx: En
       entityId: journey.id,
       detail: { text: `“${activity.title}” virou tarefa no Bitrix24.`, activityId, taskId },
     });
+    // Documentos que chegaram ao Drive antes da tarefa existir: anexa agora.
+    enqueuePendingAttachments(activityId);
   }
   await ensureChecklist(current, ctx);
   const fresh = getActivity(activityId);

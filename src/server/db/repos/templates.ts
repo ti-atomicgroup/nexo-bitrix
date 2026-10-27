@@ -1,5 +1,5 @@
 import "server-only";
-import type { ChecklistTemplateItem, LinkItem, TemplateActivityDTO, TemplateDTO, TemplateStageDTO, TemplateSummaryDTO } from "@/shared/contracts";
+import type { ChecklistTemplateItem, DocumentRequest, LinkItem, TemplateActivityDTO, TemplateDTO, TemplateStageDTO, TemplateSummaryDTO } from "@/shared/contracts";
 import type { ActivityKind, ActivityRole, JourneyKind, OffsetUnit, ReleaseMode, Visibility } from "@/shared/enums";
 import type { TemplateInput } from "@/shared/schemas";
 import { getDb } from "..";
@@ -46,6 +46,7 @@ function mapActivity(row: Record<string, unknown>): TemplateActivityDTO {
     ledgerRole: row.ledger_role === "revoke_and_collect" ? "revoke_and_collect" : null,
     checklist: parseJson<ChecklistTemplateItem[]>(row.checklist, []),
     links: parseJson<LinkItem[]>(row.links, []),
+    documents: parseJson<DocumentRequest[]>(row.documents, []),
   };
 }
 
@@ -88,9 +89,9 @@ function insertStages(templateId: string, stages: TemplateInput["stages"]): void
   );
   const insertActivity = db.prepare(`
     INSERT INTO template_activities (id, stage_id, position, title, instructions, kind, role, due_offset_days, due_offset_unit, due_time,
-      required, visibility, requires_approval, ledger_role, checklist, links)
+      required, visibility, requires_approval, ledger_role, checklist, links, documents)
     VALUES (@id, @stageId, @position, @title, @instructions, @kind, @role, @dueOffsetDays, @dueOffsetUnit, @dueTime,
-      @required, @visibility, @requiresApproval, @ledgerRole, @checklist, @links)`);
+      @required, @visibility, @requiresApproval, @ledgerRole, @checklist, @links, @documents)`);
   stages.forEach((stage, stageIndex) => {
     const stageId = newId();
     insertStage.run(stageId, templateId, stageIndex, stage.name, stage.description ?? "", stage.releaseMode, stage.releaseOffsetDays ?? 0, stage.releaseOffsetUnit ?? "calendar");
@@ -112,6 +113,7 @@ function insertStages(templateId: string, stages: TemplateInput["stages"]): void
         ledgerRole: activity.ledgerRole ?? null,
         checklist: JSON.stringify(activity.checklist ?? []),
         links: JSON.stringify(activity.links ?? []),
+        documents: JSON.stringify(activity.documents ?? []),
       });
     });
   });

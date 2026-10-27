@@ -24,3 +24,15 @@ export function bitrixTaskUrl(portal: string | null | undefined, projectId: stri
   if (!origin || !projectId || !taskId) return null;
   return `${origin}/workgroups/group/${encodeURIComponent(projectId)}/tasks/task/view/${encodeURIComponent(taskId)}/`;
 }
+
+/** Link de um arquivo no Drive do portal: aceita endereço do próprio portal (absoluto ou relativo); qualquer outro vira nulo. */
+export function bitrixPortalUrl(portal: string | null | undefined, url: string | null | undefined): string | null {
+  const origin = portalOrigin(portal);
+  if (!origin || !url) return null;
+  try {
+    const parsed = new URL(url, origin);
+    return parsed.origin === origin ? parsed.href : null;
+  } catch {
+    return null;
+  }
+}

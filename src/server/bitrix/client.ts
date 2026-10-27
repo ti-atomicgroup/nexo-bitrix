@@ -22,7 +22,8 @@ export interface ListOptions {
 
 export interface BitrixClient {
   readonly portal: string;
-  call<T = unknown>(method: string, params?: BitrixParams): Promise<T>;
+  /** `timeoutMs` só para chamadas longas (ex.: envio de arquivo ao Drive). */
+  call<T = unknown>(method: string, params?: BitrixParams, options?: { timeoutMs?: number }): Promise<T>;
   /** Lê todas as páginas (50 por página) seguindo `next`. */
   list<T = unknown>(method: string, params?: BitrixParams, options?: ListOptions): Promise<T[]>;
   /** Até 50 comandos por chamada (divide sozinho); erros por comando vêm em `errors`. */
@@ -106,13 +107,13 @@ export function createBitrixClient(options: BitrixClientOptions): BitrixClient {
     await takeToken(now, sleep);
   }
 
-  async function request(method: string, params: BitrixParams): Promise<BitrixEnvelope> {
+  async function request(method: string, params: BitrixParams, callTimeoutMs = timeoutMs): Promise<BitrixEnvelope> {
     const target = credentials();
     for (let attempt = 1; ; attempt++) {
       await gate();
       const started = now();
       try {
-        const envelope = await sendBitrixRequest(target, method, params, { transport, timeoutMs, now });
+        const envelope = await sendBitrixRequest(target, method, params, { transport, timeoutMs: callTimeoutMs, now });
         log({ method, ok: true, durationMs: now() - started });
         noteSuccess();
         return envelope;
@@ -128,8 +129,8 @@ export function createBitrixClient(options: BitrixClientOptions): BitrixClient {
     }
   }
 
-  async function call<T>(method: string, params: BitrixParams = {}): Promise<T> {
-    return (await request(method, params)).result as T;
+  async function call<T>(method: string, params: BitrixParams = {}, callOptions: { timeoutMs?: number } = {}): Promise<T> {
+    return (await request(method, params, callOptions.timeoutMs ?? timeoutMs)).result as T;
   }
 
   async function list<T>(method: string, params: BitrixParams = {}, listOptions: ListOptions = {}): Promise<T[]> {

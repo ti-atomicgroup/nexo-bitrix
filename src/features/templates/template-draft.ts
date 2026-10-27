@@ -19,6 +19,14 @@ export interface LinkDraft {
   url: string;
 }
 
+export interface DocumentDraft {
+  uid: string;
+  key: string;
+  name: string;
+  hint: string;
+  required: boolean;
+}
+
 export interface ActivityDraft {
   uid: string;
   id?: string;
@@ -35,6 +43,8 @@ export interface ActivityDraft {
   ledgerRole: "revoke_and_collect" | null;
   checklist: ChecklistDraft[];
   links: LinkDraft[];
+  /** Documentos pedidos ao colaborador (só valem em atividade do colaborador visível no link). */
+  documents: DocumentDraft[];
 }
 
 export interface StageDraft {
@@ -78,6 +88,7 @@ export function emptyActivity(): ActivityDraft {
     ledgerRole: null,
     checklist: [],
     links: [],
+    documents: [],
   };
 }
 
@@ -114,6 +125,7 @@ function activityFrom(activity: Omit<TemplateActivityDTO, "id" | "position"> & {
     ledgerRole: activity.ledgerRole,
     checklist: activity.checklist.map((item) => ({ uid: uid(), key: item.key, text: item.text, ledger: item.ledger })),
     links: activity.links.map((link) => ({ uid: uid(), label: link.label, url: link.url })),
+    documents: (activity.documents ?? []).map((document) => ({ uid: uid(), key: document.key, name: document.name, hint: document.hint, required: document.required })),
   };
 }
 
@@ -159,6 +171,11 @@ function slug(text: string, taken: Set<string>): string {
   return key;
 }
 
+/** Só a atividade do colaborador, visível no link pessoal, recebe documentos. */
+export function canRequestDocuments(activity: Pick<ActivityDraft, "role" | "visibility">): boolean {
+  return activity.role === "colaborador" && activity.visibility === "employee";
+}
+
 export function toBody(draft: TemplateDraft): TemplateBody {
   return {
     kind: draft.kind,
@@ -174,6 +191,7 @@ export function toBody(draft: TemplateDraft): TemplateBody {
       releaseOffsetUnit: stage.releaseOffsetUnit,
       activities: stage.activities.map((activity) => {
         const taken = new Set(activity.checklist.map((item) => item.key).filter(Boolean));
+        const documentKeys = new Set(activity.documents.map((document) => document.key).filter(Boolean));
         return {
           ...(activity.id ? { id: activity.id } : {}),
           title: activity.title,
@@ -193,6 +211,14 @@ export function toBody(draft: TemplateDraft): TemplateBody {
             ledger: item.ledger && item.ledger.name.trim() ? item.ledger : null,
           })),
           links: activity.links.map((link) => ({ label: link.label, url: link.url.trim() })),
+          documents: canRequestDocuments(activity)
+            ? activity.documents.map((document) => ({
+                key: document.key || slug(document.name, documentKeys),
+                name: document.name,
+                hint: document.hint.trim(),
+                required: document.required,
+              }))
+            : [],
         };
       }),
     })),

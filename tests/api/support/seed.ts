@@ -108,6 +108,7 @@ export function activityRow(overrides: Partial<ActivityRow> & { journeyId: strin
     status: "open",
     checklist: [],
     links: [],
+    documents: [],
     bitrixTaskId: null,
     bitrixStatus: null,
     bitrixMissing: false,

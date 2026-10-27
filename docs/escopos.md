@@ -20,11 +20,13 @@ permissões da conta que criou o webhook. Recomendamos uma **conta dedicada ao N
 | `im` | Bate-papo e notificações | Avisar o colaborador e os responsáveis quando uma etapa é liberada | `im.notify.personal.add` |
 | `calendar` | Calendário | Colocar 1:1 e entrevista de saída na agenda dos participantes | `calendar.event.add` |
 | `log` | Feed de notícias | Publicar as boas-vindas no 1º dia | `log.blogpost.add` |
+| `disk` | Drive | Receber os documentos pedidos ao colaborador: gravar cada arquivo na pasta "Nexo · Documentos" do projeto e anexá-lo à tarefa | `disk.storage.getlist`, `disk.folder.getchildren`, `disk.folder.addsubfolder`, `disk.folder.uploadfile`, `tasks.task.files.attach` |
 
 O método `scope` (sempre disponível) é usado na instalação para conferir o que foi concedido.
 
 ## O que o Nexo nunca faz
 
-- Não lê e-mails, mensagens, arquivos do Drive nem dados financeiros.
+- Não lê e-mails, mensagens nem dados financeiros. No Drive, só grava os documentos enviados pelo colaborador na
+  pasta "Nexo · Documentos" do projeto (e consulta essa pasta para não gravar o mesmo arquivo duas vezes).
 - Não cria nem desativa usuários no Bitrix24. A revogação de acessos é uma lista de tarefas para a TI executar e marcar.
 - Não guarda o endereço do webhook em texto: ele é cifrado (AES-256-GCM) e nunca volta para o navegador.

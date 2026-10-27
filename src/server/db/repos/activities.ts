@@ -1,5 +1,5 @@
 import "server-only";
-import type { JourneyChecklistItem, LinkItem } from "@/shared/contracts";
+import type { DocumentRequest, JourneyChecklistItem, LinkItem } from "@/shared/contracts";
 import type { ActivityKind, ActivityRole, ActivityStatus, SyncState, Visibility } from "@/shared/enums";
 import { getDb } from "..";
 import { buildSet, parseJson, toBool, toNumberOrNull, toStringOrNull } from "./util";
@@ -25,6 +25,8 @@ export interface ActivityRow {
   status: ActivityStatus;
   checklist: JourneyChecklistItem[];
   links: LinkItem[];
+  /** Documentos pedidos ao colaborador nesta atividade (cópia da trilha). */
+  documents: DocumentRequest[];
   bitrixTaskId: string | null;
   bitrixStatus: number | null;
   /** A tarefa sumiu do Bitrix (apagada ou movida): sinalizar, nunca recriar sozinho. */
@@ -82,6 +84,7 @@ function map(row: Record<string, unknown>): ActivityRow {
     status: row.status as ActivityStatus,
     checklist: parseJson<JourneyChecklistItem[]>(row.checklist, []),
     links: parseJson<LinkItem[]>(row.links, []),
+    documents: parseJson<DocumentRequest[]>(row.documents, []),
     bitrixTaskId: toStringOrNull(row.bitrix_task_id),
     bitrixStatus: toNumberOrNull(row.bitrix_status),
     bitrixMissing: toBool(row.bitrix_missing),
@@ -100,16 +103,16 @@ export function insertActivities(rows: ActivityRow[]): void {
   const db = getDb();
   const statement = db.prepare(`
     INSERT INTO journey_activities (id, journey_id, stage_position, position, template_activity_id, title, instructions, kind, role,
-      assignee_bitrix_id, assignee_name, due_at, required, visibility, requires_approval, ledger_role, status, checklist, links,
+      assignee_bitrix_id, assignee_name, due_at, required, visibility, requires_approval, ledger_role, status, checklist, links, documents,
       bitrix_task_id, bitrix_status, bitrix_missing, checklist_synced_at, sync_state, sync_error, released_at, done_at, done_source,
       calendar_event_id, last_nudged_at)
     VALUES (@id, @journeyId, @stagePosition, @position, @templateActivityId, @title, @instructions, @kind, @role,
-      @assigneeBitrixId, @assigneeName, @dueAt, @required, @visibility, @requiresApproval, @ledgerRole, @status, @checklist, @links,
+      @assigneeBitrixId, @assigneeName, @dueAt, @required, @visibility, @requiresApproval, @ledgerRole, @status, @checklist, @links, @documents,
       @bitrixTaskId, @bitrixStatus, @bitrixMissing, @checklistSyncedAt, @syncState, @syncError, @releasedAt, @doneAt, @doneSource,
       @calendarEventId, @lastNudgedAt)`);
   db.tx(() => {
     for (const row of rows) {
-      statement.run({ ...row, checklist: JSON.stringify(row.checklist), links: JSON.stringify(row.links) });
+      statement.run({ ...row, checklist: JSON.stringify(row.checklist), links: JSON.stringify(row.links), documents: JSON.stringify(row.documents) });
     }
   });
 }

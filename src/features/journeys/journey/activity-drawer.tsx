@@ -1,6 +1,6 @@
 "use client";
 
-import { BadgeCheck, CircleCheckBig, ExternalLink, MessageSquareWarning, RotateCcw } from "lucide-react";
+import { BadgeCheck, CircleCheckBig, ExternalLink, FileText, MessageSquareWarning, RefreshCw, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { ROLE_ICON } from "@/components/lines/icons";
 import { Pictogram } from "@/components/lines/pictogram";
@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
 import { api, toApiError, type ActivityActionBody } from "@/lib/api-client";
 import { formatMoment, relativeTo } from "@/lib/format";
-import type { ActivityDTO, JourneyChecklistItem, JourneyDTO } from "@/shared/contracts";
+import type { ActivityDocumentDTO, ActivityDTO, JourneyChecklistItem, JourneyDTO, ReceivedDocumentDTO } from "@/shared/contracts";
 import { ACTIVITY_KIND_LABEL, LEDGER_KIND_LABEL, ROLE_LABEL, VISIBILITY_LABEL } from "@/shared/enums";
 import { activityTiming, kindTone } from "../labels";
 import styles from "./activity-drawer.module.css";
@@ -21,7 +21,25 @@ import { activityChip } from "./journey-stages";
 
 const DONE_SOURCE = { bitrix: "no Bitrix24", nexo: "no Nexo", link: "pelo link do colaborador" } as const;
 
-type Busy = "complete" | "reopen" | "approve" | "nudge" | `item:${string}` | null;
+type Busy = "complete" | "reopen" | "approve" | "nudge" | "resend" | `item:${string}` | null;
+
+const FILE_STATUS: Record<ReceivedDocumentDTO["status"], { tone: "ok" | "info" | "late"; label: string }> = {
+  received: { tone: "info", label: "Indo para o Bitrix24" },
+  sent: { tone: "ok", label: "No Bitrix24" },
+  error: { tone: "late", label: "Não enviado" },
+};
+
+function fileSize(bytes: number): string {
+  return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+/** "2 de 3 recebidos (obrigatórios: 2 de 2)". */
+function documentsSummary(documents: ActivityDocumentDTO[]): string {
+  const got = documents.filter((document) => document.files.length).length;
+  const required = documents.filter((document) => document.required);
+  const requiredGot = required.filter((document) => document.files.length).length;
+  return `${got} de ${documents.length} recebidos${required.length ? ` · obrigatórios: ${requiredGot} de ${required.length}` : ""}`;
+}
 
 export interface ActivityDrawerProps {
   journey: JourneyDTO;
@@ -183,6 +201,59 @@ export function ActivityDrawer({ journey, activity, today, onClose, onUpdated }:
                   </li>
                 ))}
               </ul>
+            </section>
+          ) : null}
+
+          {activity.documents?.length ? (
+            <section className={styles.section} aria-labelledby="atividade-documentos">
+              <h3 id="atividade-documentos" className={styles.heading}>
+                Documentos <span className={styles.count}>{documentsSummary(activity.documents)}</span>
+              </h3>
+              <ul className={styles.documents}>
+                {activity.documents.map((document) => (
+                  <li key={document.key} className={styles.document}>
+                    <p className={styles.documentName}>
+                      <FileText size={18} strokeWidth={2.25} aria-hidden="true" />
+                      {document.name}
+                      {document.required ? null : <span className={styles.quiet}> (opcional)</span>}
+                    </p>
+                    {document.files.length ? (
+                      <ul className={styles.files}>
+                        {document.files.map((file) => (
+                          <li key={file.id}>
+                            <div className={styles.fileLine}>
+                              <Chip tone={FILE_STATUS[file.status].tone}>{FILE_STATUS[file.status].label}</Chip>
+                              <span className={styles.quiet}>
+                                {fileSize(file.size)} · recebido {relativeTo(file.receivedAt, today)}
+                              </span>
+                            </div>
+                            {file.bitrixUrl ? (
+                              <a href={file.bitrixUrl} target="_blank" rel="noopener noreferrer" className={styles.fileLink}>
+                                <ExternalLink size={16} strokeWidth={2.25} aria-hidden="true" />
+                                {file.fileName}
+                                <span className="sr-only"> (abre o arquivo no Bitrix24 em nova aba)</span>
+                              </a>
+                            ) : (
+                              <span className={styles.fileName}>{file.fileName}</span>
+                            )}
+                            {file.error ? <p className={styles.fileError}>{file.error}</p> : null}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className={styles.quiet}>{document.required ? "Ainda não chegou." : "Não enviado (opcional)."}</p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {activity.documents.some((document) => document.files.some((file) => file.status === "error")) ? (
+                <div>
+                  <Button variant="secondary" icon={RefreshCw} loading={busy === "resend"} onClick={() => run({ action: "resend_documents" }, "resend", "Documentos voltaram para a fila do Bitrix24")}>
+                    Tentar enviar de novo
+                  </Button>
+                </div>
+              ) : null}
+              <p className={styles.quiet}>O colaborador envia pelo link pessoal. Cada arquivo vai para a pasta Nexo · Documentos do projeto e fica anexado à tarefa.</p>
             </section>
           ) : null}
 

@@ -9,6 +9,7 @@ import type {
   ActivityStatus,
   AppRole,
   DetectionStatus,
+  DocumentStatus,
   JourneyKind,
   JourneyStatus,
   LedgerKind,
@@ -63,6 +64,32 @@ export interface LinkItem {
   url: string;
 }
 
+/** Documento que o RH pede ao colaborador numa atividade do link pessoal (ex.: "Comprovante de residência"). */
+export interface DocumentRequest {
+  /** Chave estável dentro da atividade (ex.: "comprovante-residencia"). */
+  key: string;
+  name: string;
+  /** Orientação curta para o colaborador (ex.: "Conta de luz ou água dos últimos 3 meses"). */
+  hint: string;
+  required: boolean;
+}
+
+/** Arquivo recebido pelo link pessoal. O arquivo vai para o Drive do projeto no Bitrix24; o Nexo guarda só os dados abaixo. */
+export interface ReceivedDocumentDTO {
+  id: string;
+  fileName: string;
+  size: number;
+  receivedAt: string;
+  status: DocumentStatus;
+  /** Abre o arquivo no Bitrix24 (Drive do projeto), depois do envio. */
+  bitrixUrl: string | null;
+  error: string | null;
+}
+
+export interface ActivityDocumentDTO extends DocumentRequest {
+  files: ReceivedDocumentDTO[];
+}
+
 export interface TemplateActivityDTO {
   id: string;
   position: number;
@@ -82,6 +109,8 @@ export interface TemplateActivityDTO {
   ledgerRole: "revoke_and_collect" | null;
   checklist: ChecklistTemplateItem[];
   links: LinkItem[];
+  /** Documentos pedidos ao colaborador (só em atividade do colaborador visível no link). Ausente = nenhum. */
+  documents?: DocumentRequest[];
 }
 
 export interface TemplateStageDTO {
@@ -150,6 +179,8 @@ export interface ActivityDTO {
   overdue: boolean;
   checklist: JourneyChecklistItem[];
   links: LinkItem[];
+  /** Documentos pedidos e o que já chegou pelo link pessoal. Ausente = nenhum pedido. */
+  documents?: ActivityDocumentDTO[];
   bitrixTaskId: string | null;
   bitrixUrl: string | null;
   bitrixMissing: boolean;
@@ -392,6 +423,8 @@ export interface SettingsDTO {
   defaults: Partial<Record<ParticipantRole, UserRef>>;
   content: CollaboratorContentDTO;
   features: { notifications: boolean; calendar: boolean; feed: boolean };
+  /** Pedido de documentos: o webhook precisa da permissão Drive (disk). */
+  documentsEnabled?: boolean;
 }
 
 export interface AppUserDTO {
@@ -428,6 +461,8 @@ export interface CollaboratorActivityDTO {
   /** Ex.: "TI" para "TI está preparando seu notebook". Nunca o nome de quem executa tarefas internas do RH. */
   ownerLabel: string;
   links: LinkItem[];
+  /** Documentos pedidos nesta atividade, com os nomes dos arquivos já enviados. Ausente = nenhum pedido. */
+  documents?: Array<DocumentRequest & { received: Array<{ fileName: string; receivedAt: string }> }>;
 }
 
 export interface CollaboratorViewDTO {
@@ -446,6 +481,8 @@ export interface CollaboratorViewDTO {
   contacts: Array<{ label: string; value: string }>;
   faq: Array<{ question: string; answer: string }>;
   completed: boolean;
+  /** O link aceita envio de arquivos (webhook com Drive e jornada em andamento). */
+  uploadsEnabled?: boolean;
 }
 
 /** Erro padrão de toda a API: mensagem em pt-BR pronta para a tela. */

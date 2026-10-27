@@ -70,6 +70,13 @@ export const linkSchema = z.object({
   url: z.url("Informe um endereço válido.").refine((value) => value.startsWith("https://"), "Use um link https://."),
 });
 
+export const documentRequestSchema = z.object({
+  key: z.string().regex(/^[a-z0-9-]{1,40}$/, "Chave inválida."),
+  name: text(80),
+  hint: z.string().trim().max(200).default(""),
+  required: z.boolean().default(true),
+});
+
 export const templateActivityInput = z.object({
   id: z.string().max(64).optional(),
   title: text(120),
@@ -85,6 +92,14 @@ export const templateActivityInput = z.object({
   ledgerRole: z.enum(["revoke_and_collect"]).nullable().default(null),
   checklist: z.array(checklistItemSchema).max(40).default([]),
   links: z.array(linkSchema).max(20).default([]),
+  documents: z
+    .array(documentRequestSchema)
+    .max(15)
+    .default([])
+    .refine((list) => new Set(list.map((item) => item.key)).size === list.length, "Há documentos repetidos nesta atividade."),
+}).refine((activity) => !activity.documents.length || (activity.role === "colaborador" && activity.visibility === "employee"), {
+  message: "Só atividades do colaborador, visíveis no link pessoal, podem pedir documentos.",
+  path: ["documents"],
 });
 
 export const templateStageInput = z.object({
@@ -164,6 +179,7 @@ export const activityActionInput = z.discriminatedUnion("action", [
   z.object({ action: z.literal("approve") }),
   z.object({ action: z.literal("nudge"), message: z.string().trim().max(500).optional() }),
   z.object({ action: z.literal("toggle_item"), itemKey: z.string().min(1).max(40), done: z.boolean() }),
+  z.object({ action: z.literal("resend_documents") }),
 ]);
 
 /* Inventário */
@@ -238,6 +254,7 @@ export const peopleQueryInput = z.object({
 
 /** Formulário da página do colaborador (POST sem JavaScript). */
 export const collaboratorDoneInput = z.object({ activityId: z.string().min(1).max(64) });
+export const collaboratorDocumentInput = z.object({ activityId: z.string().min(1).max(64), key: z.string().regex(/^[a-z0-9-]{1,40}$/) });
 
 export type ConnectWebhookInput = z.infer<typeof connectWebhookInput>;
 export type CreateAccountInput = z.infer<typeof createAccountInput>;

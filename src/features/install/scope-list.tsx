@@ -12,6 +12,7 @@ export const SCOPE_PURPOSE: Record<RequiredScope | OptionalScope, string> = {
   im: "Avisar responsáveis e enviar o link ao colaborador",
   calendar: "Marcar 1:1 e entrevista de saída na agenda",
   log: "Publicar as boas-vindas no Feed",
+  disk: "Receber documentos do colaborador no Drive do projeto",
 };
 
 /** Permissões do webhook: obrigatórias (✓/✗) e opcionais (✓/–), sempre com texto além do ícone. */

@@ -372,7 +372,7 @@ export function buildSamples(today: string) {
 
   const scopes: ScopeCheckDTO = {
     required: { task: true, user_brief: true, crm: false, sonet_group: true },
-    optional: { im: true, calendar: false, log: true },
+    optional: { im: true, calendar: false, log: true, disk: true },
   };
 
   return { today, todayDto, lines, collaboratorOnboarding, collaboratorOffboarding, scopes, company: COMPANY };

@@ -11,6 +11,7 @@ import { getCompany } from "../db/repos/settings";
 import { formatDateTimeBr } from "../domain/dates";
 import { revokeChecklist } from "../domain/ledger";
 import { AppError, notFound } from "../errors";
+import { resendDocuments } from "./documents";
 import { applyLedgerEffects } from "./ledger-effects";
 import { enqueueActivityJob, JOB_KINDS } from "./queue";
 import { enqueuePushes, releaseJourney } from "./release";
@@ -116,12 +117,18 @@ function toggleItem(journey: JourneyRow, activity: ActivityRow, itemKey: string,
   kick();
 }
 
-/** complete | reopen | approve | nudge | toggle_item. Atualiza localmente e enfileira a escrita no Bitrix. */
+/** complete | reopen | approve | nudge | toggle_item | resend_documents. Atualiza localmente e enfileira a escrita no Bitrix. */
 export function applyActivityAction(activityId: string, input: ActivityActionInput, actor: Actor): void {
   const activity = getActivity(activityId);
   if (!activity) throw notFound("Atividade");
   const journey = getJourney(activity.journeyId);
   if (!journey) throw notFound("Jornada");
+  // Documentos que pararam com erro continuam indo para o Bitrix mesmo com a jornada encerrada.
+  if (input.action === "resend_documents") {
+    const count = resendDocuments(activity.id);
+    if (count) auditActivity(journey, actor, "Envio de documentos repetido", `${count} documento(s) de “${activity.title}” voltaram para a fila do Bitrix24.`, activity.id);
+    return;
+  }
   if (journey.status === "completed" || journey.status === "cancelled") throw closedJourney();
   switch (input.action) {
     case "complete":

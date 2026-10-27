@@ -6,11 +6,23 @@ import { CollaboratorActivity } from "./collaborator-activity";
 import { COLLABORATOR_CSS } from "./collaborator-styles";
 import { countdownFor } from "./countdown";
 
+export type CollaboratorFlash = "done" | "error" | "doc_received" | "doc_completed" | "doc_too_big" | "doc_bad_type" | "doc_error";
+
+const FLASH_TEXT: Record<CollaboratorFlash, { ok: boolean; text: string }> = {
+  done: { ok: true, text: "Pronto! Marcamos como feita. Obrigado." },
+  error: { ok: false, text: "Não foi possível marcar agora. Tente de novo em instantes; se continuar, fale com o RH." },
+  doc_received: { ok: true, text: "Recebemos o seu documento. O RH já pode ver." },
+  doc_completed: { ok: true, text: "Recebemos tudo o que era obrigatório. Obrigado! Os opcionais ainda podem ser enviados." },
+  doc_too_big: { ok: false, text: "O arquivo passou de 10 MB. Tire uma foto com menos resolução ou envie um PDF menor." },
+  doc_bad_type: { ok: false, text: "Envie uma foto (JPG, PNG, WEBP ou HEIC) ou um PDF." },
+  doc_error: { ok: false, text: "Não foi possível enviar agora. Tente de novo em instantes; se continuar, fale com o RH." },
+};
+
 export interface CollaboratorPageProps {
   view: CollaboratorViewDTO;
   token: string;
-  /** Resultado do último "Marcar como feita" (vem da query depois do redirecionamento 303). */
-  flash?: "done" | "error" | null;
+  /** Resultado do último formulário (vem da query depois do redirecionamento 303). */
+  flash?: CollaboratorFlash | null;
   /** Prévia dentro do console do RH: sem formulários e sem `<main>` próprio. */
   preview?: boolean;
 }
@@ -88,16 +100,18 @@ export function CollaboratorPage({ view, token, flash = null, preview = false }:
           </p>
         ) : null}
 
-        {flash === "done" ? (
-          <p className="cp-flash" role="status">
-            <CircleCheck size={20} strokeWidth={2.25} aria-hidden="true" />
-            Pronto! Marcamos como feita. Obrigado.
-          </p>
-        ) : flash === "error" ? (
-          <p className="cp-flash cp-flash--err" role="alert">
-            <CircleAlert size={20} strokeWidth={2.25} aria-hidden="true" />
-            Não foi possível marcar agora. Tente de novo em instantes; se continuar, fale com o RH.
-          </p>
+        {flash ? (
+          FLASH_TEXT[flash].ok ? (
+            <p className="cp-flash" role="status">
+              <CircleCheck size={20} strokeWidth={2.25} aria-hidden="true" />
+              {FLASH_TEXT[flash].text}
+            </p>
+          ) : (
+            <p className="cp-flash cp-flash--err" role="alert">
+              <CircleAlert size={20} strokeWidth={2.25} aria-hidden="true" />
+              {FLASH_TEXT[flash].text}
+            </p>
+          )
         ) : null}
 
         {view.completed ? (
@@ -196,7 +210,7 @@ export function CollaboratorPage({ view, token, flash = null, preview = false }:
                       {stage.activities.length ? (
                         <ul className="cp-acts">
                           {stage.activities.map((activity) => (
-                            <CollaboratorActivity key={activity.id} activity={activity} today={today} token={token} preview={preview} />
+                            <CollaboratorActivity key={activity.id} activity={activity} today={today} token={token} preview={preview} uploads={Boolean(view.uploadsEnabled)} />
                           ))}
                         </ul>
                       ) : null}
@@ -217,7 +231,7 @@ export function CollaboratorPage({ view, token, flash = null, preview = false }:
               {mine.length ? (
                 <ul className="cp-acts">
                   {mine.map((activity) => (
-                    <CollaboratorActivity key={activity.id} activity={activity} today={today} token={token} preview={preview} />
+                    <CollaboratorActivity key={activity.id} activity={activity} today={today} token={token} preview={preview} uploads={Boolean(view.uploadsEnabled)} />
                   ))}
                 </ul>
               ) : (
@@ -231,7 +245,7 @@ export function CollaboratorPage({ view, token, flash = null, preview = false }:
                 </h2>
                 <ul className="cp-acts">
                   {theirs.map((activity) => (
-                    <CollaboratorActivity key={activity.id} activity={activity} today={today} token={token} preview={preview} />
+                    <CollaboratorActivity key={activity.id} activity={activity} today={today} token={token} preview={preview} uploads={Boolean(view.uploadsEnabled)} />
                   ))}
                 </ul>
               </section>

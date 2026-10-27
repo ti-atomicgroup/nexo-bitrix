@@ -81,7 +81,7 @@ export function ConnectStep({ check, onConnected, onContinue, reconnect = false 
         </li>
         <li>
           Em <strong>Configurar permissões</strong>, marque <strong>Tarefas, Usuários, CRM e Grupos de trabalho</strong>. Para os extras, marque também{" "}
-          <strong>Notificações, Agenda e Feed de notícias</strong>.
+          <strong>Notificações, Agenda, Feed de notícias e Drive</strong>.
         </li>
         <li>
           Clique em <strong>Salvar</strong>, copie o endereço do webhook e cole abaixo.

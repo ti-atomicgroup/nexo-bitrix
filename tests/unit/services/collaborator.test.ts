@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { POST as documentRoute } from "@/app/j/[token]/documento/route";
 import { POST as doneRoute } from "@/app/j/[token]/feito/route";
 import { getDb } from "@/server/db";
 import { getJourney, updateJourney, type JourneyRow } from "@/server/db/repos/journeys";
@@ -219,5 +220,67 @@ describe("POST /j/:token/feito", () => {
     for (let attempt = 0; attempt < 30; attempt++) expect((await post(token, mine.id)).headers.get("location")).toBe(`/j/${token}?feito=1`);
     expect((await post(token, mine.id)).headers.get("location")).toBe(`/j/${token}?erro=1`);
     expect(engine.markDoneFromLink).toHaveBeenCalledTimes(30);
+  });
+});
+
+describe("POST /j/:token/documento", () => {
+  const PDF = new Uint8Array(Buffer.from("%PDF-1.7\nconteúdo"));
+
+  function post(token: string, fields: { activityId?: string; key?: string; file?: Blob }): Promise<Response> {
+    const body = new FormData();
+    if (fields.activityId !== undefined) body.set("activityId", fields.activityId);
+    if (fields.key !== undefined) body.set("key", fields.key);
+    if (fields.file) body.set("file", fields.file, "foto.pdf");
+    return documentRoute(new Request(`http://localhost/j/${token}/documento`, { method: "POST", body }), { params: Promise.resolve({ token }) });
+  }
+
+  function setup() {
+    const seeded = seedOffboarding();
+    vi.mocked(engine.documentsEnabled).mockReturnValue(true);
+    vi.mocked(engine.receiveDocument).mockReset();
+    vi.mocked(engine.receiveDocument).mockImplementation(() => ({ document: {} as never, duplicate: false, completed: false }));
+    return { ...seeded, token: tokenOf(createCollaboratorLink(seeded.journey.id, RH).url) };
+  }
+
+  it("confere o tipo pelo conteúdo, entrega ao motor e volta para a atividade", async () => {
+    const { journey, mine, token } = setup();
+    const response = await post(token, { activityId: mine.id, key: "rg", file: new Blob([PDF]) });
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(`/j/${token}?enviado=1#atividade-${mine.id}`);
+    const [passedJourney, activityId, key, file] = vi.mocked(engine.receiveDocument).mock.calls[0]!;
+    expect([passedJourney.id, activityId, key, file.type]).toEqual([journey.id, mine.id, "rg", { mime: "application/pdf", ext: "pdf" }]);
+    vi.mocked(engine.receiveDocument).mockImplementation(() => ({ document: {} as never, duplicate: false, completed: true }));
+    expect((await post(token, { activityId: mine.id, key: "rg", file: new Blob([PDF]) })).headers.get("location")).toBe(`/j/${token}?enviado=completo#atividade-${mine.id}`);
+  });
+
+  it("recusa tipo errado, arquivo grande demais e campos faltando sem chamar o motor", async () => {
+    const { mine, token } = setup();
+    const zip = new Blob([new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2, 3])]);
+    expect((await post(token, { activityId: mine.id, key: "rg", file: zip })).headers.get("location")).toBe(`/j/${token}?erro=tipo#atividade-${mine.id}`);
+    const big = new Blob([PDF, new Uint8Array(10 * 1024 * 1024)]);
+    expect((await post(token, { activityId: mine.id, key: "rg", file: big })).headers.get("location")).toBe(`/j/${token}?erro=grande#atividade-${mine.id}`);
+    expect((await post(token, { activityId: mine.id, key: "rg" })).headers.get("location")).toBe(`/j/${token}?erro=documento#atividade-${mine.id}`);
+    expect((await post(token, { activityId: mine.id, key: "Chave Inválida", file: new Blob([PDF]) })).headers.get("location")).toBe(`/j/${token}?erro=documento`);
+    expect(engine.receiveDocument).not.toHaveBeenCalled();
+  });
+
+  it("sem a permissão Drive ou com recusa do motor, volta com erro; token revogado → 404", async () => {
+    const { journey, mine, token } = setup();
+    vi.mocked(engine.receiveDocument).mockImplementation(() => {
+      throw new AppError("DOCUMENT_NOT_REQUESTED", "Este documento não foi pedido pelo RH.", 422);
+    });
+    expect((await post(token, { activityId: mine.id, key: "rg", file: new Blob([PDF]) })).headers.get("location")).toBe(`/j/${token}?erro=documento#atividade-${mine.id}`);
+    vi.mocked(engine.documentsEnabled).mockReturnValue(false);
+    expect((await post(token, { activityId: mine.id, key: "rg", file: new Blob([PDF]) })).headers.get("location")).toBe(`/j/${token}?erro=documento#atividade-${mine.id}`);
+    revokeCollaboratorLink(journey.id, RH);
+    expect((await post(token, { activityId: mine.id, key: "rg", file: new Blob([PDF]) })).status).toBe(404);
+    expect((await post(token, {})).status).toBe(404);
+  });
+
+  it("limita a 20 envios a cada 10 minutos por link", async () => {
+    const { mine, token } = setup();
+    for (let attempt = 0; attempt < 20; attempt++) await post(token, { activityId: mine.id, key: "rg", file: new Blob([PDF]) });
+    expect((await post(token, { activityId: mine.id, key: "rg", file: new Blob([PDF]) })).headers.get("location")).toBe(`/j/${token}?erro=documento#atividade-${mine.id}`);
+    expect(engine.receiveDocument).toHaveBeenCalledTimes(20);
   });
 });

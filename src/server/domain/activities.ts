@@ -67,7 +67,9 @@ export function computeActivities(input: ComputeActivitiesInput): ComputedActivi
   for (const stage of stages) {
     const ordered = [...stage.activities].sort((a, b) => a.position - b.position);
     for (const activity of ordered) {
-      const assignee = resolveAssignee(activity.role, input.participants, input.person);
+      // Pedido de documentos sem conta do colaborador: a tarefa fica com o RH, que recebe os arquivos anexados nela.
+      const receivesDocuments = activity.role === "colaborador" && Boolean(activity.documents?.length);
+      const assignee = resolveAssignee(activity.role, input.participants, input.person) ?? (receivesDocuments ? (input.participants.rh ?? null) : null);
       if (!assignee && activity.role !== "colaborador") missing.add(activity.role === "outro" ? "rh" : activity.role);
       const checklist: JourneyChecklistItem[] = activity.checklist.map((item) => ({
         key: item.key,
@@ -96,6 +98,7 @@ export function computeActivities(input: ComputeActivitiesInput): ComputedActivi
         status: "locked",
         checklist,
         links: activity.links,
+        documents: activity.documents ?? [],
         bitrixTaskId: null,
         bitrixStatus: null,
         bitrixMissing: false,

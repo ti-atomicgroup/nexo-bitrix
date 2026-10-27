@@ -34,7 +34,12 @@ export const sendDocuments = (): ActivityDraft => ({
   dueOffsetDays: -3,
   dueOffsetUnit: "business",
   visibility: "employee",
-  instructions: "Envie ao RH os documentos pedidos na mensagem de boas-vindas. Se tiver qualquer dúvida, fale com o RH.",
+  instructions: "Envie cada documento abaixo por aqui mesmo: foto nítida do celular ou PDF. Se tiver qualquer dúvida, fale com o RH.",
+  documents: [
+    { key: "documento-com-foto", name: "Documento com foto", hint: "RG ou CNH, frente e verso.", required: true },
+    { key: "comprovante-residencia", name: "Comprovante de residência", hint: "Conta de luz, água ou internet dos últimos 3 meses.", required: true },
+    { key: "dados-bancarios", name: "Dados bancários", hint: "Print do app do banco com agência e conta.", required: false },
+  ],
 });
 
 export const itHeadsUp = (): ActivityDraft => ({

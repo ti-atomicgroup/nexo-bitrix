@@ -19,6 +19,11 @@ export function engineMock(): typeof Engine {
     linkJourneyPerson: vi.fn(),
     applyActivityAction: vi.fn(),
     markDoneFromLink: vi.fn(() => ({ ok: true, message: "Feito." })),
+    documentsEnabled: vi.fn(() => false),
+    receiveDocument: vi.fn(() => {
+      throw new Error("receiveDocument não configurado no teste");
+    }),
+    resendDocuments: vi.fn(() => 0),
     addManualLedgerItem: vi.fn(() => {
       throw new Error("addManualLedgerItem não configurado no teste");
     }),

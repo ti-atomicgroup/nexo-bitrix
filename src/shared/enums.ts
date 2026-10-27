@@ -36,6 +36,10 @@ export type LedgerKind = (typeof LEDGER_KINDS)[number];
 export const LEDGER_STATUSES = ["planned", "active", "return_requested", "closed", "waived"] as const;
 export type LedgerStatus = (typeof LEDGER_STATUSES)[number];
 
+/** received: guardado no Nexo, a caminho do Bitrix; sent: no Drive do projeto (e anexado à tarefa, se houver); error: envio parou. */
+export const DOCUMENT_STATUSES = ["received", "sent", "error"] as const;
+export type DocumentStatus = (typeof DOCUMENT_STATUSES)[number];
+
 export const SYNC_STATES = ["local", "queued", "synced", "error", "uncertain"] as const;
 export type SyncState = (typeof SYNC_STATES)[number];
 
@@ -53,7 +57,7 @@ export const SETUP_STAGES = ["connect", "account", "prepare", "ready"] as const;
 export type SetupStage = (typeof SETUP_STAGES)[number];
 
 export const REQUIRED_SCOPES = ["task", "user_brief", "crm", "sonet_group"] as const;
-export const OPTIONAL_SCOPES = ["im", "calendar", "log"] as const;
+export const OPTIONAL_SCOPES = ["im", "calendar", "log", "disk"] as const;
 export type RequiredScope = (typeof REQUIRED_SCOPES)[number];
 export type OptionalScope = (typeof OPTIONAL_SCOPES)[number];
 
@@ -97,4 +101,5 @@ export const SCOPE_LABEL: Record<RequiredScope | OptionalScope, string> = {
   im: "Notificações",
   calendar: "Agenda",
   log: "Feed de notícias",
+  disk: "Drive",
 };

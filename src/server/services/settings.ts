@@ -2,7 +2,7 @@ import "server-only";
 import type { SettingsDTO, UserRef } from "@/shared/contracts";
 import { PARTICIPANT_ROLES, type ParticipantRole } from "@/shared/enums";
 import type { SettingsInput } from "@/shared/schemas";
-import { maskWebhookUrl, verifyWebhook, type Actor } from "@/server/engine";
+import { maskWebhookUrl, resendDocuments, verifyWebhook, type Actor } from "@/server/engine";
 import { getDb } from "../db";
 import { findPersonByBitrixId } from "../db/repos/people";
 import {
@@ -54,6 +54,7 @@ export function getSettings(): SettingsDTO {
     defaults: getDefaults(),
     content: getContent(),
     features: { notifications: features.notifications, calendar: features.calendar, feed: features.feed },
+    documentsEnabled: webhook ? scopeCheck(webhook.scopes).optional.disk : false,
   };
 }
 
@@ -122,5 +123,7 @@ export async function replaceWebhook(url: string, actor: Actor): Promise<Setting
   }
   setWebhookRecord({ encryptedUrl: check.encryptedUrl, portal: check.portal, owner: check.owner, scopes: check.scopes, verifiedAt: new Date().toISOString() });
   auditAs(actor, "Webhook do Bitrix24 trocado", "settings", null, `Conta ${check.owner.name}`);
+  // Ex.: a permissão Drive acabou de ser marcada: os documentos que esperavam por ela seguem para o Bitrix.
+  resendDocuments();
   return getSettings();
 }

@@ -14,7 +14,10 @@ import { maskWebhookUrl as maskUrl } from "../bitrix/webhook-url";
 import type { LedgerRow } from "../db/repos/ledger";
 import { activityLibrary as library } from "../seeds/library";
 import { starterTemplates as starters } from "../seeds/templates";
+import type { JourneyRow } from "../db/repos/journeys";
 import * as actions from "./actions";
+import * as documents from "./documents";
+import type { ReceivedFile, ReceiveResult } from "./documents";
 import * as journeys from "./journeys";
 import * as people from "./people";
 import * as prepare from "./prepare";
@@ -73,7 +76,7 @@ export function linkJourneyPerson(journeyId: string, bitrixUserId: string, actor
   journeys.linkJourneyPerson(journeyId, bitrixUserId, actor);
 }
 
-/** complete | reopen | approve | nudge | toggle_item. Atualiza localmente e enfileira a escrita no Bitrix. */
+/** complete | reopen | approve | nudge | toggle_item | resend_documents. Atualiza localmente e enfileira a escrita no Bitrix. */
 export function applyActivityAction(activityId: string, input: ActivityActionInput, actor: Actor): void {
   actions.applyActivityAction(activityId, input, actor);
 }
@@ -81,6 +84,25 @@ export function applyActivityAction(activityId: string, input: ActivityActionInp
 /** "Marcar como feita" vindo do link do colaborador. Só aceita atividades do próprio colaborador, visíveis e liberadas. */
 export function markDoneFromLink(journeyId: string, activityId: string): { ok: boolean; message: string } {
   return actions.markDoneFromLink(journeyId, activityId);
+}
+
+/* ───────────── Documentos do link pessoal ───────────── */
+
+export type { ReceivedFile, ReceiveResult } from "./documents";
+
+/** O webhook tem a permissão Drive (o link pessoal só oferece envio de arquivos com ela). */
+export function documentsEnabled(): boolean {
+  return documents.documentsEnabled();
+}
+
+/** Arquivo do link pessoal: guarda cifrado, enfileira o envio ao Drive e conclui a atividade quando chegam todos os obrigatórios. */
+export function receiveDocument(journey: JourneyRow, activityId: string, requestKey: string, file: ReceivedFile): ReceiveResult {
+  return documents.receiveDocument(journey, activityId, requestKey, file);
+}
+
+/** Reenfileira os documentos que pararam com erro (ex.: depois de marcar a permissão Drive no webhook). */
+export function resendDocuments(): number {
+  return documents.resendDocuments();
 }
 
 /* ───────────── Inventário ───────────── */

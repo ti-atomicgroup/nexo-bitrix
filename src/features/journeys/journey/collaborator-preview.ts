@@ -37,6 +37,9 @@ export function toCollaboratorPreview(journey: JourneyDTO, settings: SettingsDTO
             mine: activity.role === "colaborador",
             ownerLabel: OWNER_LABEL[activity.role],
             links: activity.links,
+            ...(activity.documents?.length
+              ? { documents: activity.documents.map(({ files, ...request }) => ({ ...request, received: files.map((file) => ({ fileName: file.fileName, receivedAt: file.receivedAt })) })) }
+              : {}),
           }),
         ),
     }))
@@ -62,5 +65,6 @@ export function toCollaboratorPreview(journey: JourneyDTO, settings: SettingsDTO
     contacts: content?.contacts ?? [],
     faq: (kind === "onboarding" ? content?.faqOnboarding : content?.faqOffboarding) ?? [],
     completed: summary.status === "completed",
+    uploadsEnabled: Boolean(settings?.documentsEnabled) && (summary.status === "active" || summary.status === "paused"),
   };
 }
