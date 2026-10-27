@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { hostname } from "node:os";
 import { createBitrixClient, type BitrixClient } from "../bitrix/client";
 import { BitrixError } from "../bitrix/errors";
+import { bitrixTransport } from "../bitrix/relay";
 import { blockedUntil, rateLimitedUntil } from "../bitrix/limiter";
 import type { FetchLike } from "../bitrix/transport";
 import { parseWebhookUrl, type BitrixCredentials } from "../bitrix/webhook-url";
@@ -49,7 +50,8 @@ export function createRuntimeClient(credentials: BitrixCredentials): BitrixClien
   const current = state();
   return createBitrixClient({
     credentials,
-    transport: current.transport ?? undefined,
+    // Pelo worker do Bitrix24 quando o Nexo sobe por `npm start` (scripts/start.mjs); nos testes, o transporte injetado.
+    transport: current.transport ?? bitrixTransport(),
     sleep: current.sleep ?? undefined,
     onRateLimit: mirrorRateLimit,
   });

@@ -18,7 +18,8 @@ vi.mock("@/server/domain", async () => (await import("./support/domain-fake")).d
  */
 const API_DIR = fileURLToPath(new URL("../../src/app/api", import.meta.url));
 const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
-const PUBLIC = new Set(["health", "probe", "status", "setup/connect", "setup/account", "auth/login", "tasks/[taskId]"]);
+// "jobs/tick" é interna (só o worker do Bitrix24, com token): fica fora da tabela da API, como a sonda.
+const PUBLIC = new Set(["health", "probe", "jobs/tick", "status", "setup/connect", "setup/account", "auth/login", "tasks/[taskId]"]);
 
 type Method = (typeof METHODS)[number];
 interface RouteEntry {
@@ -77,7 +78,7 @@ describe("inventário de rotas da API", () => {
     const found = new Set(entries.map((entry) => `${entry.method} /api/${entry.route.replace(/\[([^\]]+)\]/g, ":$1")}`));
     const expected = new Set(Object.values(API_ROUTES).map((spec) => `${spec.method} ${spec.path.split("?")[0]}`));
     expect([...expected].filter((key) => !found.has(key))).toEqual([]);
-    const extra = [...found].filter((key) => !expected.has(key) && !key.endsWith("/api/probe"));
+    const extra = [...found].filter((key) => !expected.has(key) && !key.endsWith("/api/probe") && !key.endsWith("/api/jobs/tick"));
     expect(extra).toEqual([]);
     expect(entries.length).toBeGreaterThanOrEqual(Object.keys(API_ROUTES).length);
   });
@@ -134,7 +135,7 @@ describe("inventário de rotas da API", () => {
     const publicInTable = Object.values(API_ROUTES)
       .filter((spec) => spec.auth === "public" || spec.auth === "install")
       .map((spec) => spec.path.split("?")[0]!.replace(/^\/api\//, ""));
-    const publicRoutes = [...PUBLIC].filter((route) => route !== "probe").map((route) => route.replace(/\[([^\]]+)\]/g, ":$1"));
+    const publicRoutes = [...PUBLIC].filter((route) => route !== "probe" && route !== "jobs/tick").map((route) => route.replace(/\[([^\]]+)\]/g, ":$1"));
     expect(new Set(publicInTable)).toEqual(new Set(publicRoutes));
   });
 });

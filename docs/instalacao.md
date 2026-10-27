@@ -44,6 +44,20 @@ Pronto. Não há variáveis de ambiente para preencher nem chaves para gerar.
 3. Comandos padrão de Next.js: `npm ci`, `npm run build`, `npm start` (porta 3000).
 4. Os dados ficam no volume persistente `/app/.data` (equivale ao `./data` local): banco SQLite, chave da instância e registros.
 
+### Worker do Bitrix24
+
+`npm start` (`scripts/start.mjs`) sobe dois processos:
+
+- **Nexo** (`next start`, porta `PORT`): telas e API. Não abre conexão com o Bitrix24.
+- **Worker do Bitrix24** (`scripts/bitrix-worker.mjs`, só em `127.0.0.1:3901`): é o único que chama a API REST do
+  Bitrix24. O Nexo manda cada chamada para ele por `http://127.0.0.1`, sem passar pelo domínio público, e o worker
+  acorda o motor a cada minuto por `POST http://127.0.0.1:${PORT}/api/jobs/tick`.
+
+Os dois combinam um token interno gerado na partida. O worker só aceita endereços `https://*.bitrix24.*/rest/` e nunca
+registra o endereço do webhook. Se ele cair, volta sozinho. `/api/health` mostra `bitrixWorker: "ligado"`, e
+`/api/probe?bitrix=<portal>` traz em `workerEgress` o teste de saída feito pelo próprio worker.
+`npm run start:web` sobe só o Nexo, que então chama o Bitrix24 direto.
+
 ## Problemas comuns
 
 | O que aparece | O que fazer |
