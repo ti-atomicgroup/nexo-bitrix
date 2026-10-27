@@ -11,7 +11,7 @@ export const API_ROUTES = {
   status: { method: "GET", path: "/api/status", auth: "public", output: "StatusDTO" },
 
   /* Instalação (só enquanto não existe administrador) */
-  /* Conectar e preparar falam com o Bitrix24: respondem 202 na hora e a tela consulta `task` até terminar. */
+  /* Rotas que falam com o Bitrix24 (conectar, preparar, trocar webhook, pessoas, fontes do CRM): respondem 202 na hora e a tela consulta `task` até terminar. */
   setupConnect: { method: "POST", path: "/api/setup/connect", auth: "public", input: "connectWebhookInput", output: "TaskStartedDTO (202) → WebhookCheckDTO" },
   setupAccount: { method: "POST", path: "/api/setup/account", auth: "install", input: "createAccountInput", output: "SessionDTO" },
   setupPrepare: { method: "POST", path: "/api/setup/prepare", auth: "admin", input: "prepareInput", output: "TaskStartedDTO (202) → SetupStateDTO" },
@@ -30,7 +30,7 @@ export const API_ROUTES = {
 
   /* Pessoas (cache local de usuários do Bitrix) */
   people: { method: "GET", path: "/api/people?query=&limit=", auth: "user", input: "peopleQueryInput", output: "PersonDTO[]" },
-  peopleRefresh: { method: "POST", path: "/api/people/refresh", auth: "user", output: "{ count: number }" },
+  peopleRefresh: { method: "POST", path: "/api/people/refresh", auth: "user", output: "TaskStartedDTO (202) → { count: number }" },
   personLedger: { method: "GET", path: "/api/people/:personId/ledger", auth: "user", output: "LedgerItemDTO[]" },
   personLedgerAdd: { method: "POST", path: "/api/people/:personId/ledger", auth: "user", input: "ledgerItemInput", output: "LedgerItemDTO" },
   ledgerWaive: { method: "PATCH", path: "/api/ledger/:ledgerItemId", auth: "user", input: "ledgerWaiveInput", output: "LedgerItemDTO" },
@@ -56,7 +56,7 @@ export const API_ROUTES = {
   /* Automação */
   detectionDismiss: { method: "POST", path: "/api/detections/:detectionId/dismiss", auth: "user", output: "{ ok: true }" },
   detection: { method: "GET", path: "/api/detections/:detectionId", auth: "user", output: "DetectionDTO" },
-  crmSources: { method: "GET", path: "/api/crm/sources", auth: "admin", output: "CrmSourceDTO[]" },
+  crmSources: { method: "GET", path: "/api/crm/sources", auth: "admin", output: "TaskStartedDTO (202) → CrmSourceDTO[]" },
   triggers: { method: "GET", path: "/api/triggers", auth: "user", output: "TriggerDTO[]" },
   triggerCreate: { method: "POST", path: "/api/triggers", auth: "admin", input: "triggerInput", output: "TriggerDTO" },
   triggerUpdate: { method: "PUT", path: "/api/triggers/:triggerId", auth: "admin", input: "triggerInput", output: "TriggerDTO" },
@@ -65,7 +65,7 @@ export const API_ROUTES = {
   /* Ajustes */
   settings: { method: "GET", path: "/api/settings", auth: "user", output: "SettingsDTO" },
   settingsUpdate: { method: "PUT", path: "/api/settings", auth: "admin", input: "settingsInput", output: "SettingsDTO" },
-  webhookReplace: { method: "POST", path: "/api/settings/webhook", auth: "admin", input: "replaceWebhookInput", output: "SettingsDTO" },
+  webhookReplace: { method: "POST", path: "/api/settings/webhook", auth: "admin", input: "replaceWebhookInput", output: "TaskStartedDTO (202) → SettingsDTO" },
   users: { method: "GET", path: "/api/users", auth: "admin", output: "AppUserDTO[]" },
   userCreate: { method: "POST", path: "/api/users", auth: "admin", input: "createUserInput", output: "AppUserDTO" },
   userUpdate: { method: "PATCH", path: "/api/users/:userId", auth: "admin", input: "updateUserInput", output: "AppUserDTO" },

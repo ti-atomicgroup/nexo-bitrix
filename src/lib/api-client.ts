@@ -338,7 +338,7 @@ export const api = {
 
   /* Pessoas */
   people: (query: { query?: string; limit?: number } = {}, o?: CallOptions) => call<PersonDTO[]>("people", { ...o, query }),
-  peopleRefresh: (o?: CallOptions) => call<{ count: number }>("peopleRefresh", o),
+  peopleRefresh: (o?: CallOptions) => runTask<{ count: number }>("peopleRefresh", { ...o }),
   personLedger: (personId: string, o?: CallOptions) => call<LedgerItemDTO[]>("personLedger", { ...o, params: { personId } }),
   personLedgerAdd: (personId: string, body: LedgerItemBody, o?: CallOptions) =>
     call<LedgerItemDTO>("personLedgerAdd", { ...o, params: { personId }, body }),
@@ -372,7 +372,7 @@ export const api = {
   /* Automação */
   detectionDismiss: (detectionId: string, o?: CallOptions) => call<Ok>("detectionDismiss", { ...o, params: { detectionId } }),
   detection: (detectionId: string, o?: CallOptions) => call<DetectionDTO>("detection", { ...o, params: { detectionId } }),
-  crmSources: (o?: CallOptions) => call<CrmSourceDTO[]>("crmSources", o),
+  crmSources: (o?: CallOptions) => runTask<CrmSourceDTO[]>("crmSources", { ...o }),
   triggers: (o?: CallOptions) => call<TriggerDTO[]>("triggers", o),
   triggerCreate: (body: TriggerBody, o?: CallOptions) => call<TriggerDTO>("triggerCreate", { ...o, body }),
   triggerUpdate: (triggerId: string, body: TriggerBody, o?: CallOptions) =>
@@ -382,7 +382,7 @@ export const api = {
   /* Ajustes */
   settings: (o?: CallOptions) => call<SettingsDTO>("settings", o),
   settingsUpdate: (body: SettingsBody, o?: CallOptions) => call<SettingsDTO>("settingsUpdate", { ...o, body }),
-  webhookReplace: (body: ReplaceWebhookBody, o?: CallOptions) => call<SettingsDTO>("webhookReplace", { ...o, body }),
+  webhookReplace: (body: ReplaceWebhookBody, o?: CallOptions) => runTask<SettingsDTO>("webhookReplace", { ...o, body }),
   users: (o?: CallOptions) => call<AppUserDTO[]>("users", o),
   userCreate: (body: CreateUserBody, o?: CallOptions) => call<AppUserDTO>("userCreate", { ...o, body }),
   userUpdate: (userId: string, body: UpdateUserBody, o?: CallOptions) => call<AppUserDTO>("userUpdate", { ...o, params: { userId }, body }),
