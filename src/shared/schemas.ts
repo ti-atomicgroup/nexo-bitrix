@@ -182,6 +182,12 @@ export const activityActionInput = z.discriminatedUnion("action", [
   z.object({ action: z.literal("nudge"), message: z.string().trim().max(500).optional() }),
   z.object({ action: z.literal("toggle_item"), itemKey: z.string().min(1).max(40), done: z.boolean() }),
   z.object({ action: z.literal("resend_documents") }),
+  z.object({
+    action: z.literal("reject_document"),
+    documentId: z.string().min(1).max(64),
+    reason: z.string().trim().min(3, "Diga ao colaborador o que corrigir.").max(300),
+  }),
+  documentRequestSchema.omit({ key: true }).extend({ action: z.literal("request_document") }),
 ]);
 
 /* Inventário */

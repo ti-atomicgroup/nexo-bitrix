@@ -49,3 +49,22 @@ export function missingRequired(requests: DocumentRequest[], receivedKeys: Itera
   const received = new Set(receivedKeys);
   return requests.filter((request) => request.required && !received.has(request.key));
 }
+
+/** "Carteira de trabalho" → "carteira-de-trabalho" (sem acentos, até 40 caracteres, sem repetir as chaves já usadas). */
+export function documentKey(name: string, taken: Iterable<string>): string {
+  const used = new Set(taken);
+  const base =
+    name
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 34) || "documento";
+  let key = base;
+  for (let n = 2; used.has(key); n++) key = `${base}-${n}`;
+  return key;
+}
+
+/** Arquivos que contam como recebidos (o RH não pediu de novo). */
+export const acceptedDocuments = <T extends { rejectedAt: string | null }>(documents: T[]): T[] => documents.filter((document) => !document.rejectedAt);

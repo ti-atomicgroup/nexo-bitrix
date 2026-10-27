@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, Copy, KeyRound, Mail, MessageCircle, RefreshCw } from "lucide-react";
+import { BellRing, Ban, Copy, KeyRound, Mail, MessageCircle, RefreshCw } from "lucide-react";
 import { useRef, useState } from "react";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -14,6 +14,7 @@ import { useApi } from "@/lib/use-api";
 import type { CollaboratorLinkDTO, JourneyDTO } from "@/shared/contracts";
 import { toCollaboratorPreview } from "./collaborator-preview";
 import styles from "./link-tab.module.css";
+import { collaboratorPending, reminderMessage } from "./reminder";
 
 function absolute(url: string): string {
   if (/^https?:\/\//.test(url)) return url;
@@ -51,19 +52,25 @@ export function LinkTab({ journey, today, onChanged }: { journey: JourneyDTO; to
     }
   };
 
-  const copy = async () => {
-    if (!created) return;
+  const copyText = async (text: string, field: HTMLInputElement | HTMLTextAreaElement | null, title: string) => {
     try {
-      await navigator.clipboard.writeText(created);
-      toast.show({ tone: "success", title: "Link copiado" });
+      await navigator.clipboard.writeText(text);
+      toast.show({ tone: "success", title });
     } catch {
       // Dentro do painel da Onnira a API de área de transferência é bloqueada; o comando antigo ainda funciona com o texto selecionado.
-      inputRef.current?.select();
+      field?.select();
       const copied = typeof document.execCommand === "function" && document.execCommand("copy");
-      if (copied) toast.show({ tone: "success", title: "Link copiado" });
-      else toast.show({ tone: "info", title: "Copie com Ctrl+C", description: "O navegador não deixou copiar sozinho; o link já está selecionado." });
+      if (copied) toast.show({ tone: "success", title });
+      else toast.show({ tone: "info", title: "Copie com Ctrl+C", description: "O navegador não deixou copiar sozinho; o texto já está selecionado." });
     }
   };
+  const copy = () => (created ? copyText(created, inputRef.current, "Link copiado") : undefined);
+
+  // Lembrete: o que falta do lado do colaborador, pronto para WhatsApp ou e-mail.
+  const reminderRef = useRef<HTMLTextAreaElement>(null);
+  const pending = collaboratorPending(journey);
+  const reminder = reminderMessage(kind, first, pending, created);
+  const reminderSubject = kind === "onboarding" ? `O que falta para a sua chegada à ${company}` : "O que falta para concluir a sua saída";
 
   const message =
     kind === "onboarding"
@@ -126,6 +133,34 @@ export function LinkTab({ journey, today, onChanged }: { journey: JourneyDTO; to
             </Button>
           </div>
         )}
+
+        {journey.link.active && pending.length ? (
+          <section className={styles.reminder} aria-labelledby="lembrete-titulo">
+            <h3 id="lembrete-titulo" className={styles.reminderTitle}>
+              <BellRing size={18} strokeWidth={2.25} aria-hidden="true" />
+              Lembrar {first} do que falta
+            </h3>
+            <label className={styles.urlLabel} htmlFor="lembrete-texto">
+              Mensagem
+            </label>
+            <textarea id="lembrete-texto" ref={reminderRef} className={styles.message} readOnly rows={Math.min(8, pending.length + 3)} value={reminder} />
+            <div className={styles.actions}>
+              <ButtonLink href={`https://wa.me/?text=${encodeURIComponent(reminder)}`} external variant="secondary" icon={MessageCircle}>
+                Lembrar por WhatsApp
+              </ButtonLink>
+              <ButtonLink
+                href={`mailto:${person.email ?? ""}?subject=${encodeURIComponent(reminderSubject)}&body=${encodeURIComponent(reminder)}`}
+                variant="secondary"
+                icon={Mail}
+              >
+                Lembrar por e-mail
+              </ButtonLink>
+              <Button variant="ghost" icon={Copy} onClick={() => copyText(reminder, reminderRef.current, "Mensagem copiada")}>
+                Copiar mensagem
+              </Button>
+            </div>
+          </section>
+        ) : null}
 
         {journey.link.active ? (
           <div>

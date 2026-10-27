@@ -21,6 +21,9 @@ export interface DocumentRow {
   error: string | null;
   receivedAt: string;
   sentAt: string | null;
+  /** O RH pediu de novo: o arquivo fica no Drive, mas não conta como recebido. */
+  rejectedAt: string | null;
+  rejectedReason: string | null;
 }
 
 const COLUMNS = {
@@ -31,9 +34,13 @@ const COLUMNS = {
   attachmentId: "attachment_id",
   error: "error",
   sentAt: "sent_at",
+  rejectedAt: "rejected_at",
+  rejectedReason: "rejected_reason",
 };
 
-export type DocumentPatch = Partial<Pick<DocumentRow, "status" | "localFile" | "driveFileId" | "bitrixUrl" | "attachmentId" | "error" | "sentAt">>;
+export type DocumentPatch = Partial<
+  Pick<DocumentRow, "status" | "localFile" | "driveFileId" | "bitrixUrl" | "attachmentId" | "error" | "sentAt" | "rejectedAt" | "rejectedReason">
+>;
 
 function map(row: Record<string, unknown>): DocumentRow {
   return {
@@ -53,6 +60,8 @@ function map(row: Record<string, unknown>): DocumentRow {
     error: toStringOrNull(row.error),
     receivedAt: String(row.received_at),
     sentAt: toStringOrNull(row.sent_at),
+    rejectedAt: toStringOrNull(row.rejected_at),
+    rejectedReason: toStringOrNull(row.rejected_reason),
   };
 }
 

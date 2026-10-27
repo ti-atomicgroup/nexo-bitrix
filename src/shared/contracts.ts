@@ -84,6 +84,9 @@ export interface ReceivedDocumentDTO {
   /** Abre o arquivo no Bitrix24 (Drive do projeto), depois do envio. */
   bitrixUrl: string | null;
   error: string | null;
+  /** O RH pediu de novo (ex.: foto ilegível): não conta como recebido. */
+  rejectedAt?: string | null;
+  rejectedReason?: string | null;
 }
 
 export interface ActivityDocumentDTO extends DocumentRequest {
@@ -478,7 +481,8 @@ export interface CollaboratorActivityDTO {
   ownerLabel: string;
   links: LinkItem[];
   /** Documentos pedidos nesta atividade, com os nomes dos arquivos já enviados. Ausente = nenhum pedido. */
-  documents?: Array<DocumentRequest & { received: Array<{ fileName: string; receivedAt: string }> }>;
+  /** `received`: só os aceitos. `retryReason`: o RH pediu de novo e ainda não chegou outro arquivo. */
+  documents?: Array<DocumentRequest & { received: Array<{ fileName: string; receivedAt: string }>; retryReason?: string | null }>;
 }
 
 export interface CollaboratorViewDTO {

@@ -50,6 +50,7 @@ const COLUMNS = {
   status: "status",
   checklist: "checklist",
   links: "links",
+  documents: "documents",
   bitrixTaskId: "bitrix_task_id",
   bitrixStatus: "bitrix_status",
   bitrixMissing: "bitrix_missing",

@@ -1,14 +1,17 @@
 import "server-only";
+import type { DocumentRequest } from "@/shared/contracts";
 import type { ActivityActionInput, LedgerItemInput } from "@/shared/schemas";
 import { getDb } from "../db";
 import { getActivity, listActivities, updateActivity, type ActivityRow } from "../db/repos/activities";
 import { audit } from "../db/repos/audit";
+import { getDocument, updateDocument } from "../db/repos/documents";
 import { enqueueJob } from "../db/repos/jobs";
 import { getJourney, listJourneys, type JourneyRow } from "../db/repos/journeys";
 import { getLedgerItem, insertLedgerItem, updateLedgerItem, type LedgerRow } from "../db/repos/ledger";
 import { findPerson } from "../db/repos/people";
 import { getCompany } from "../db/repos/settings";
 import { formatDateTimeBr } from "../domain/dates";
+import { documentKey } from "../domain/documents";
 import { revokeChecklist } from "../domain/ledger";
 import { AppError, notFound } from "../errors";
 import { resendDocuments } from "./documents";
@@ -117,7 +120,54 @@ function toggleItem(journey: JourneyRow, activity: ActivityRow, itemKey: string,
   kick();
 }
 
-/** complete | reopen | approve | nudge | toggle_item | resend_documents. Atualiza localmente e enfileira a escrita no Bitrix. */
+/** Atividade do próprio colaborador, visível no link: a única que recebe documentos. */
+function assertDocumentsActivity(activity: ActivityRow): void {
+  if (activity.role !== "colaborador" || activity.visibility !== "employee") {
+    throw new AppError("DOCUMENTS_NOT_ALLOWED", "Só atividades do colaborador, visíveis no link pessoal, recebem documentos.", 422);
+  }
+  if (activity.status === "cancelled") throw cancelledActivity();
+}
+
+/** Comentário na tarefa (avisa responsável e observadores), quando a tarefa já existe no Bitrix24. */
+function commentOnTask(activity: ActivityRow, message: string): void {
+  if (hasLiveTask(activity)) enqueueJob({ kind: JOB_KINDS.taskComment, payload: { activityId: activity.id, message } });
+}
+
+/**
+ * "Pedir de novo": o arquivo fica no Drive e anexado (histórico), mas deixa de contar como recebido. O colaborador vê o
+ * motivo no link. Se a atividade já estava feita e o documento é obrigatório, ela volta para a fazer.
+ */
+function rejectDocument(journey: JourneyRow, activity: ActivityRow, documentId: string, reason: string, actor: Actor): void {
+  assertDocumentsActivity(activity);
+  const document = getDocument(documentId);
+  if (!document || document.activityId !== activity.id) throw notFound("Documento");
+  if (document.rejectedAt) return;
+  const request = activity.documents.find((item) => item.key === document.requestKey);
+  const name = request?.name ?? document.fileName;
+  getDb().tx(() => {
+    updateDocument(document.id, { rejectedAt: new Date().toISOString(), rejectedReason: reason });
+    commentOnTask(activity, `O RH pediu de novo “${name}”: ${reason}`);
+    auditActivity(journey, actor, "Documento pedido de novo", `“${name}” em “${activity.title}”: ${reason}`, activity.id);
+  });
+  if (request?.required) reopenActivity(journey, activity, actor);
+  else kick();
+}
+
+/** Documento a mais só para esta pessoa (a trilha não muda). Obrigatório reabre a atividade se ela já estava feita. */
+function requestDocument(journey: JourneyRow, activity: ActivityRow, input: Omit<DocumentRequest, "key">, actor: Actor): void {
+  assertDocumentsActivity(activity);
+  if (activity.documents.length >= 15) throw new AppError("TOO_MANY_DOCUMENTS", "Esta atividade já pede 15 documentos, o máximo.", 422);
+  const request: DocumentRequest = { key: documentKey(input.name, activity.documents.map((item) => item.key)), name: input.name, hint: input.hint, required: input.required };
+  getDb().tx(() => {
+    updateActivity(activity.id, { documents: [...activity.documents, request] });
+    commentOnTask(activity, `O RH pediu mais um documento: “${request.name}”${request.required ? "" : " (opcional)"}. O colaborador envia pelo link pessoal.`);
+    auditActivity(journey, actor, "Documento pedido", `“${request.name}” em “${activity.title}”${request.required ? "" : " (opcional)"}.`, activity.id);
+  });
+  if (request.required) reopenActivity(journey, activity, actor);
+  else kick();
+}
+
+/** complete | reopen | approve | nudge | toggle_item | resend_documents | reject_document | request_document. */
 export function applyActivityAction(activityId: string, input: ActivityActionInput, actor: Actor): void {
   const activity = getActivity(activityId);
   if (!activity) throw notFound("Atividade");
@@ -142,6 +192,10 @@ export function applyActivityAction(activityId: string, input: ActivityActionInp
       return nudgeActivity(journey, activity, input.message, actor);
     case "toggle_item":
       return toggleItem(journey, activity, input.itemKey, input.done, actor);
+    case "reject_document":
+      return rejectDocument(journey, activity, input.documentId, input.reason, actor);
+    case "request_document":
+      return requestDocument(journey, activity, { name: input.name, hint: input.hint, required: input.required }, actor);
   }
 }
 

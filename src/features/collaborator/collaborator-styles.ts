@@ -101,6 +101,7 @@ body:has(> .cp),body:has(> main.cp){margin:0}
 .cp-doc-name{font-weight:600;overflow-wrap:anywhere}
 .cp-doc-opt{color:var(--cp-muted);font-weight:400}
 .cp-doc-state{font-size:14px;font-weight:700}
+.cp-doc-retry{padding:8px 10px;border-left:4px solid var(--cp-yellow-edge);background:var(--cp-yellow-tint);font-size:14px;overflow-wrap:anywhere}
 .cp-docs-note{color:var(--cp-muted);font-size:14px}
 .cp-upload{display:grid;gap:8px;margin:0}
 .cp-file-label{color:var(--cp-muted);font-size:14px;font-weight:600}

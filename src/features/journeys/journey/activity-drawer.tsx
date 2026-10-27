@@ -1,6 +1,6 @@
 "use client";
 
-import { BadgeCheck, CircleCheckBig, ExternalLink, FileText, MessageSquareWarning, RefreshCw, RotateCcw } from "lucide-react";
+import { BadgeCheck, CircleCheckBig, ExternalLink, FilePlus2, FileText, MessageSquareWarning, RefreshCw, RotateCcw, Undo2 } from "lucide-react";
 import { useState } from "react";
 import { ROLE_ICON } from "@/components/lines/icons";
 import { Pictogram } from "@/components/lines/pictogram";
@@ -8,6 +8,7 @@ import { Button, ButtonLink } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Chip } from "@/components/ui/chip";
 import { Drawer } from "@/components/ui/drawer";
+import { Field } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
@@ -21,7 +22,7 @@ import { activityChip } from "./journey-stages";
 
 const DONE_SOURCE = { bitrix: "no Bitrix24", nexo: "no Nexo", link: "pelo link do colaborador" } as const;
 
-type Busy = "complete" | "reopen" | "approve" | "nudge" | "resend" | `item:${string}` | null;
+type Busy = "complete" | "reopen" | "approve" | "nudge" | "resend" | "reject" | "request" | `item:${string}` | null;
 
 const FILE_STATUS: Record<ReceivedDocumentDTO["status"], { tone: "ok" | "info" | "late"; label: string }> = {
   received: { tone: "info", label: "Indo para o Bitrix24" },
@@ -33,13 +34,19 @@ function fileSize(bytes: number): string {
   return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
+/** Arquivos que contam: os que o RH não pediu de novo. */
+const accepted = (document: ActivityDocumentDTO) => document.files.filter((file) => !file.rejectedAt);
+
 /** "2 de 3 recebidos (obrigatórios: 2 de 2)". */
 function documentsSummary(documents: ActivityDocumentDTO[]): string {
-  const got = documents.filter((document) => document.files.length).length;
+  if (!documents.length) return "nenhum pedido";
+  const got = documents.filter((document) => accepted(document).length).length;
   const required = documents.filter((document) => document.required);
-  const requiredGot = required.filter((document) => document.files.length).length;
+  const requiredGot = required.filter((document) => accepted(document).length).length;
   return `${got} de ${documents.length} recebidos${required.length ? ` · obrigatórios: ${requiredGot} de ${required.length}` : ""}`;
 }
+
+const EMPTY_REQUEST = { activityId: "", name: "", hint: "", required: true };
 
 export interface ActivityDrawerProps {
   journey: JourneyDTO;
@@ -59,12 +66,17 @@ export function ActivityDrawer({ journey, activity, today, onClose, onUpdated }:
   // Estado local por atividade (zera sozinho quando outra atividade é aberta).
   const [nudge, setNudge] = useState({ id: "", text: "" });
   const [optimistic, setOptimistic] = useState<{ id: string; items: JourneyChecklistItem[] } | null>(null);
+  // "Pedir de novo" (motivo por arquivo) e "Pedir documento" (só para esta pessoa).
+  const [rejecting, setRejecting] = useState<{ fileId: string; reason: string } | null>(null);
+  const [newRequest, setNewRequest] = useState(EMPTY_REQUEST);
 
   const stage = activity ? journey.stages.find((item) => item.position === activity.stagePosition) : undefined;
   const checklist = activity ? (optimistic?.id === activity.id ? optimistic.items : activity.checklist) : [];
   const nudgeText = activity && nudge.id === activity.id ? nudge.text : "";
   const locked = activity?.status === "locked" || activity?.status === "cancelled";
   const canNudge = Boolean(activity?.assignee) && (activity?.status === "open" || activity?.status === "in_progress" || activity?.status === "awaiting_approval");
+  const canRequestDocuments = activity?.role === "colaborador" && activity.visibility === "employee" && activity.status !== "cancelled";
+  const requesting = activity !== null && newRequest.activityId === activity.id;
 
   const run = async (body: ActivityActionBody, busyKey: Exclude<Busy, null>, success: string) => {
     if (!activity) return;
@@ -74,6 +86,8 @@ export function ActivityDrawer({ journey, activity, today, onClose, onUpdated }:
       setOptimistic(null);
       onUpdated(updated);
       if (body.action === "nudge") setNudge({ id: activity.id, text: "" });
+      if (body.action === "reject_document") setRejecting(null);
+      if (body.action === "request_document") setNewRequest(EMPTY_REQUEST);
       if (body.action !== "toggle_item") toast.show({ tone: "success", title: success });
     } catch (error) {
       setOptimistic(null);
@@ -204,13 +218,13 @@ export function ActivityDrawer({ journey, activity, today, onClose, onUpdated }:
             </section>
           ) : null}
 
-          {activity.documents?.length ? (
+          {activity.documents?.length || canRequestDocuments ? (
             <section className={styles.section} aria-labelledby="atividade-documentos">
               <h3 id="atividade-documentos" className={styles.heading}>
-                Documentos <span className={styles.count}>{documentsSummary(activity.documents)}</span>
+                Documentos <span className={styles.count}>{documentsSummary(activity.documents ?? [])}</span>
               </h3>
               <ul className={styles.documents}>
-                {activity.documents.map((document) => (
+                {(activity.documents ?? []).map((document) => (
                   <li key={document.key} className={styles.document}>
                     <p className={styles.documentName}>
                       <FileText size={18} strokeWidth={2.25} aria-hidden="true" />
@@ -222,7 +236,7 @@ export function ActivityDrawer({ journey, activity, today, onClose, onUpdated }:
                         {document.files.map((file) => (
                           <li key={file.id}>
                             <div className={styles.fileLine}>
-                              <Chip tone={FILE_STATUS[file.status].tone}>{FILE_STATUS[file.status].label}</Chip>
+                              {file.rejectedAt ? <Chip tone="neutral">Pedido de novo</Chip> : <Chip tone={FILE_STATUS[file.status].tone}>{FILE_STATUS[file.status].label}</Chip>}
                               <span className={styles.quiet}>
                                 {fileSize(file.size)} · recebido {relativeTo(file.receivedAt, today)}
                               </span>
@@ -237,6 +251,40 @@ export function ActivityDrawer({ journey, activity, today, onClose, onUpdated }:
                               <span className={styles.fileName}>{file.fileName}</span>
                             )}
                             {file.error ? <p className={styles.fileError}>{file.error}</p> : null}
+                            {file.rejectedAt ? (
+                              <p className={styles.quiet}>Motivo: {file.rejectedReason ?? "não informado"}. O colaborador vê no link e envia outro.</p>
+                            ) : canRequestDocuments && rejecting?.fileId === file.id ? (
+                              <div className={styles.inlineForm}>
+                                <Textarea
+                                  label="O que o colaborador precisa corrigir"
+                                  rows={2}
+                                  placeholder="Ex.: a foto ficou tremida; envie de novo com o documento inteiro."
+                                  value={rejecting.reason}
+                                  onChange={(event) => setRejecting({ fileId: file.id, reason: event.target.value })}
+                                />
+                                <div className={styles.inlineActions}>
+                                  <Button
+                                    size="s"
+                                    variant="primary"
+                                    icon={Undo2}
+                                    loading={busy === "reject"}
+                                    disabled={rejecting.reason.trim().length < 3}
+                                    onClick={() => run({ action: "reject_document", documentId: file.id, reason: rejecting.reason }, "reject", "Pedido de novo ao colaborador")}
+                                  >
+                                    Pedir de novo
+                                  </Button>
+                                  <Button size="s" variant="ghost" onClick={() => setRejecting(null)}>
+                                    Cancelar
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : canRequestDocuments ? (
+                              <div>
+                                <Button size="s" variant="ghost" icon={Undo2} onClick={() => setRejecting({ fileId: file.id, reason: "" })}>
+                                  Pedir de novo
+                                </Button>
+                              </div>
+                            ) : null}
                           </li>
                         ))}
                       </ul>
@@ -246,14 +294,49 @@ export function ActivityDrawer({ journey, activity, today, onClose, onUpdated }:
                   </li>
                 ))}
               </ul>
-              {activity.documents.some((document) => document.files.some((file) => file.status === "error")) ? (
+              {(activity.documents ?? []).some((document) => document.files.some((file) => file.status === "error")) ? (
                 <div>
                   <Button variant="secondary" icon={RefreshCw} loading={busy === "resend"} onClick={() => run({ action: "resend_documents" }, "resend", "Documentos voltaram para a fila do Bitrix24")}>
                     Tentar enviar de novo
                   </Button>
                 </div>
               ) : null}
-              <p className={styles.quiet}>O colaborador envia pelo link pessoal. Cada arquivo vai para a pasta Nexo · Documentos do projeto e fica anexado à tarefa.</p>
+              {canRequestDocuments ? (
+                requesting ? (
+                  <div className={styles.inlineForm}>
+                    <Field label="Documento" placeholder="Ex.: Carteira de trabalho" value={newRequest.name} onChange={(event) => setNewRequest({ ...newRequest, name: event.target.value })} />
+                    <Field label="Orientação" optional placeholder="Ex.: página da foto e dos dados" value={newRequest.hint} onChange={(event) => setNewRequest({ ...newRequest, hint: event.target.value })} />
+                    <Checkbox label="Obrigatório" checked={newRequest.required} onChange={(event) => setNewRequest({ ...newRequest, required: event.target.checked })} />
+                    <div className={styles.inlineActions}>
+                      <Button
+                        size="s"
+                        variant="primary"
+                        icon={FilePlus2}
+                        loading={busy === "request"}
+                        disabled={!newRequest.name.trim()}
+                        onClick={() =>
+                          run({ action: "request_document", name: newRequest.name, hint: newRequest.hint, required: newRequest.required }, "request", "Documento pedido ao colaborador")
+                        }
+                      >
+                        Pedir documento
+                      </Button>
+                      <Button size="s" variant="ghost" onClick={() => setNewRequest(EMPTY_REQUEST)}>
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <Button size="s" icon={FilePlus2} onClick={() => setNewRequest({ ...EMPTY_REQUEST, activityId: activity.id })}>
+                      Pedir outro documento
+                    </Button>
+                  </div>
+                )
+              ) : null}
+              <p className={styles.quiet}>
+                O colaborador envia pelo link pessoal. Cada arquivo vai para a pasta Nexo · Documentos do projeto e fica anexado à tarefa. Pedidos feitos aqui valem só para esta
+                pessoa; a trilha não muda.
+              </p>
             </section>
           ) : null}
 

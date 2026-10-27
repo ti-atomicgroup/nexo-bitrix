@@ -12,7 +12,7 @@ import { getJourney, type JourneyRow } from "../db/repos/journeys";
 import { beginOperation, confirmOperation, getOperation, markOperationFailed, markOperationUncertain } from "../db/repos/operations";
 import { findPerson } from "../db/repos/people";
 import { getWebhookRecord } from "../db/repos/settings";
-import { driveFileName, journeyFolderName, missingRequired, type FileType } from "../domain/documents";
+import { acceptedDocuments, driveFileName, journeyFolderName, missingRequired, type FileType } from "../domain/documents";
 import { AppError } from "../errors";
 import { log } from "../log";
 import { readDocumentFile, removeDocumentFile, storeDocumentFile } from "../security/document-vault";
@@ -67,7 +67,8 @@ export function receiveDocument(journey: JourneyRow, activityId: string, request
   if (activity.status === "locked" || activity.status === "cancelled") throw new AppError("ACTIVITY_LOCKED", "Esta atividade ainda não foi liberada.", 409);
 
   const hash = sha256(file.bytes);
-  const previous = listDocumentsByActivity(activity.id).find((document) => document.requestKey === request.key && document.sha256 === hash);
+  // Mesmo arquivo de novo não grava outra vez; um arquivo que o RH pediu de novo não conta.
+  const previous = acceptedDocuments(listDocumentsByActivity(activity.id)).find((document) => document.requestKey === request.key && document.sha256 === hash);
   if (previous) return { document: previous, duplicate: true, completed: false };
 
   const person = findPerson(journey.personId);
@@ -102,7 +103,7 @@ export function receiveDocument(journey: JourneyRow, activityId: string, request
 function completeWhenAllReceived(journey: JourneyRow, activity: ActivityRow): boolean {
   if (activity.status !== "open" && activity.status !== "in_progress") return false;
   if (!activity.documents.some((request) => request.required)) return false;
-  const received = listDocumentsByActivity(activity.id).map((document) => document.requestKey);
+  const received = acceptedDocuments(listDocumentsByActivity(activity.id)).map((document) => document.requestKey);
   if (missingRequired(activity.documents, received).length) return false;
   return markDoneFromLink(journey.id, activity.id).ok;
 }

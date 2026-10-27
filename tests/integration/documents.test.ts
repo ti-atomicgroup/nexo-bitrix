@@ -8,7 +8,8 @@ import { getDocument, listDocumentsByActivity } from "@/server/db/repos/document
 import { getJourney } from "@/server/db/repos/journeys";
 import { getWebhookRecord, setWebhookRecord } from "@/server/db/repos/settings";
 import { createTemplate } from "@/server/db/repos/templates";
-import { createJourney, receiveDocument, resendDocuments } from "@/server/engine";
+import { applyActivityAction, createJourney, receiveDocument, resendDocuments } from "@/server/engine";
+import { createCollaboratorLink, loadCollaboratorView } from "@/server/services/collaborator";
 import { DOCUMENTS_ROOT_FOLDER, markDocumentFailed } from "@/server/engine/documents";
 import { markOperationFailed } from "@/server/db/repos/operations";
 import { templateInput } from "@/shared/schemas";
@@ -207,6 +208,47 @@ describe("documentos pelo link pessoal", () => {
     expect(env.fake.countCalls("tasks.task.files.attach")).toBe(1);
     expect(env.fake.attachments).toHaveLength(1);
     expect(getDocument(document.id)).toMatchObject({ status: "sent", attachmentId: String(env.fake.attachments[0]!.id) });
+  });
+
+  it("pedir de novo: o arquivo deixa de contar, a atividade reabre e o colaborador vê o motivo", async () => {
+    env = setupEngine({ scopes: WITH_DISK });
+    await prepare();
+    const journeyId = start({ bitrixUserId: "12" });
+    await cycle();
+    const { document, completed } = receive(journeyId, "documento-com-foto", pdf("rg"));
+    expect(completed).toBe(true);
+    await cycle();
+    const activityId = activityByTitle(journeyId, TITLE).id;
+
+    applyActivityAction(activityId, { action: "reject_document", documentId: document.id, reason: "A foto ficou tremida" }, HR_ACTOR);
+    expect(getDocument(document.id)).toMatchObject({ rejectedReason: "A foto ficou tremida", status: "sent" });
+    expect(activityByTitle(journeyId, TITLE).status).toBe("open");
+    await cycle();
+    expect(env.fake.comments.some((comment) => comment.message.includes("pediu de novo “Documento com foto”: A foto ficou tremida"))).toBe(true);
+
+    const token = new URL(createCollaboratorLink(journeyId, HR_ACTOR).url!, "http://localhost").pathname.split("/").pop()!;
+    const request = loadCollaboratorView(token)!.stages.flatMap((stage) => stage.activities).find((activity) => activity.id === activityId)!.documents![0]!;
+    expect(request).toMatchObject({ received: [], retryReason: "A foto ficou tremida" });
+
+    // O mesmo arquivo de novo conta como um envio novo (o anterior foi recusado) e conclui de novo.
+    expect(receive(journeyId, "documento-com-foto", pdf("rg"))).toMatchObject({ duplicate: false, completed: true });
+  });
+
+  it("pedir outro documento só para esta pessoa: entra na lista e reabre a atividade se for obrigatório", async () => {
+    env = setupEngine({ scopes: WITH_DISK });
+    await prepare();
+    const journeyId = start({ bitrixUserId: "12" });
+    await cycle();
+    receive(journeyId, "documento-com-foto", pdf("rg"));
+    await cycle();
+    const activityId = activityByTitle(journeyId, TITLE).id;
+    expect(activityByTitle(journeyId, TITLE).status).toBe("done");
+
+    applyActivityAction(activityId, { action: "request_document", name: "Carteira de trabalho", hint: "Página da foto", required: true }, HR_ACTOR);
+    const activity = activityByTitle(journeyId, TITLE);
+    expect(activity.documents.at(-1)).toEqual({ key: "carteira-de-trabalho", name: "Carteira de trabalho", hint: "Página da foto", required: true });
+    expect(activity.status).toBe("open");
+    expect(receive(journeyId, "carteira-de-trabalho", pdf("ctps")).completed).toBe(true);
   });
 
   it("recria a pasta quando ela foi apagada no Drive", async () => {

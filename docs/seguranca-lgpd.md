@@ -24,6 +24,8 @@ O Nexo **não** guarda CPF, RG, dados bancários, salários nem conteúdo de ent
   de um minuto, e depois é apagado. Se o envio falhar (ex.: falta a permissão Drive), o arquivo continua cifrado até
   o RH tentar de novo.
 - Limite de 20 envios a cada 10 minutos por link.
+- O RH pode **pedir de novo** um arquivo (ex.: foto ilegível) com o motivo, que o colaborador vê no link. O arquivo recusado
+  continua no Drive e anexado à tarefa, como histórico, mas deixa de contar como recebido. Para apagá-lo, use o Bitrix24.
 
 ## Proteções
 

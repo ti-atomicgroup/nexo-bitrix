@@ -79,6 +79,7 @@ function DocumentRequests({ activity, token, preview, uploads }: { activity: Col
                   </p>
                   {request.hint ? <p className="cp-act-meta">{request.hint}</p> : null}
                   <p className="cp-doc-state">{count ? (count > 1 ? `Recebido (${count} arquivos)` : "Recebido") : request.required ? "Falta enviar" : "Envie se tiver"}</p>
+                  {!count && request.retryReason ? <p className="cp-doc-retry">O RH pediu de novo: {request.retryReason}</p> : null}
                 </div>
               </div>
               {form && count ? (

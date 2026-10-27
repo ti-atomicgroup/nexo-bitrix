@@ -38,7 +38,17 @@ export function toCollaboratorPreview(journey: JourneyDTO, settings: SettingsDTO
             ownerLabel: OWNER_LABEL[activity.role],
             links: activity.links,
             ...(activity.documents?.length
-              ? { documents: activity.documents.map(({ files, ...request }) => ({ ...request, received: files.map((file) => ({ fileName: file.fileName, receivedAt: file.receivedAt })) })) }
+              ? {
+                  documents: activity.documents.map(({ files, ...request }) => {
+                    const accepted = files.filter((file) => !file.rejectedAt);
+                    const rejected = files.find((file) => file.rejectedAt);
+                    return {
+                      ...request,
+                      received: accepted.map((file) => ({ fileName: file.fileName, receivedAt: file.receivedAt })),
+                      retryReason: !accepted.length && rejected ? (rejected.rejectedReason ?? null) : null,
+                    };
+                  }),
+                }
               : {}),
           }),
         ),

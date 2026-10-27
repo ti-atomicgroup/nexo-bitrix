@@ -93,10 +93,16 @@ function toCollaboratorActivity(activity: ActivityRow, documents: DocumentRow[])
     links: activity.links,
     ...(activity.documents.length
       ? {
-          documents: activity.documents.map((request) => ({
-            ...request,
-            received: received.filter((document) => document.requestKey === request.key).map((document) => ({ fileName: document.fileName, receivedAt: document.receivedAt })),
-          })),
+          documents: activity.documents.map((request) => {
+            const files = received.filter((document) => document.requestKey === request.key);
+            const accepted = files.filter((document) => !document.rejectedAt);
+            const rejected = files.filter((document) => document.rejectedAt).sort((a, b) => String(b.rejectedAt).localeCompare(String(a.rejectedAt)))[0];
+            return {
+              ...request,
+              received: accepted.map((document) => ({ fileName: document.fileName, receivedAt: document.receivedAt })),
+              retryReason: !accepted.length && rejected ? rejected.rejectedReason : null,
+            };
+          }),
         }
       : {}),
   };

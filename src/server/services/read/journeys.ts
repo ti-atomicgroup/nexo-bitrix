@@ -119,6 +119,8 @@ function activityDocuments(activity: ActivityRow, ctx: ReadContext): ActivityDoc
         status: document.status,
         bitrixUrl: bitrixPortalUrl(ctx.portal, document.bitrixUrl),
         error: document.error ? redactText(document.error) : null,
+        rejectedAt: document.rejectedAt,
+        rejectedReason: document.rejectedReason,
       })),
   }));
 }
