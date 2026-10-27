@@ -2,7 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import type { DocumentRequest } from "@/shared/contracts";
 import { isBitrixError } from "../bitrix/errors";
-import { addTaskComment, attachFileToTask, ensureDriveFolder, findDriveChild, getGroupDriveRoot, uploadDriveFile } from "../bitrix/methods";
+import { addTaskComment, attachFileToTask, ensureDriveFolder, findDriveChild, findTaskAttachment, getGroupDriveRoot, uploadDriveFile } from "../bitrix/methods";
 import { getDb } from "../db";
 import { getActivity, type ActivityRow } from "../db/repos/activities";
 import { audit } from "../db/repos/audit";
@@ -98,8 +98,10 @@ export function receiveDocument(journey: JourneyRow, activityId: string, request
   return { document, duplicate: false, completed };
 }
 
+/** Conclui quando chega o último obrigatório. Atividade só com opcionais fica para o colaborador marcar como feita. */
 function completeWhenAllReceived(journey: JourneyRow, activity: ActivityRow): boolean {
   if (activity.status !== "open" && activity.status !== "in_progress") return false;
+  if (!activity.documents.some((request) => request.required)) return false;
   const received = listDocumentsByActivity(activity.id).map((document) => document.requestKey);
   if (missingRequired(activity.documents, received).length) return false;
   return markDoneFromLink(journey.id, activity.id).ok;
@@ -149,22 +151,31 @@ async function journeyFolder(ctx: EngineContext, journey: JourneyRow): Promise<{
 
 const isNotFound = (error: unknown) => isBitrixError(error) && !error.retryable && (error.code.includes("NOT_FOUND") || error.httpStatus === 404);
 
-/** Grava o arquivo no Drive. Depois de uma resposta incerta, procura pelo nome (único) antes de reenviar. */
+/**
+ * Grava o arquivo no Drive. O nome é único por documento: depois de qualquer tentativa anterior (incerta ou com erro),
+ * procura pelo nome antes de reenviar, e uma recusa clara (ex.: nome já existe, gravado atrasado) também confere o Drive.
+ */
 async function uploadToDrive(ctx: EngineContext, document: DocumentRow, journey: JourneyRow): Promise<DocumentRow> {
   if (!document.localFile) throw new AppError("DOCUMENT_FILE_MISSING", "O arquivo não está mais guardado no Nexo. Peça ao colaborador para enviar de novo.", 409);
   const folder = await journeyFolder(ctx, journey);
   const key = `document:upload:${document.id}`;
   const previous = getOperation(key);
   try {
-    let file = previous && previous.status !== "failed" ? await findDriveChild(ctx.client, folder.id, document.fileName, "file") : null;
+    let file = previous ? await findDriveChild(ctx.client, folder.id, document.fileName, "file") : null;
     if (!file) {
       beginOperation(key);
       try {
         file = await uploadDriveFile(ctx.client, folder.id, document.fileName, readDocumentFile(document.localFile));
       } catch (error) {
-        if (isBitrixError(error) && error.uncertain) markOperationUncertain(key);
-        else markOperationFailed(key);
-        throw error;
+        if (isBitrixError(error) && error.uncertain) {
+          markOperationUncertain(key);
+          throw error;
+        }
+        file = isBitrixError(error) && !isNotFound(error) ? await findDriveChild(ctx.client, folder.id, document.fileName, "file").catch(() => null) : null;
+        if (!file) {
+          markOperationFailed(key);
+          throw error;
+        }
       }
     }
     confirmOperation(key, file.id);
@@ -178,6 +189,26 @@ async function uploadToDrive(ctx: EngineContext, document: DocumentRow, journey:
     }
     throw error;
   }
+}
+
+/** Anexa o arquivo do Drive à tarefa. Depois de uma resposta incerta, confere os anexos da tarefa antes de anexar de novo. */
+async function attachToTask(ctx: EngineContext, document: DocumentRow, taskId: string, driveFileId: string): Promise<DocumentRow> {
+  const key = `document:attach:${document.id}`;
+  const previous = getOperation(key);
+  const unsure = previous?.status === "uncertain" || previous?.status === "sending";
+  let attachmentId = unsure ? await findTaskAttachment(ctx.client, taskId, driveFileId) : null;
+  if (!attachmentId) {
+    beginOperation(key);
+    try {
+      attachmentId = (await attachFileToTask(ctx.client, taskId, driveFileId)) || "ok";
+    } catch (error) {
+      if (isBitrixError(error) && error.uncertain) markOperationUncertain(key);
+      else markOperationFailed(key);
+      throw error;
+    }
+  }
+  confirmOperation(key, attachmentId);
+  return updateDocument(document.id, { attachmentId }) ?? document;
 }
 
 function requestOf(activity: ActivityRow | null, document: DocumentRow): DocumentRequest | null {
@@ -200,8 +231,7 @@ export async function handleDocumentSend(payload: Record<string, unknown>, ctx: 
   const activity = getActivity(document.activityId);
   const taskId = activity?.bitrixTaskId && !activity.bitrixMissing ? activity.bitrixTaskId : null;
   if (taskId && !document.attachmentId && document.driveFileId) {
-    const attachmentId = await attachFileToTask(ctx.client, taskId, document.driveFileId);
-    document = updateDocument(document.id, { attachmentId: attachmentId || "ok" }) ?? document;
+    document = await attachToTask(ctx, document, taskId, document.driveFileId);
     const request = requestOf(activity, document);
     const person = findPerson(journey.personId);
     try {

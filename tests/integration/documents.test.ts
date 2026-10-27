@@ -2,14 +2,15 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { getDataDir } from "@/server/db";
+import { getDataDir, getDb } from "@/server/db";
 import { getActivity } from "@/server/db/repos/activities";
 import { getDocument, listDocumentsByActivity } from "@/server/db/repos/documents";
 import { getJourney } from "@/server/db/repos/journeys";
 import { getWebhookRecord, setWebhookRecord } from "@/server/db/repos/settings";
 import { createTemplate } from "@/server/db/repos/templates";
 import { createJourney, receiveDocument, resendDocuments } from "@/server/engine";
-import { DOCUMENTS_ROOT_FOLDER } from "@/server/engine/documents";
+import { DOCUMENTS_ROOT_FOLDER, markDocumentFailed } from "@/server/engine/documents";
+import { markOperationFailed } from "@/server/db/repos/operations";
 import { templateInput } from "@/shared/schemas";
 import { activityByTitle, advance, cycle, HR_ACTOR, prepare, setupEngine, type EngineEnv } from "../fakes/engine-setup";
 
@@ -21,7 +22,12 @@ const TITLE = "Envie seus documentos";
 const pdf = (text: string) => new Uint8Array(Buffer.from(`%PDF-1.7\n${text}`));
 const PDF_TYPE = { mime: "application/pdf", ext: "pdf" };
 
-function documentsTemplate() {
+const DEFAULT_DOCUMENTS = [
+  { key: "documento-com-foto", name: "Documento com foto", required: true },
+  { key: "dados-bancarios", name: "Dados bancários", required: false },
+];
+
+function documentsTemplate(documents = DEFAULT_DOCUMENTS) {
   return createTemplate(
     templateInput.parse({
       kind: "onboarding",
@@ -37,10 +43,7 @@ function documentsTemplate() {
               kind: "delivery",
               visibility: "employee",
               dueOffsetDays: -2,
-              documents: [
-                { key: "documento-com-foto", name: "Documento com foto", required: true },
-                { key: "dados-bancarios", name: "Dados bancários", required: false },
-              ],
+              documents,
             },
           ],
         },
@@ -49,9 +52,9 @@ function documentsTemplate() {
   );
 }
 
-function start(person: { bitrixUserId: string } | { name: string }, participants: Record<string, string> = {}): string {
+function start(person: { bitrixUserId: string } | { name: string }, participants: Record<string, string> = {}, documents = DEFAULT_DOCUMENTS): string {
   return createJourney(
-    { requestId: randomUUID(), kind: "onboarding", person, templateId: documentsTemplate().id, anchorDate: "2026-11-03", participants },
+    { requestId: randomUUID(), kind: "onboarding", person, templateId: documentsTemplate(documents).id, anchorDate: "2026-11-03", participants },
     HR_ACTOR,
   ).id;
 }
@@ -111,6 +114,15 @@ describe("documentos pelo link pessoal", () => {
     expect(() => receive(journeyId, "nao-pedido", pdf("x"))).toThrow("não foi pedido");
   });
 
+  it("atividade só com documentos opcionais não conclui sozinha no primeiro envio", async () => {
+    env = setupEngine({ scopes: WITH_DISK });
+    await prepare();
+    const journeyId = start({ bitrixUserId: "12" }, {}, [{ key: "dados-bancarios", name: "Dados bancários", required: false }]);
+    await cycle();
+    expect(receive(journeyId, "dados-bancarios", pdf("banco")).completed).toBe(false);
+    expect(activityByTitle(journeyId, TITLE).status).toBe("open");
+  });
+
   it("sem a permissão Drive, o documento espera com erro e segue quando o webhook ganha a permissão", async () => {
     env = setupEngine();
     await prepare();
@@ -144,6 +156,57 @@ describe("documentos pelo link pessoal", () => {
     expect(env.fake.driveFiles()).toHaveLength(1);
     expect(getDocument(document.id)).toMatchObject({ status: "sent", localFile: null });
     expect(env.fake.attachments).toHaveLength(1);
+  });
+
+  it("documento parado com erro depois de um envio que gravou atrasado: o reenvio acha o arquivo pelo nome", async () => {
+    env = setupEngine({ scopes: WITH_DISK });
+    await prepare();
+    const journeyId = start({ bitrixUserId: "12" });
+    await cycle();
+    const { document } = receive(journeyId, "documento-com-foto", pdf("rg"));
+    env.fake.failNext("disk.folder.uploadfile", "commitThenTimeout");
+    await cycle();
+    // Estado ruim de antes da correção: tentativa marcada como falha e documento com erro.
+    markOperationFailed(`document:upload:${document.id}`);
+    markDocumentFailed(document.id, "Nome já existe");
+    expect(resendDocuments()).toBe(1);
+    advance(31_000);
+    await cycle();
+    expect(env.fake.countCalls("disk.folder.uploadfile")).toBe(1);
+    expect(getDocument(document.id)).toMatchObject({ status: "sent", localFile: null });
+    expect(env.fake.attachments).toHaveLength(1);
+  });
+
+  it("nome já existe no Drive sem registro da tentativa: usa o arquivo que está lá", async () => {
+    env = setupEngine({ scopes: WITH_DISK });
+    await prepare();
+    const journeyId = start({ bitrixUserId: "12" });
+    await cycle();
+    const { document } = receive(journeyId, "documento-com-foto", pdf("rg"));
+    env.fake.failNext("disk.folder.uploadfile", "commitThenTimeout");
+    await cycle();
+    getDb().prepare("DELETE FROM operations WHERE key = ?").run(`document:upload:${document.id}`);
+    advance(31_000);
+    await cycle();
+    expect(env.fake.countCalls("disk.folder.uploadfile")).toBe(2);
+    expect(env.fake.driveFiles()).toHaveLength(1);
+    expect(getDocument(document.id)).toMatchObject({ status: "sent", localFile: null });
+  });
+
+  it("anexo incerto: confere os anexos da tarefa em vez de anexar de novo", async () => {
+    env = setupEngine({ scopes: WITH_DISK });
+    await prepare();
+    const journeyId = start({ bitrixUserId: "12" });
+    await cycle();
+    const { document } = receive(journeyId, "documento-com-foto", pdf("rg"));
+    env.fake.failNext("tasks.task.files.attach", "commitThenTimeout");
+    await cycle();
+    expect(getDocument(document.id)).toMatchObject({ status: "received", attachmentId: null });
+    advance(31_000);
+    await cycle();
+    expect(env.fake.countCalls("tasks.task.files.attach")).toBe(1);
+    expect(env.fake.attachments).toHaveLength(1);
+    expect(getDocument(document.id)).toMatchObject({ status: "sent", attachmentId: String(env.fake.attachments[0]!.id) });
   });
 
   it("recria a pasta quando ela foi apagada no Drive", async () => {

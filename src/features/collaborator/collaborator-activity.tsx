@@ -143,7 +143,8 @@ export function CollaboratorActivity({ activity, today, token, preview, uploads 
   const done = activity.status === "done";
   const waiting = activity.status === "waiting";
   // Com envio de arquivos, a atividade fica feita sozinha quando chegam os obrigatórios: sem "Marcar como feita".
-  const byUpload = Boolean(activity.documents?.length) && uploads;
+  // Só com opcionais não há o que esperar: o colaborador marca quando terminar (ou quando não tiver os documentos).
+  const byUpload = uploads && Boolean(activity.documents?.some((request) => request.required));
   return (
     <li id={`atividade-${activity.id}`} className={`cp-act cp-act--mine${done ? " cp-act--done" : ""}`}>
       <div className="cp-act-head">

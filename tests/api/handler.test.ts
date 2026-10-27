@@ -138,6 +138,6 @@ describe("envoltório das rotas", () => {
     const handler = route({ auth: "public" }, () => {
       throw control;
     });
-    await expect(handler(new Request("http://localhost/api/x"))).rejects.toBe(control);
+    await expect(handler(new Request("http://localhost/api/x"), { params: Promise.resolve({}) })).rejects.toBe(control);
   });
 });

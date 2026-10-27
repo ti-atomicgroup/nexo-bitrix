@@ -38,7 +38,7 @@ export interface RouteArgs<A extends AuthMode, I, K extends string> {
 
 type InputOf<S> = S extends z.ZodType ? z.output<S> : undefined;
 
-export type RouteHandler<K extends string> = (request: Request, context?: { params: Promise<Record<K, string>> }) => Promise<Response>;
+export type RouteHandler<K extends string> = (request: Request, context: { params: Promise<Record<K, string>> }) => Promise<Response>;
 
 export const UNAUTHENTICATED_MESSAGE = "Sua sessão expirou. Entre de novo.";
 export const FORBIDDEN_MESSAGE = "Peça a um administrador do Nexo para fazer isso.";

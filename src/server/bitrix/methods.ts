@@ -538,3 +538,22 @@ export async function attachFileToTask(client: BitrixClient, taskId: string, fil
   const result = asRecord(await client.call("tasks.task.files.attach", { taskId: Number(taskId), fileId: Number(fileId) }));
   return text(pick(result, "attachmentId", "ATTACHMENT_ID"));
 }
+
+/**
+ * Anexo da tarefa que aponta para este arquivo do Drive, se já existe (para não anexar duas vezes depois de uma resposta incerta).
+ * A tarefa lista os anexos (UF_TASK_WEBDAV_FILES) e cada anexo diz de qual arquivo do Drive veio (OBJECT_ID).
+ */
+export async function findTaskAttachment(client: BitrixClient, taskId: string, fileId: string): Promise<string | null> {
+  const result = asRecord(await client.call("tasks.task.get", { taskId: Number(taskId), select: ["ID", "UF_TASK_WEBDAV_FILES"] }));
+  const task = asRecord(result.task ?? result);
+  const raw = pick(task, "ufTaskWebdavFiles", "UF_TASK_WEBDAV_FILES");
+  const ids = (Array.isArray(raw) ? raw : []).map(text).filter((id) => /^\d+$/.test(id)).slice(-50);
+  if (!ids.length) return null;
+  const commands: BatchCommands = {};
+  for (const id of ids) commands[`a${id}`] = { method: "disk.attachedObject.get", params: { id: Number(id) } };
+  const { results, errors } = await client.batch(commands);
+  // Sem ler todos os anexos não dá para afirmar que falta: melhor tentar de novo depois do que anexar em dobro.
+  const failure = Object.values(errors)[0];
+  if (failure) throw failure;
+  return ids.find((id) => text(asRecord(results[`a${id}`]).OBJECT_ID) === fileId) ?? null;
+}

@@ -58,7 +58,8 @@ function fail(message) {
 
 const file = join(dataDir(), "nexo.sqlite");
 if (!existsSync(file)) fail(`Não encontrei o banco do Nexo em ${file}. Rode na pasta do projeto ou informe NEXO_DATA_DIR.`);
-const db = new DatabaseSync(file);
+// Espera até 5 s se o Nexo estiver gravando no banco na mesma hora (como o servidor faz).
+const db = new DatabaseSync(file, { timeout: 5000 });
 const users = db.prepare("SELECT id, name, email, role FROM app_users WHERE active = 1 ORDER BY role, email").all();
 if (!users.length) fail("Não há acessos ativos neste Nexo.");
 
@@ -76,15 +77,28 @@ if ((await askHidden("Repita a nova senha: ")) !== password) fail("As senhas nã
 rl.close();
 const hash = await hashPassword(password);
 const now = new Date().toISOString();
-db.exec("BEGIN IMMEDIATE");
-db.prepare("UPDATE app_users SET password_hash = ?, failed_logins = 0, locked_until = NULL, must_change_password = 0 WHERE id = ?").run(hash, user.id);
-const sessions = db.prepare("DELETE FROM sessions WHERE user_id = ?").run(user.id).changes;
-db.prepare("INSERT INTO audit_log (at, actor_type, actor_id, actor_name, action, entity, entity_id, detail) VALUES (?, 'system', NULL, NULL, ?, 'user', ?, ?)").run(
-  now,
-  "Senha redefinida pelo terminal do servidor",
-  user.id,
-  JSON.stringify({ text: `Acesso ${user.email}; ${sessions} sessão(ões) encerrada(s).` }),
-);
-db.exec("COMMIT");
-db.close();
+let sessions = 0;
+try {
+  db.exec("BEGIN IMMEDIATE");
+  db.prepare("UPDATE app_users SET password_hash = ?, failed_logins = 0, locked_until = NULL, must_change_password = 0 WHERE id = ?").run(hash, user.id);
+  sessions = db.prepare("DELETE FROM sessions WHERE user_id = ?").run(user.id).changes;
+  db.prepare("INSERT INTO audit_log (at, actor_type, actor_id, actor_name, action, entity, entity_id, detail) VALUES (?, 'system', NULL, NULL, ?, 'user', ?, ?)").run(
+    now,
+    "Senha redefinida pelo terminal do servidor",
+    user.id,
+    JSON.stringify({ text: `Acesso ${user.email}; ${sessions} sessão(ões) encerrada(s).` }),
+  );
+  db.exec("COMMIT");
+} catch (error) {
+  if (db.isTransaction) db.exec("ROLLBACK");
+  const busy = /locked|busy/i.test(String(error?.message));
+  console.error(
+    busy
+      ? "\nO banco está ocupado pelo Nexo neste momento. Nada foi alterado; rode o comando de novo em alguns segundos."
+      : `\nNão deu para gravar a nova senha. Nada foi alterado. (${error?.message ?? error})`,
+  );
+  process.exit(1);
+} finally {
+  if (db.isOpen) db.close();
+}
 console.log(`Pronto. Senha de ${user.email} redefinida; o bloqueio por tentativas foi desfeito. Entre no Nexo com a nova senha.`);

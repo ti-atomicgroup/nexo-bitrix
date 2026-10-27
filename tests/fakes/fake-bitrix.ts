@@ -385,7 +385,7 @@ export class FakeBitrix {
       case "tasks.task.get": {
         const task = this.tasks.get(Number(params.taskId));
         if (!task) throw new FakeFailure(400, "ERROR_CORE", "Task not found or access denied");
-        return { result: { task: this.taskPayload(task) } };
+        return { result: { task: this.taskPayload(task, asList(params.select).map(String)) } };
       }
       case "tasks.task.complete":
       case "tasks.task.renew":
@@ -503,6 +503,11 @@ export class FakeBitrix {
         const id = this.ids.attachment++;
         this.attachments.push({ id, taskId: task.id, fileId: file.id });
         return { result: { attachmentId: id } };
+      }
+      case "disk.attachedObject.get": {
+        const attachment = this.attachments.find((item) => item.id === Number(params.id));
+        if (!attachment) throw new FakeFailure(404, "ERROR_NOT_FOUND", "Could not find entity with id");
+        return { result: { ID: String(attachment.id), OBJECT_ID: String(attachment.fileId), ENTITY_TYPE: "tasks_task", ENTITY_ID: String(attachment.taskId) } };
       }
       case "log.blogpost.add": {
         const id = this.ids.post++;
@@ -651,6 +656,7 @@ export class FakeBitrix {
       AUDITORS: ["auditors", task.auditors.map(String)],
       TASK_CONTROL: ["taskControl", task.taskControl],
       UF_CRM_TASK: ["ufCrmTask", task.ufCrmTask],
+      UF_TASK_WEBDAV_FILES: ["ufTaskWebdavFiles", this.attachments.filter((attachment) => attachment.taskId === task.id).map((attachment) => attachment.id)],
     };
     const keys = select?.length ? ["ID", ...select.map(String)] : Object.keys(all);
     return Object.fromEntries(keys.filter((key) => all[key]).map((key) => all[key]!));

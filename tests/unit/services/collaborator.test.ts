@@ -226,12 +226,16 @@ describe("POST /j/:token/feito", () => {
 describe("POST /j/:token/documento", () => {
   const PDF = new Uint8Array(Buffer.from("%PDF-1.7\nconteúdo"));
 
-  function post(token: string, fields: { activityId?: string; key?: string; file?: Blob }): Promise<Response> {
-    const body = new FormData();
-    if (fields.activityId !== undefined) body.set("activityId", fields.activityId);
-    if (fields.key !== undefined) body.set("key", fields.key);
-    if (fields.file) body.set("file", fields.file, "foto.pdf");
-    return documentRoute(new Request(`http://localhost/j/${token}/documento`, { method: "POST", body }), { params: Promise.resolve({ token }) });
+  /** Como o navegador manda: multipart com o tamanho declarado. */
+  async function post(token: string, fields: { activityId?: string; key?: string; file?: Blob }): Promise<Response> {
+    const form = new FormData();
+    if (fields.activityId !== undefined) form.set("activityId", fields.activityId);
+    if (fields.key !== undefined) form.set("key", fields.key);
+    if (fields.file) form.set("file", fields.file, "foto.pdf");
+    const encoded = new Request("http://localhost/", { method: "POST", body: form });
+    const body = await encoded.arrayBuffer();
+    const headers = { "content-type": encoded.headers.get("content-type")!, "content-length": String(body.byteLength) };
+    return documentRoute(new Request(`http://localhost/j/${token}/documento`, { method: "POST", body, headers }), { params: Promise.resolve({ token }) });
   }
 
   function setup() {
@@ -275,6 +279,20 @@ describe("POST /j/:token/documento", () => {
     revokeCollaboratorLink(journey.id, RH);
     expect((await post(token, { activityId: mine.id, key: "rg", file: new Blob([PDF]) })).status).toBe(404);
     expect((await post(token, {})).status).toBe(404);
+  });
+
+  it("não lê o corpo sem link válido nem sem tamanho declarado", async () => {
+    const { mine, token } = setup();
+    const unread = (headers: Record<string, string>, to = token) => {
+      const body = new ReadableStream({ pull: () => { throw new Error("corpo lido"); } });
+      return documentRoute(new Request(`http://localhost/j/${to}/documento`, { method: "POST", body, headers, duplex: "half" } as RequestInit), { params: Promise.resolve({ token: to }) });
+    };
+    // Envio em partes (sem content-length): recusado antes de ler.
+    expect((await unread({ "content-type": "multipart/form-data; boundary=x" })).headers.get("location")).toBe(`/j/${token}?erro=documento`);
+    expect((await unread({ "content-type": "multipart/form-data; boundary=x", "content-length": String(11 * 1024 * 1024) })).headers.get("location")).toBe(`/j/${token}?erro=grande`);
+    expect((await unread({ "content-length": "100" }, "a".repeat(43))).status).toBe(404);
+    expect(engine.receiveDocument).not.toHaveBeenCalled();
+    expect((await post(token, { activityId: mine.id, key: "rg", file: new Blob([PDF]) })).headers.get("location")).toBe(`/j/${token}?enviado=1#atividade-${mine.id}`);
   });
 
   it("limita a 20 envios a cada 10 minutos por link", async () => {
