@@ -59,6 +59,19 @@ export function addDays(dateOnly: string, days: number): string {
   return toDateOnly(new Date(date.getTime() + days * DAY_MS));
 }
 
+/**
+ * Data no fim de semana: o dia ("sábado"/"domingo") e o dia útil mais perto na direção pedida
+ * (segunda seguinte para quem chega, sexta anterior para quem sai). Nulo em dia de semana. Feriados não entram.
+ */
+export function weekendOf(dateOnly: string, direction: "next" | "previous"): { weekday: "sábado" | "domingo"; businessDay: string } | null {
+  const date = parseDateOnly(dateOnly);
+  if (!date) return null;
+  const day = date.getUTCDay();
+  if (day !== 0 && day !== 6) return null;
+  const shift = direction === "next" ? (day === 6 ? 2 : 1) : day === 6 ? -1 : -2;
+  return { weekday: day === 6 ? "sábado" : "domingo", businessDay: addDays(dateOnly, shift) };
+}
+
 /** Dias de `from` até `to` (positivo se `to` vem depois). */
 export function daysBetween(from: string, to: string): number {
   const a = parseDateOnly(from);

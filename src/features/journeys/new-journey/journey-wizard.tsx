@@ -16,7 +16,7 @@ import { useToast } from "@/components/ui/toast";
 import { countdownFor } from "@/features/collaborator/countdown";
 import { PersonPicker } from "@/features/people/person-picker";
 import { api, toApiError } from "@/lib/api-client";
-import { daysBetween, firstName, formatDateMedium, formatSince, plural, todayIn } from "@/lib/format";
+import { daysBetween, firstName, formatDateMedium, formatSince, formatWeekdayShort, plural, todayIn, weekendOf } from "@/lib/format";
 import { newRequestId } from "@/lib/request-id";
 import { useApi, type ApiState } from "@/lib/use-api";
 import { useNow } from "@/lib/use-session";
@@ -119,6 +119,8 @@ export function JourneyWizard({ initial, templates, detection, companyName }: Jo
 
   const anchorLabel = state.kind === "offboarding" ? "Último dia" : "1º dia";
   const daysUntil = state.anchorDate ? daysBetween(today, state.anchorDate) : null;
+  // 1º dia ou último dia no fim de semana: tarefas do dia, boas-vindas no Feed e revogação de acessos cairiam no sábado/domingo.
+  const weekend = state.anchorDate ? weekendOf(state.anchorDate, state.kind === "offboarding" ? "previous" : "next") : null;
 
   return (
     <div className={styles.layout}>
@@ -264,6 +266,19 @@ export function JourneyWizard({ initial, templates, detection, companyName }: Jo
                   }
                 />
               </div>
+              {weekend ? (
+                <Notice tone="warning" title={`${formatDateMedium(state.anchorDate, today)} é ${weekend.weekday === "sábado" ? "um sábado" : "um domingo"}`}>
+                  <p>
+                    {state.kind === "offboarding"
+                      ? "A revogação de acessos e a devolução de equipamentos ficariam marcadas para o fim de semana."
+                      : "As tarefas do 1º dia e as boas-vindas no Feed ficariam para o fim de semana."}{" "}
+                    Confira se a data está certa.
+                  </p>
+                  <Button size="s" variant="secondary" onClick={() => update({ anchorDate: weekend.businessDay })}>
+                    Usar {formatWeekdayShort(weekend.businessDay).replace(".", "")}, {formatDateMedium(weekend.businessDay, today)}
+                  </Button>
+                </Notice>
+              ) : null}
               {state.kind === "offboarding" ? (
                 <div data-invalid={errors.reason ? "true" : undefined}>
                   <ChoiceCards
