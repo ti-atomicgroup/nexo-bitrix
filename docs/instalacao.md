@@ -53,3 +53,4 @@ Pronto. Não há variáveis de ambiente para preencher nem chaves para gerar.
 | "Limite temporário do Bitrix24" | O Bitrix24 limita chamadas por segundo. O Nexo espera e tenta de novo sozinho. |
 | O link do colaborador abre "Acesso permitido somente dentro da Onnira" | A Onnira bloqueia acessos de fora do painel. Peça ao suporte da Onnira para liberar o caminho `/j/*`. |
 | Página em branco ou erro | Abra `/diagnostico` e use "Copiar relatório" para enviar ao suporte. |
+| Esqueceu a senha ou o login ficou bloqueado | Outro administrador redefine em Ajustes → Equipe. Sem outro administrador, quem tem acesso ao servidor roda `npm run senha:redefinir -- <e-mail>` na pasta do Nexo: a nova senha é digitada no terminal, o bloqueio é desfeito e as sessões abertas desse acesso são encerradas. |
