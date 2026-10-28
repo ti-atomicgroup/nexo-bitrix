@@ -4,6 +4,7 @@ import { setFeatures, setWebhookRecord, getWebhookRecord } from "@/server/db/rep
 import { createTemplate } from "@/server/db/repos/templates";
 import { addManualLedgerItem, createJourney } from "@/server/engine";
 import { findPersonByBitrixId } from "@/server/db/repos/people";
+import { buildJourneyDTO } from "@/server/services/read/journeys";
 import { templateInput } from "@/shared/schemas";
 import { advance, cycle, HR_ACTOR, prepare, setupEngine, type EngineEnv } from "../fakes/engine-setup";
 
@@ -32,9 +33,9 @@ const staged = (kind: "onboarding" | "offboarding") =>
     }),
   );
 
-function start(templateIdValue: string, kind: "onboarding" | "offboarding" = "onboarding"): string {
+function start(templateIdValue: string, kind: "onboarding" | "offboarding" = "onboarding", position?: string): string {
   return createJourney(
-    { requestId: randomUUID(), kind, person: { bitrixUserId: "12" }, templateId: templateIdValue, anchorDate: "2026-10-28", participants: {}, offboardingReason: kind === "offboarding" ? "involuntary" : undefined },
+    { requestId: randomUUID(), kind, person: { bitrixUserId: "12" }, position, templateId: templateIdValue, anchorDate: "2026-10-28", participants: {}, offboardingReason: kind === "offboarding" ? "involuntary" : undefined },
     HR_ACTOR,
   ).id;
 }
@@ -115,5 +116,17 @@ describe("extras (im, calendar, log)", () => {
     advance(Date.parse("2026-10-28T12:00:30Z") - Date.now());
     await cycle();
     expect(env.fake.posts).toHaveLength(0);
+  });
+
+  it("o cargo informado na jornada vai nas boas-vindas e no resumo, no lugar do cargo do cadastro", async () => {
+    env = setupEngine();
+    await prepare();
+    const id = start(staged("onboarding").id, "onboarding", "Executiva de contas");
+    expect(buildJourneyDTO(id).summary.person.position).toBe("Executiva de contas");
+    advance(Date.parse("2026-10-28T12:00:30Z") - Date.now());
+    await cycle();
+    expect(env.fake.posts[0]?.message).toBe(
+      "Hoje é o primeiro dia de [USER=12]Ana Souza[/USER], Executiva de contas, na Empresa Teste. Deixe sua mensagem de boas-vindas!",
+    );
   });
 });

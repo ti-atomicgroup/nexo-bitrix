@@ -158,6 +158,7 @@ export function makeJourney(overrides: Partial<JourneyRow> = {}): JourneyRow {
     completedAt: null,
     cancelledAt: null,
     cancelReason: null,
+    personPosition: null,
     ...overrides,
   };
 }

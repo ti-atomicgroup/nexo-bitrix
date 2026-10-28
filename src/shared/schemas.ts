@@ -150,6 +150,8 @@ export const createJourneyInput = z
     requestId: z.uuid(),
     kind: z.enum(JOURNEY_KINDS),
     person: journeyPersonInput,
+    /** Cargo da pessoa nesta jornada (ex.: "Analista de vendas"): aparece na jornada, no Feed e no convite. */
+    position: z.string().trim().max(80).optional(),
     templateId: z.string().min(1).max(64),
     anchorDate: dateOnlySchema,
     participants: z

@@ -43,7 +43,7 @@ function personByBitrixId(ctx: ReadContext, bitrixUserId: string): PersonRow | n
 }
 
 function personDTO(journey: JourneyRow, person: PersonRow | null): PersonDTO {
-  if (person) return toPersonDTO(person);
+  if (person) return { ...toPersonDTO(person), position: journey.personPosition ?? person.position };
   return { id: journey.personId, bitrixUserId: null, name: "Pessoa removida", email: null, position: null, department: null, active: false, source: "manual" };
 }
 

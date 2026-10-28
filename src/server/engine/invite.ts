@@ -78,7 +78,7 @@ export async function handlePersonInvite(payload: Record<string, unknown>, ctx: 
     const departmentId = departments[0];
     if (!departmentId) throw new AppError("INVITE_DEPARTMENT", "Não encontramos um departamento no Bitrix24 para a pessoa convidada. Convide-a pelo Bitrix24 e vincule a conta aqui.", 422);
     try {
-      accountId = await inviteUser(ctx.client, { email, name: person.name, departmentId });
+      accountId = await inviteUser(ctx.client, { email, name: person.name, departmentId, position: journey?.personPosition });
     } catch (error) {
       if (isBitrixError(error) && !error.retryable && DENIED_CODES.has(error.code)) throw new AppError("INVITE_DENIED", INVITE_DENIED_MESSAGE, 403);
       throw error;

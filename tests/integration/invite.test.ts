@@ -35,8 +35,8 @@ const welcome = () =>
     }),
   );
 
-function start(person: CreateJourneyInput["person"]): string {
-  return createJourney({ requestId: randomUUID(), kind: "onboarding", person, templateId: welcome().id, anchorDate: "2026-10-29", participants: {} }, HR_ACTOR).id;
+function start(person: CreateJourneyInput["person"], position?: string): string {
+  return createJourney({ requestId: randomUUID(), kind: "onboarding", person, position, templateId: welcome().id, anchorDate: "2026-10-29", participants: {} }, HR_ACTOR).id;
 }
 
 const personOf = (journeyId: string) => findPerson(getJourney(journeyId)!.personId)!;
@@ -46,13 +46,13 @@ describe("convite para o Bitrix24", () => {
     env = setupEngine({ scopes: WITH_USER });
     env.fake.departments.set(13, [7]);
     await prepare();
-    const id = start({ name: "Paula Lima Prado", email: "paula@pessoal.test", invite: true });
+    const id = start({ name: "Paula Lima Prado", email: "paula@pessoal.test", invite: true }, "Analista de vendas");
     expect(personOf(id)).toMatchObject({ bitrixUserId: null, inviteStatus: "sending", email: "paula@pessoal.test" });
 
     await cycle();
 
     const added = env.fake.calls.find((call) => call.method === "user.add")!;
-    expect(added.params).toMatchObject({ EMAIL: "paula@pessoal.test", NAME: "Paula", LAST_NAME: "Lima Prado", UF_DEPARTMENT: [7] });
+    expect(added.params).toMatchObject({ EMAIL: "paula@pessoal.test", NAME: "Paula", LAST_NAME: "Lima Prado", UF_DEPARTMENT: [7], WORK_POSITION: "Analista de vendas" });
     const person = personOf(id);
     expect(person.bitrixUserId).not.toBeNull();
     expect(person).toMatchObject({ inviteStatus: null, inviteError: null });

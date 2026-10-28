@@ -15,6 +15,8 @@ export interface JourneyRow {
   anchorDate: string;
   status: JourneyStatus;
   offboardingReason: OffboardingReason | null;
+  /** Cargo informado pelo RH ao criar a jornada (vale mais que o cargo do cadastro). */
+  personPosition: string | null;
   participants: Partial<Record<ParticipantRole, UserRef>>;
   sourceType: "manual" | "trigger";
   sourceKey: string | null;
@@ -31,8 +33,11 @@ export interface JourneyRow {
   cancelReason: string | null;
 }
 
-export type NewJourney = Omit<JourneyRow, "createdAt" | "updatedAt" | "completedAt" | "cancelledAt" | "cancelReason" | "linkTokenHash" | "linkExpiresAt"> &
-  Partial<Pick<JourneyRow, "linkTokenHash" | "linkExpiresAt">>;
+export type NewJourney = Omit<
+  JourneyRow,
+  "createdAt" | "updatedAt" | "completedAt" | "cancelledAt" | "cancelReason" | "linkTokenHash" | "linkExpiresAt" | "personPosition"
+> &
+  Partial<Pick<JourneyRow, "linkTokenHash" | "linkExpiresAt" | "personPosition">>;
 
 const COLUMNS = {
   status: "status",
@@ -61,6 +66,7 @@ function map(row: Record<string, unknown>): JourneyRow {
     anchorDate: String(row.anchor_date),
     status: row.status as JourneyStatus,
     offboardingReason: (toStringOrNull(row.offboarding_reason) as OffboardingReason | null) ?? null,
+    personPosition: toStringOrNull(row.person_position),
     participants: parseJson<Partial<Record<ParticipantRole, UserRef>>>(row.participants, {}),
     sourceType: row.source_type as JourneyRow["sourceType"],
     sourceKey: toStringOrNull(row.source_key),
@@ -82,9 +88,9 @@ export function insertJourney(journey: NewJourney): JourneyRow {
   const now = nowIso();
   getDb()
     .prepare(`
-      INSERT INTO journeys (id, kind, person_id, template_id, template_version, template_snapshot, anchor_date, status, offboarding_reason,
+      INSERT INTO journeys (id, kind, person_id, template_id, template_version, template_snapshot, anchor_date, status, offboarding_reason, person_position,
         participants, source_type, source_key, source_label, crm_binding, crm_url, link_token_hash, link_expires_at, created_by, created_at, updated_at)
-      VALUES (@id, @kind, @personId, @templateId, @templateVersion, @snapshot, @anchorDate, @status, @offboardingReason,
+      VALUES (@id, @kind, @personId, @templateId, @templateVersion, @snapshot, @anchorDate, @status, @offboardingReason, @personPosition,
         @participants, @sourceType, @sourceKey, @sourceLabel, @crmBinding, @crmUrl, @linkTokenHash, @linkExpiresAt, @createdBy, @now, @now)`)
     .run({
       id: journey.id,
@@ -96,6 +102,7 @@ export function insertJourney(journey: NewJourney): JourneyRow {
       anchorDate: journey.anchorDate,
       status: journey.status,
       offboardingReason: journey.offboardingReason,
+      personPosition: journey.personPosition?.trim() || null,
       participants: JSON.stringify(journey.participants),
       sourceType: journey.sourceType,
       sourceKey: journey.sourceKey,

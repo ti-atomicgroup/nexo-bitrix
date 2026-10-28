@@ -11,6 +11,8 @@ export interface WizardState {
   manualEmail: string;
   /** Convidar a pessoa para o Bitrix24 pelo e-mail (pessoa sem conta). */
   invite: boolean;
+  /** Cargo nesta jornada: vem do Bitrix24 ao escolher a pessoa e o RH pode mudar. */
+  position: string;
   templateId: string | null;
   anchorDate: string;
   reason: OffboardingReason | null;
@@ -29,6 +31,7 @@ export function initialState(settings: SettingsDTO | null, detection: DetectionD
     manualName: "",
     manualEmail: "",
     invite: false,
+    position: "",
     templateId: null,
     anchorDate: "",
     reason: null,
@@ -98,6 +101,7 @@ export function buildInput(state: WizardState, requestId: string): CreateJourney
     person: manual
       ? { name: state.manualName.trim(), ...(state.manualEmail.trim() ? { email: state.manualEmail.trim() } : {}), ...(state.invite ? { invite: true } : {}) }
       : { bitrixUserId: state.bitrixPerson?.bitrixUserId ?? "" },
+    ...(state.position.trim() ? { position: state.position.trim() } : {}),
     templateId: state.templateId,
     anchorDate: state.anchorDate,
     participants,

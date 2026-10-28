@@ -97,10 +97,10 @@ export async function userDepartments(client: BitrixClient, userId: string): Pro
 }
 
 /** `user.add`: o Bitrix24 cria a conta e manda o convite para o e-mail. Devolve o ID da conta nova. */
-export async function inviteUser(client: BitrixClient, input: { email: string; name: string; departmentId: string }): Promise<string> {
+export async function inviteUser(client: BitrixClient, input: { email: string; name: string; departmentId: string; position?: string | null }): Promise<string> {
   const [first = input.name, ...rest] = input.name.trim().split(/\s+/);
   const id = text(
-    await client.call("user.add", { EMAIL: input.email, NAME: first, LAST_NAME: rest.join(" "), EXTRANET: "N", UF_DEPARTMENT: [Number(input.departmentId)] }),
+    await client.call("user.add", { EMAIL: input.email, NAME: first, LAST_NAME: rest.join(" "), EXTRANET: "N", UF_DEPARTMENT: [Number(input.departmentId)], ...(input.position ? { WORK_POSITION: input.position } : {}) }),
   );
   if (!/^\d+$/.test(id)) throw invalidResponse(true);
   return id;

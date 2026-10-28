@@ -188,7 +188,10 @@ export function JourneyWizard({ initial, templates, detection, companyName, invi
                   <PersonPicker
                     label={state.kind === "offboarding" ? "Quem vai sair" : "Quem vai chegar"}
                     value={state.bitrixPerson}
-                    onChange={(bitrixPerson) => update({ bitrixPerson })}
+                    onChange={(bitrixPerson) =>
+                      // O cargo do Bitrix24 vem preenchido; o que o RH digitou à mão fica.
+                      update({ bitrixPerson, position: !state.position.trim() || state.position === state.bitrixPerson?.position ? (bitrixPerson?.position ?? "") : state.position })
+                    }
                     error={errors.person}
                   />
                 </div>
@@ -229,6 +232,21 @@ export function JourneyWizard({ initial, templates, detection, companyName, invi
                     </p>
                   ) : null}
                 </div>
+              ) : null}
+              {state.kind ? (
+                <Field
+                  label="Cargo"
+                  optional
+                  autoComplete="off"
+                  maxLength={80}
+                  hint={
+                    state.kind === "onboarding"
+                      ? "Aparece na jornada e nas boas-vindas do Feed no 1º dia."
+                      : "Aparece na jornada."
+                  }
+                  value={state.position}
+                  onChange={(event) => update({ position: event.target.value })}
+                />
               ) : null}
             </section>
           ) : null}

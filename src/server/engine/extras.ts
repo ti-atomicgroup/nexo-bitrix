@@ -134,7 +134,8 @@ export async function handleFeedPost(payload: Record<string, unknown>, ctx: Engi
   const person = findPerson(journey.personId);
   if (!person) return;
   const mention = person.bitrixUserId ? `[USER=${person.bitrixUserId}]${person.name}[/USER]` : person.name;
-  const position = person.position ? `, ${person.position},` : "";
+  const role = journey.personPosition ?? person.position;
+  const position = role ? `, ${role},` : "";
   const firstName = person.name.split(/\s+/)[0] ?? person.name;
   try {
     await sendOnce(`feed:post:${journey.id}`, () =>
