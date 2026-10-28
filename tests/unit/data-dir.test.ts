@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -14,7 +14,7 @@ describe("resolveDataDir", () => {
     const base = mkdtempSync(join(tmpdir(), "nexo-dir-"));
     created.push(base);
     const target = join(base, "dados");
-    const choice = resolveDataDir({ NEXO_DATA_DIR: target }, "/nao/existe");
+    const choice = resolveDataDir({ NEXO_DATA_DIR: target }, ["/nao/existe"]);
     expect(choice).toEqual({ path: resolve(target), source: "NEXO_DATA_DIR" });
     expect(existsSync(target)).toBe(true);
   });
@@ -22,11 +22,19 @@ describe("resolveDataDir", () => {
   it("usa o volume da Onnira quando existe e é gravável", () => {
     const volume = mkdtempSync(join(tmpdir(), "nexo-volume-"));
     created.push(volume);
-    expect(resolveDataDir({}, volume)).toEqual({ path: volume, source: "onnira-volume" });
+    expect(resolveDataDir({}, [volume])).toEqual({ path: volume, source: "onnira-volume" });
+  });
+
+  it("usa a pasta oculta .data do projeto quando /app/.data não existe", () => {
+    const project = mkdtempSync(join(tmpdir(), "nexo-projeto-"));
+    created.push(project);
+    const hidden = join(project, ".data");
+    mkdirSync(hidden);
+    expect(resolveDataDir({}, [join(project, "nao-existe"), hidden])).toEqual({ path: hidden, source: "onnira-volume" });
   });
 
   it("cai para ./data quando não há configuração nem volume", () => {
-    const choice = resolveDataDir({}, join(tmpdir(), "nexo-sem-volume-inexistente"));
+    const choice = resolveDataDir({}, [join(tmpdir(), "nexo-sem-volume-inexistente")]);
     expect(choice).toEqual({ path: resolve("./data"), source: "local" });
   });
 });

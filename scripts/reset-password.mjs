@@ -20,6 +20,7 @@ const MIN_LENGTH = 10;
 function dataDir() {
   if (process.env.NEXO_DATA_DIR?.trim()) return resolve(process.env.NEXO_DATA_DIR.trim());
   if (existsSync("/app/.data/nexo.sqlite")) return "/app/.data";
+  if (existsSync(".data/nexo.sqlite")) return resolve(process.cwd(), ".data");
   return resolve(process.cwd(), "data");
 }
 

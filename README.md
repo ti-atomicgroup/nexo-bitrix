@@ -8,7 +8,7 @@ Onboarding e offboarding de colaboradores integrados ao **Bitrix24**, hospedado 
 
 ## Rodar localmente
 
-Requer Node.js 22.13 ou superior (usa o SQLite embutido do Node; `better-sqlite3` é a alternativa).
+Requer Node.js 22 ou superior. Usa o SQLite embutido do Node (22.13+); em versões anteriores, usa o `better-sqlite3`, que vem nas dependências opcionais.
 
 ```bash
 npm install
@@ -22,7 +22,7 @@ O app abre em `http://localhost:3000`. Os dados ficam em `./data` (criada automa
 
 1. Envie a branch para o repositório público conectado à Onnira.
 2. Na Onnira, aponte a aplicação para a branch e republique. Comandos: `npm ci`, `npm run build`, `npm start` (porta 3000).
-3. Abra o app pelo painel da Onnira. Na Onnira os dados ficam no volume persistente `/app/.data`, que equivale ao `./data` local.
+3. Abra o app pelo painel da Onnira. Na Onnira os dados ficam no volume persistente, a pasta oculta `.data` do projeto (`/app/.data`), que equivale ao `./data` local.
 
 Nenhuma variável de ambiente é obrigatória. Opcionais: `NEXO_DATA_DIR` (outra pasta de dados) e `PORT`.
 

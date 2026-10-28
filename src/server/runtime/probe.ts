@@ -87,6 +87,7 @@ export function serverProbe(headers: Headers) {
       candidates: {
         env: process.env.NEXO_DATA_DIR ? dirStatus(process.env.NEXO_DATA_DIR) : null,
         onniraVolume: dirStatus(ONNIRA_VOLUME),
+        projectVolume: dirStatus("./.data"),
         local: dirStatus("./data"),
       },
     },

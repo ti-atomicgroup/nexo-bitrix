@@ -37,5 +37,8 @@
     "eslint": "9.39.5",
     "eslint-config-next": "16.4.2",
     "vitest": "3.2.7"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "13.0.3"
   }
 }
