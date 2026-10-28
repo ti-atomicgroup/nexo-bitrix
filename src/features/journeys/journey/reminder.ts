@@ -1,28 +1,10 @@
 import type { JourneyDTO } from "@/shared/contracts";
+import { collaboratorPendingItems } from "@/shared/collaborator-pending";
 import type { JourneyKind } from "@/shared/enums";
 
-/**
- * O que falta do lado do colaborador: documentos obrigatórios que ainda não chegaram (ou que o RH pediu de novo)
- * e as atividades dele em aberto, visíveis no link.
- */
+/** O que falta do lado do colaborador (só os nomes), para o lembrete por WhatsApp ou e-mail. */
 export function collaboratorPending(journey: JourneyDTO): string[] {
-  const items: string[] = [];
-  for (const stage of journey.stages) {
-    for (const activity of stage.activities) {
-      if (activity.role !== "colaborador" || activity.visibility !== "employee") continue;
-      if (activity.status !== "open" && activity.status !== "in_progress") continue;
-      const documents = activity.documents ?? [];
-      if (!documents.length) {
-        items.push(activity.title);
-        continue;
-      }
-      for (const document of documents) {
-        if (!document.required || document.files.some((file) => !file.rejectedAt)) continue;
-        items.push(document.files.length ? `${document.name} (pedimos de novo)` : document.name);
-      }
-    }
-  }
-  return items;
+  return collaboratorPendingItems(journey).map((item) => item.label);
 }
 
 /** Mensagem de lembrete pronta para WhatsApp ou e-mail. Com o link recém-criado, ele vai junto. */

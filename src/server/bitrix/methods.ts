@@ -469,6 +469,11 @@ export async function notifyUser(client: BitrixClient, userId: string, message: 
   return text(await client.call("im.notify.personal.add", { USER_ID: Number(userId), MESSAGE: message }));
 }
 
+/** Mensagem no chat com a pessoa, em nome da conta dona do webhook (aceita BBCode, como [URL=…]…[/URL]). */
+export async function sendChatMessage(client: BitrixClient, userId: string, message: string): Promise<string> {
+  return text(await client.call("im.message.add", { DIALOG_ID: userId, MESSAGE: message }));
+}
+
 export interface MeetingInput {
   ownerId: string;
   name: string;

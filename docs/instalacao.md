@@ -36,7 +36,9 @@ Pronto. Não há variáveis de ambiente para preencher nem chaves para gerar.
 ## 3. Primeiros passos
 
 - **Nova jornada:** escolha a pessoa, a trilha e a data. O Nexo mostra quantas tarefas serão criadas e para quem.
-- **Link do colaborador:** na página da jornada, aba "Link do colaborador", envie por WhatsApp ou e-mail.
+- **Link do colaborador:** na página da jornada, aba "Link do colaborador", envie pelo chat do Bitrix24 (para quem já
+  tem conta) ou copie e mande por onde preferir. Na mesma aba, "Lembrar pelo Bitrix24" manda o que falta, com um
+  atalho para cada tarefa.
 - **Automação:** em Ajustes → Automações, escolha o funil e a etapa do CRM que significa "contratado". O Nexo passa a mostrar no Painel de hoje quem foi contratado, com a jornada pronta para iniciar.
 
 ## Publicação na Onnira (responsável técnico)

@@ -1,8 +1,8 @@
 "use client";
 
-import { BellRing, Ban, Copy, KeyRound, Mail, MessageCircle, RefreshCw } from "lucide-react";
+import { BellRing, Ban, Copy, KeyRound, MessagesSquare, RefreshCw } from "lucide-react";
 import { useRef, useState } from "react";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Notice } from "@/components/ui/notice";
 import { LoadingArea, Skeleton } from "@/components/ui/skeleton";
@@ -21,17 +21,40 @@ function absolute(url: string): string {
   return `${window.location.origin}${url.startsWith("/") ? "" : "/"}${url}`;
 }
 
-/** Link pessoal do colaborador: criar, revogar, copiar, enviar por WhatsApp ou e-mail e ver a prévia. */
+/** Link pessoal do colaborador: criar, revogar, enviar pelo chat do Bitrix24 ou copiar, lembrar do que falta e ver a prévia. */
 export function LinkTab({ journey, today, onChanged }: { journey: JourneyDTO; today: string; onChanged: (link: CollaboratorLinkDTO) => void }) {
   const toast = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
   const settings = useApi((signal) => api.settings({ signal }), [], { revalidateOnFocus: false });
   const [created, setCreated] = useState<string | null>(null);
   const [busy, setBusy] = useState<"create" | "revoke" | null>(null);
+  const [sending, setSending] = useState<"link" | "reminder" | null>(null);
   const [confirmRevoke, setConfirmRevoke] = useState(false);
   const { person, kind } = journey.summary;
   const first = firstName(person.name);
-  const company = settings.data?.company.name || "a empresa";
+  // Chat do Bitrix24: só para quem tem conta lá e com a permissão Bate-papo e notificações (im) no webhook.
+  const canChat = Boolean(person.bitrixUserId) && Boolean(settings.data?.webhook?.scopes.optional.im);
+  const chatHint = !person.bitrixUserId
+    ? `${first} ainda não tem conta no Bitrix24: copie e envie por onde preferir, ou vincule ou convide a conta no topo da página.`
+    : settings.data && !settings.data.webhook?.scopes.optional.im
+      ? "Para enviar pelo chat do Bitrix24, o webhook precisa da permissão Bate-papo e notificações (im)."
+      : null;
+
+  const sendByBitrix = async (body: { kind: "link"; url: string } | { kind: "reminder" }) => {
+    setSending(body.kind);
+    try {
+      await api.journeyCollaboratorMessage(journey.summary.id, body);
+      toast.show({
+        tone: "success",
+        title: body.kind === "link" ? "Link enviado pelo Bitrix24" : "Lembrete enviado pelo Bitrix24",
+        description: `A mensagem está no chat de ${first} no Bitrix24.`,
+      });
+    } catch (error) {
+      toast.show({ tone: "error", title: "Não foi possível enviar pelo Bitrix24", description: toApiError(error).message });
+    } finally {
+      setSending(null);
+    }
+  };
 
   const run = async (action: "create" | "revoke") => {
     setBusy(action);
@@ -66,19 +89,10 @@ export function LinkTab({ journey, today, onChanged }: { journey: JourneyDTO; to
   };
   const copy = () => (created ? copyText(created, inputRef.current, "Link copiado") : undefined);
 
-  // Lembrete: o que falta do lado do colaborador, pronto para WhatsApp ou e-mail.
+  // Lembrete: o que falta do lado do colaborador (no Bitrix24, cada item leva à tarefa; o texto daqui serve para copiar).
   const reminderRef = useRef<HTMLTextAreaElement>(null);
   const pending = collaboratorPending(journey);
   const reminder = reminderMessage(kind, first, pending, created);
-  const reminderSubject = kind === "onboarding" ? `O que falta para a sua chegada à ${company}` : "O que falta para concluir a sua saída";
-
-  const message =
-    kind === "onboarding"
-      ? `Olá, ${first}! Este é o seu link pessoal para acompanhar a sua chegada à ${company}: ${created ?? ""}`
-      : `Olá, ${first}. Este é o seu link pessoal com as informações da sua saída da ${company}: ${created ?? ""}`;
-  const subject = kind === "onboarding" ? `Boas-vindas à ${company}` : "Informações da sua saída";
-  const mailto = `mailto:${person.email ?? ""}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
-  const whatsapp = `https://wa.me/?text=${encodeURIComponent(message)}`;
 
   return (
     <div className={styles.tab}>
@@ -102,16 +116,16 @@ export function LinkTab({ journey, today, onChanged }: { journey: JourneyDTO; to
             </label>
             <input id="link-colaborador" ref={inputRef} className={styles.url} readOnly value={created} onFocus={(event) => event.currentTarget.select()} />
             <div className={styles.actions}>
-              <Button variant="primary" icon={Copy} onClick={copy}>
+              {canChat ? (
+                <Button variant="primary" icon={MessagesSquare} loading={sending === "link"} onClick={() => sendByBitrix({ kind: "link", url: created })}>
+                  Enviar pelo Bitrix24
+                </Button>
+              ) : null}
+              <Button variant={canChat ? "secondary" : "primary"} icon={Copy} onClick={copy}>
                 Copiar link
               </Button>
-              <ButtonLink href={whatsapp} external variant="secondary" icon={MessageCircle}>
-                Enviar por WhatsApp
-              </ButtonLink>
-              <ButtonLink href={mailto} variant="secondary" icon={Mail}>
-                Enviar por e-mail
-              </ButtonLink>
             </div>
+            {chatHint ? <p className={styles.hint}>{chatHint}</p> : null}
           </div>
         ) : journey.link.active ? (
           <Notice
@@ -145,20 +159,16 @@ export function LinkTab({ journey, today, onChanged }: { journey: JourneyDTO; to
             </label>
             <textarea id="lembrete-texto" ref={reminderRef} className={styles.message} readOnly rows={Math.min(8, pending.length + 3)} value={reminder} />
             <div className={styles.actions}>
-              <ButtonLink href={`https://wa.me/?text=${encodeURIComponent(reminder)}`} external variant="secondary" icon={MessageCircle}>
-                Lembrar por WhatsApp
-              </ButtonLink>
-              <ButtonLink
-                href={`mailto:${person.email ?? ""}?subject=${encodeURIComponent(reminderSubject)}&body=${encodeURIComponent(reminder)}`}
-                variant="secondary"
-                icon={Mail}
-              >
-                Lembrar por e-mail
-              </ButtonLink>
-              <Button variant="ghost" icon={Copy} onClick={() => copyText(reminder, reminderRef.current, "Mensagem copiada")}>
+              {canChat ? (
+                <Button variant="forest" icon={MessagesSquare} loading={sending === "reminder"} onClick={() => sendByBitrix({ kind: "reminder" })}>
+                  Lembrar pelo Bitrix24
+                </Button>
+              ) : null}
+              <Button variant={canChat ? "ghost" : "secondary"} icon={Copy} onClick={() => copyText(reminder, reminderRef.current, "Mensagem copiada")}>
                 Copiar mensagem
               </Button>
             </div>
+            {canChat ? <p className={styles.hint}>No Bitrix24, cada item da lista abre a tarefa correspondente.</p> : chatHint ? <p className={styles.hint}>{chatHint}</p> : null}
           </section>
         ) : null}
 

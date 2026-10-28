@@ -279,6 +279,7 @@ export type CreateJourneyBody = In<typeof Schemas.createJourneyInput>;
 export type JourneyActionBody = In<typeof Schemas.journeyActionInput>;
 export type LinkPersonBody = In<typeof Schemas.linkPersonInput>;
 export type CollaboratorLinkBody = In<typeof Schemas.collaboratorLinkInput>;
+export type CollaboratorMessageBody = In<typeof Schemas.collaboratorMessageInput>;
 export type ActivityActionBody = In<typeof Schemas.activityActionInput>;
 export type TemplateBody = In<typeof Schemas.templateInput>;
 export type TriggerBody = In<typeof Schemas.triggerInput>;
@@ -357,6 +358,8 @@ export const api = {
     call<JourneyDTO>("journeyLinkPerson", { ...o, params: { journeyId }, body }),
   journeyCollaboratorLink: (journeyId: string, body: CollaboratorLinkBody, o?: CallOptions) =>
     call<CollaboratorLinkDTO>("journeyCollaboratorLink", { ...o, params: { journeyId }, body }),
+  journeyCollaboratorMessage: (journeyId: string, body: CollaboratorMessageBody, o?: CallOptions) =>
+    runTask<{ sent: true }>("journeyCollaboratorMessage", { ...o, params: { journeyId }, body }),
   activityAction: (activityId: string, body: ActivityActionBody, o?: CallOptions) =>
     call<ActivityDTO>("activityAction", { ...o, params: { activityId }, body }),
 

@@ -43,6 +43,13 @@ export const API_ROUTES = {
   journeyAction: { method: "POST", path: "/api/journeys/:journeyId/actions", auth: "user", input: "journeyActionInput", output: "JourneyDTO" },
   journeyLinkPerson: { method: "POST", path: "/api/journeys/:journeyId/person", auth: "user", input: "linkPersonInput", output: "JourneyDTO" },
   journeyCollaboratorLink: { method: "POST", path: "/api/journeys/:journeyId/link", auth: "user", input: "collaboratorLinkInput", output: "CollaboratorLinkDTO" },
+  journeyCollaboratorMessage: {
+    method: "POST",
+    path: "/api/journeys/:journeyId/message",
+    auth: "user",
+    input: "collaboratorMessageInput",
+    output: "TaskStartedDTO (202) → { sent: true }",
+  },
   activityAction: { method: "POST", path: "/api/activities/:activityId/actions", auth: "user", input: "activityActionInput", output: "ActivityDTO" },
 
   /* Trilhas */

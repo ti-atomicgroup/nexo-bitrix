@@ -180,6 +180,12 @@ export const linkPersonInput = z.union([z.object({ bitrixUserId: bitrixUserIdSch
 
 export const collaboratorLinkInput = z.object({ action: z.enum(["create", "revoke"]) });
 
+/** Mensagem no chat do Bitrix24 para a pessoa: o link recém-criado (só existe na tela) ou o lembrete do que falta. */
+export const collaboratorMessageInput = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("link"), url: z.url().max(500) }),
+  z.object({ kind: z.literal("reminder") }),
+]);
+
 export const activityActionInput = z.discriminatedUnion("action", [
   z.object({ action: z.literal("complete") }),
   z.object({ action: z.literal("reopen") }),
@@ -278,6 +284,7 @@ export type TemplateActivityInput = z.infer<typeof templateActivityInput>;
 export type CreateJourneyInput = z.infer<typeof createJourneyInput>;
 export type JourneyActionInput = z.infer<typeof journeyActionInput>;
 export type LinkPersonInput = z.infer<typeof linkPersonInput>;
+export type CollaboratorMessageInput = z.infer<typeof collaboratorMessageInput>;
 export type ActivityActionInput = z.infer<typeof activityActionInput>;
 export type LedgerItemInput = z.infer<typeof ledgerItemInput>;
 export type TriggerInput = z.infer<typeof triggerInput>;

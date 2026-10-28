@@ -13,6 +13,7 @@ export function engineMock(): typeof Engine {
     maskWebhookUrl: vi.fn((url: string) => url.replace(/\/rest\/(\d+)\/[^/]+/, "/rest/$1/••••••")),
     prepareWorkspace: vi.fn(async () => undefined),
     refreshPeople: vi.fn(async () => 0),
+    sendChatMessage: vi.fn(async () => "1"),
     previewJourney: vi.fn(() => ({ activityCount: 0, spanDays: 0, firstDueAt: null, lastDueAt: null, byRole: {}, releasedNow: 0, missingAssignees: [] })),
     createJourney: vi.fn(() => ({ id: "journey-from-engine" })),
     applyJourneyAction: vi.fn(),

@@ -166,6 +166,8 @@ export class FakeBitrix {
   checklist = new Map<number, FakeChecklistItem>();
   comments: Array<{ id: number; taskId: number; message: string }> = [];
   notifications: Array<{ id: number; userId: number; message: string }> = [];
+  /** Mensagens de chat (`im.message.add`) da conta dona do webhook. */
+  chat: Array<{ id: number; dialogId: string; message: string }> = [];
   events: Array<{ id: number; ownerId: number; name: string; from: string; to: string; attendees: number[] }> = [];
   posts: Array<{ id: number; title: string; message: string; dest: string[] }> = [];
   stageHistory: FakeStageHistory[] = [];
@@ -450,6 +452,13 @@ export class FakeBitrix {
         const item = this.crmItems.get(`${Number(params.entityTypeId)}:${Number(params.id)}`);
         if (!item) throw new FakeFailure(400, "NOT_FOUND", "Element not found");
         return { result: { item: { id: item.id, title: item.title, stageId: item.stageId, categoryId: item.categoryId, ...item.fields } } };
+      }
+      case "im.message.add": {
+        const dialogId = String(params.DIALOG_ID ?? "");
+        this.requireUser(Number(dialogId));
+        const id = this.ids.notify++;
+        this.chat.push({ id, dialogId, message: String(params.MESSAGE ?? "") });
+        return { result: id };
       }
       case "im.notify.personal.add": {
         const userId = Number(params.USER_ID);

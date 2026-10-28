@@ -21,7 +21,8 @@ import type { ReceivedFile, ReceiveResult } from "./documents";
 import * as journeys from "./journeys";
 import * as people from "./people";
 import * as prepare from "./prepare";
-import { bitrixRateLimitedUntil as rateLimitedUntil } from "./runtime";
+import { sendChatMessage as chatMessage } from "../bitrix/methods";
+import { bitrixRateLimitedUntil as rateLimitedUntil, requireBitrix } from "./runtime";
 import * as scheduler from "./scheduler";
 import * as triggers from "./triggers";
 import type { Actor, SchedulerStatus, WebhookCheck } from "./types";
@@ -51,6 +52,11 @@ export async function prepareWorkspace(input: PrepareInput, actor: Actor): Promi
 /* ───────────── Pessoas ───────────── */
 
 /** Atualiza o cache local de usuários ativos do Bitrix. Devolve quantos foram gravados. */
+/** Mensagem no chat do Bitrix24 com a pessoa (escopo im), pedida pelo RH na tela. Não passa pela fila: sem reenvio. */
+export async function sendChatMessage(userId: string, message: string): Promise<string> {
+  return chatMessage(requireBitrix(), userId, message);
+}
+
 export async function refreshPeople(): Promise<number> {
   return people.refreshPeople();
 }

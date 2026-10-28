@@ -63,7 +63,7 @@ export function revokeCollaboratorLink(journeyId: string, actor: Actor): Collabo
 }
 
 /** Jornada do token, se o link ainda vale (não revogado, não expirado, jornada não cancelada). */
-function journeyForToken(token: string, now: number): JourneyRow | null {
+export function journeyForToken(token: string, now: number): JourneyRow | null {
   if (!TOKEN_SHAPE.test(token)) return null;
   const journey = findJourneyByLinkHash(hashToken(token));
   if (!journey || journey.status === "cancelled") return null;

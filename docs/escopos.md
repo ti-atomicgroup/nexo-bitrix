@@ -17,7 +17,7 @@ permissões da conta que criou o webhook. Recomendamos uma **conta dedicada ao N
 
 | Escopo | Rótulo no Bitrix | Para que o Nexo usa | Método |
 |---|---|---|---|
-| `im` | Bate-papo e notificações | Avisar o colaborador e os responsáveis quando uma etapa é liberada | `im.notify.personal.add` |
+| `im` | Bate-papo e notificações | Avisar o colaborador e os responsáveis quando uma etapa é liberada; enviar no chat o link pessoal e o lembrete do que falta, quando o RH pede | `im.notify.personal.add`, `im.message.add` |
 | `calendar` | Calendário | Colocar 1:1 e entrevista de saída na agenda dos participantes | `calendar.event.add` |
 | `log` | Feed de notícias | Publicar as boas-vindas no 1º dia | `log.blogpost.add` |
 | `user` | Usuários (completo) | Convidar para o Bitrix24 quem ainda não tem conta, na nova jornada ou na página da jornada. Só funciona se a conta dona do webhook for **administradora** do portal | `user.get`, `user.add` |
