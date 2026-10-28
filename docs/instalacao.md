@@ -45,7 +45,9 @@ Pronto. Não há variáveis de ambiente para preencher nem chaves para gerar.
 
 1. Repositório público no GitHub com este código; branch de publicação (ex.: `nexo-v2`).
 2. Na Onnira, crie ou edite a aplicação apontando para o repositório e a branch. Diretório base `/`.
-3. Comandos padrão de Next.js: `npm ci`, `npm run build`, `npm start` (porta 3000).
+3. Comandos padrão de Next.js: `npm ci`, `npm run build`, `npm start` (porta 3000). No envio por ZIP, escolha
+   "Outro / configurar manualmente" e informe esses três comandos. Node 22 ou superior (`.nvmrc` e `engines`).
+   Teste de saúde: `/health` ou `/api/health`, que respondem 200 sem tocar no banco.
 4. Os dados ficam no volume persistente, a pasta oculta `.data` do projeto (`/app/.data`; equivale ao `./data` local): banco SQLite, chave da instância e registros. Em Ajustes → Diagnóstico, a pasta de dados deve aparecer como `onnira-volume`; se aparecer `local`, os dados se perdem a cada publicação.
 
 ### Worker do Bitrix24

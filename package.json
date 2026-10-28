@@ -4,7 +4,7 @@
   "private": true,
   "description": "Nexo: onboarding e offboarding de colaboradores integrados ao Bitrix24, hospedado na Onnira Cloud.",
   "engines": {
-    "node": ">=20.9"
+    "node": ">=22"
   },
   "scripts": {
     "dev": "next dev",

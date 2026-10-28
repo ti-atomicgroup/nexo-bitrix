@@ -35,9 +35,12 @@ function startWorker() {
   });
 }
 
+log("info", "starting", { node: process.version, port, workerPort });
 startWorker();
 
-const web = spawn(process.execPath, ["--disable-warning=ExperimentalWarning", join(root, "node_modules", "next", "dist", "bin", "next"), "start", "-H", "0.0.0.0"], {
+// `--disable-warning` só existe a partir do Node 20.11 e 21.3; antes disso o Node recusaria a opção e o Nexo não subiria.
+const quiet = process.allowedNodeEnvironmentFlags.has("--disable-warning") ? ["--disable-warning=ExperimentalWarning"] : [];
+const web = spawn(process.execPath, [...quiet, join(root, "node_modules", "next", "dist", "bin", "next"), "start", "-H", "0.0.0.0"], {
   cwd: root,
   env,
   stdio: "inherit",
