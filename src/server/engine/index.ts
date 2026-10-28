@@ -76,6 +76,11 @@ export function linkJourneyPerson(journeyId: string, bitrixUserId: string, actor
   journeys.linkJourneyPerson(journeyId, bitrixUserId, actor);
 }
 
+/** Convida a pessoa sem conta para o Bitrix24 (`user.add` pela fila); a conta nova é vinculada sozinha. */
+export function inviteJourneyPerson(journeyId: string, email: string, actor: Actor): void {
+  journeys.inviteJourneyPerson(journeyId, email, actor);
+}
+
 /** complete | reopen | approve | nudge | toggle_item | resend_documents. Atualiza localmente e enfileira a escrita no Bitrix. */
 export function applyActivityAction(activityId: string, input: ActivityActionInput, actor: Actor): void {
   actions.applyActivityAction(activityId, input, actor);

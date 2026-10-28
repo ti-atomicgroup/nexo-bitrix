@@ -17,6 +17,7 @@ export function engineMock(): typeof Engine {
     createJourney: vi.fn(() => ({ id: "journey-from-engine" })),
     applyJourneyAction: vi.fn(),
     linkJourneyPerson: vi.fn(),
+    inviteJourneyPerson: vi.fn(),
     applyActivityAction: vi.fn(),
     markDoneFromLink: vi.fn(() => ({ ok: true, message: "Feito." })),
     documentsEnabled: vi.fn(() => false),

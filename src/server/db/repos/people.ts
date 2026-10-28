@@ -12,6 +12,9 @@ export interface PersonRow {
   department: string | null;
   active: boolean;
   source: "bitrix" | "manual" | "crm";
+  /** Convite para o Bitrix24: enviando (na fila) ou falhou (com o motivo). */
+  inviteStatus: "sending" | "failed" | null;
+  inviteError: string | null;
   updatedAt: string;
 }
 
@@ -34,6 +37,8 @@ function map(row: Record<string, unknown>): PersonRow {
     department: toStringOrNull(row.department),
     active: toBool(row.active),
     source: row.source as PersonRow["source"],
+    inviteStatus: (toStringOrNull(row.invite_status) as PersonRow["inviteStatus"]) ?? null,
+    inviteError: toStringOrNull(row.invite_error),
     updatedAt: String(row.updated_at),
   };
 }
@@ -117,6 +122,18 @@ export function linkPersonToBitrix(personId: string, bitrixUserId: string): Pers
   });
 }
 
+/** Situação do convite para o Bitrix24 (`null` limpa). Com `email`, grava o e-mail que recebe o convite. */
+export function setPersonInvite(personId: string, invite: { status: "sending" | "failed"; error?: string | null; email?: string } | null): void {
+  const db = getDb();
+  if (invite?.email) db.prepare("UPDATE people SET email = ? WHERE id = ?").run(invite.email.trim(), personId);
+  db.prepare("UPDATE people SET invite_status = ?, invite_error = ?, updated_at = ? WHERE id = ?").run(
+    invite?.status ?? null,
+    invite?.status === "failed" ? (invite.error ?? null) : null,
+    nowIso(),
+    personId,
+  );
+}
+
 export function toPersonDTO(row: PersonRow): PersonDTO {
   return {
     id: row.id,
@@ -127,5 +144,6 @@ export function toPersonDTO(row: PersonRow): PersonDTO {
     department: row.department,
     active: row.active,
     source: row.source,
+    invite: row.inviteStatus ? { status: row.inviteStatus, error: row.inviteError } : null,
   };
 }

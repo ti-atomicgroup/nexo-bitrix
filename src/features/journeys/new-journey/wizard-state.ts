@@ -9,6 +9,8 @@ export interface WizardState {
   bitrixPerson: UserRef | null;
   manualName: string;
   manualEmail: string;
+  /** Convidar a pessoa para o Bitrix24 pelo e-mail (pessoa sem conta). */
+  invite: boolean;
   templateId: string | null;
   anchorDate: string;
   reason: OffboardingReason | null;
@@ -26,6 +28,7 @@ export function initialState(settings: SettingsDTO | null, detection: DetectionD
     bitrixPerson: null,
     manualName: "",
     manualEmail: "",
+    invite: false,
     templateId: null,
     anchorDate: "",
     reason: null,
@@ -67,6 +70,7 @@ export function validateStep(step: number, state: WizardState): WizardErrors {
           errors[field] ??= issue.message;
         }
       }
+      if (state.invite && !state.manualEmail.trim()) errors.manualEmail ??= "Informe o e-mail para enviar o convite do Bitrix24.";
     }
   }
   if (step === 1) {
@@ -92,7 +96,7 @@ export function buildInput(state: WizardState, requestId: string): CreateJourney
     requestId,
     kind: state.kind,
     person: manual
-      ? { name: state.manualName.trim(), ...(state.manualEmail.trim() ? { email: state.manualEmail.trim() } : {}) }
+      ? { name: state.manualName.trim(), ...(state.manualEmail.trim() ? { email: state.manualEmail.trim() } : {}), ...(state.invite ? { invite: true } : {}) }
       : { bitrixUserId: state.bitrixPerson?.bitrixUserId ?? "" },
     templateId: state.templateId,
     anchorDate: state.anchorDate,

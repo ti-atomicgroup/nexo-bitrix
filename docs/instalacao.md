@@ -13,6 +13,8 @@ Tempo estimado: **5 minutos**. Você vai precisar de:
    - **Obrigatórias:** Tarefas (`task`), Usuários (`user_brief` ou `user`), CRM (`crm`) e Grupos de trabalho (`sonet_group`).
    - **Opcionais:** Bate-papo e notificações (`im`), Calendário (`calendar`), Feed de notícias (`log`) e Drive (`disk`).
      Sem o Drive, o link pessoal mostra os documentos pedidos só como lista, sem envio de arquivos.
+   - **Para convidar pelo Nexo:** Usuários (`user`) no lugar de `user_brief`, num webhook de conta **administradora**.
+     Sem isso, quem ainda não tem conta é convidado pelo Bitrix24 e vinculado na página da jornada.
 4. Clique em **Salvar** e só depois copie o **endereço do webhook**. Ele muda ao salvar.
 
 > Dica: crie o webhook com uma conta dedicada ao Nexo. As tarefas aparecem como criadas por essa conta, e o acesso

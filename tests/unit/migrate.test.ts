@@ -72,7 +72,7 @@ describe("migrações", () => {
     const insert = db.prepare("INSERT INTO template_activities (id, stage_id, position, title, role, visibility) VALUES (?, 's1', ?, ?, ?, ?)");
     insert.run("a1", 0, "Envie seus documentos", "colaborador", "employee");
     insert.run("a2", 1, "Envie seus documentos", "rh", "team");
-    expect(migrate(db)).toEqual([2, 3, 4]);
+    expect(migrate(db)).toEqual([2, 3, 4, 5]);
     const documents = (id: string) => JSON.parse(String(db.prepare("SELECT documents FROM template_activities WHERE id = ?").get<{ documents: string }>(id)?.documents));
     expect(documents("a1").map((item: { key: string }) => item.key)).toEqual(["documento-com-foto", "comprovante-residencia", "dados-bancarios"]);
     expect(documents("a2")).toEqual([]);
@@ -95,7 +95,7 @@ describe("migrações", () => {
     db.prepare("INSERT INTO template_activities (id, stage_id, position, title, role, visibility, instructions, documents) VALUES ('a1','s1',0,'Envie seus documentos','colaborador','employee',?, '[{\"key\":\"rg\"}]')").run(
       "Envie ao RH os documentos pedidos na mensagem de boas-vindas. Se tiver qualquer dúvida, fale com o RH.",
     );
-    expect(migrate(db)).toEqual([3, 4]);
+    expect(migrate(db)).toEqual([3, 4, 5]);
     const latest = (id: string) => db.prepare("SELECT release_latest_offset_days AS days, release_offset_unit AS unit FROM template_stages WHERE id = ?").get(id);
     expect(latest("s2")).toEqual({ days: 2, unit: "business" });
     expect(latest("s3")).toMatchObject({ days: null });

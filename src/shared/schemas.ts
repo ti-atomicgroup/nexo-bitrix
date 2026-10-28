@@ -140,7 +140,8 @@ export const templateInput = z
 
 export const journeyPersonInput = z.union([
   z.object({ bitrixUserId: bitrixUserIdSchema }),
-  z.object({ name: text(120), email: emailSchema.optional() }),
+  /** `invite`: o Bitrix24 convida a pessoa pelo e-mail e a conta nova recebe as tarefas dela. */
+  z.object({ name: text(120), email: emailSchema.optional(), invite: z.boolean().optional() }),
 ]);
 
 export const createJourneyInput = z
@@ -162,6 +163,9 @@ export const createJourneyInput = z
     if (input.kind === "offboarding" && !("bitrixUserId" in input.person)) {
       ctx.addIssue({ code: "custom", path: ["person"], message: "No desligamento, escolha a pessoa no Bitrix24." });
     }
+    if ("name" in input.person && input.person.invite && !input.person.email) {
+      ctx.addIssue({ code: "custom", path: ["person", "email"], message: "Informe o e-mail para enviar o convite do Bitrix24." });
+    }
   });
 
 export const journeyPreviewInput = createJourneyInput;
@@ -171,7 +175,8 @@ export const journeyActionInput = z.object({
   reason: z.string().trim().max(500).optional(),
 });
 
-export const linkPersonInput = z.object({ bitrixUserId: bitrixUserIdSchema });
+/** Vincula uma conta que já existe ou convida a pessoa para o Bitrix24 pelo e-mail. */
+export const linkPersonInput = z.union([z.object({ bitrixUserId: bitrixUserIdSchema }), z.object({ inviteEmail: emailSchema })]);
 
 export const collaboratorLinkInput = z.object({ action: z.enum(["create", "revoke"]) });
 
@@ -272,6 +277,7 @@ export type TemplateInput = z.infer<typeof templateInput>;
 export type TemplateActivityInput = z.infer<typeof templateActivityInput>;
 export type CreateJourneyInput = z.infer<typeof createJourneyInput>;
 export type JourneyActionInput = z.infer<typeof journeyActionInput>;
+export type LinkPersonInput = z.infer<typeof linkPersonInput>;
 export type ActivityActionInput = z.infer<typeof activityActionInput>;
 export type LedgerItemInput = z.infer<typeof ledgerItemInput>;
 export type TriggerInput = z.infer<typeof triggerInput>;

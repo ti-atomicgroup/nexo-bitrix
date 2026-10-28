@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { BoardingPass } from "@/components/lines/boarding-pass";
 import { Button, ButtonLink } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ChoiceCards } from "@/components/ui/choice-cards";
 import { Field } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
@@ -42,10 +43,12 @@ export interface JourneyWizardProps {
   templates: ApiState<TemplateSummaryDTO[]>;
   detection: DetectionDTO | null;
   companyName: string | null;
+  /** O webhook tem a permissão Usuários (user): dá para convidar a pessoa para o Bitrix24 daqui. */
+  invitesEnabled: boolean;
 }
 
 /** Assistente de nova jornada: quem → trilha e data → participantes e resumo. */
-export function JourneyWizard({ initial, templates, detection, companyName }: JourneyWizardProps) {
+export function JourneyWizard({ initial, templates, detection, companyName, invitesEnabled }: JourneyWizardProps) {
   const router = useRouter();
   const toast = useToast();
   const now = useNow(60_000);
@@ -200,16 +203,31 @@ export function JourneyWizard({ initial, templates, detection, companyName }: Jo
                     error={errors.manualName}
                   />
                   <Field
-                    label="E-mail pessoal"
+                    label={state.invite ? "E-mail" : "E-mail pessoal"}
                     type="email"
-                    optional
+                    optional={!state.invite}
                     autoComplete="off"
-                    hint="Para enviar o link de boas-vindas antes do primeiro dia."
+                    hint={state.invite ? "O convite do Bitrix24 chega aqui, e este e-mail vira o login da pessoa." : "Para enviar o link de boas-vindas antes do primeiro dia."}
                     value={state.manualEmail}
                     onChange={(event) => update({ manualEmail: event.target.value })}
                     error={errors.manualEmail}
                   />
-                  <p className={styles.note}>Quando a conta no Bitrix24 existir, vincule-a na página da jornada para as tarefas da pessoa serem criadas.</p>
+                  {invitesEnabled ? (
+                    <Checkbox
+                      className={styles.wide}
+                      label="Convidar para o Bitrix24"
+                      description="O Bitrix24 cria a conta e manda o convite para o e-mail. As tarefas da pessoa já vão para a conta nova."
+                      checked={state.invite}
+                      onChange={(event) => update({ invite: event.target.checked })}
+                    />
+                  ) : null}
+                  {!state.invite ? (
+                    <p className={styles.note}>
+                      {invitesEnabled
+                        ? "Sem convite, vincule a conta na página da jornada quando ela existir no Bitrix24."
+                        : "Quando a conta no Bitrix24 existir, vincule-a na página da jornada para as tarefas da pessoa serem criadas. Para convidar daqui, o webhook precisa da permissão Usuários (user) e ser de uma conta administradora."}
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
             </section>

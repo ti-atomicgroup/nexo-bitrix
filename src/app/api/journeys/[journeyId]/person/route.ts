@@ -5,5 +5,5 @@ import { linkPersonInput } from "@/shared/schemas";
 export const dynamic = "force-dynamic";
 
 export const POST = route({ auth: "user", params: ["journeyId"], input: linkPersonInput }, ({ params, input, actor }) =>
-  linkPerson(params.journeyId, input.bitrixUserId, actor),
+  linkPerson(params.journeyId, input, actor),
 );

@@ -75,6 +75,37 @@ export async function listActiveUsers(client: BitrixClient, options: { includeIn
     .filter((user) => user.bitrixUserId && (options.includeInactive || user.active));
 }
 
+/* ───────────── convite (escopo user; o dono do webhook precisa ser administrador) ───────────── */
+
+/** Conta com este e-mail (ativa, convidada ou desativada), sem extranet nem bots. */
+export async function findUserByEmail(client: BitrixClient, email: string): Promise<BitrixUserInfo | null> {
+  const raw = await client.call<unknown>("user.get", { FILTER: { EMAIL: email } });
+  const wanted = email.trim().toLowerCase();
+  const match = (Array.isArray(raw) ? raw : [])
+    .filter((user) => !EXTERNAL_USER_TYPES.has(text(asRecord(user).USER_TYPE)))
+    .map(parseUser)
+    .find((user) => user.bitrixUserId && user.email?.toLowerCase() === wanted);
+  return match ?? null;
+}
+
+/** Departamentos (`UF_DEPARTMENT`) de uma conta: o convidado entra no mesmo departamento. */
+export async function userDepartments(client: BitrixClient, userId: string): Promise<string[]> {
+  const raw = await client.call<unknown>("user.get", { FILTER: { ID: userId } });
+  const user = asRecord(Array.isArray(raw) ? raw[0] : null);
+  const departments = Array.isArray(user.UF_DEPARTMENT) ? user.UF_DEPARTMENT : [];
+  return departments.map((value) => text(value)).filter((value) => /^\d+$/.test(value));
+}
+
+/** `user.add`: o Bitrix24 cria a conta e manda o convite para o e-mail. Devolve o ID da conta nova. */
+export async function inviteUser(client: BitrixClient, input: { email: string; name: string; departmentId: string }): Promise<string> {
+  const [first = input.name, ...rest] = input.name.trim().split(/\s+/);
+  const id = text(
+    await client.call("user.add", { EMAIL: input.email, NAME: first, LAST_NAME: rest.join(" "), EXTRANET: "N", UF_DEPARTMENT: [Number(input.departmentId)] }),
+  );
+  if (!/^\d+$/.test(id)) throw invalidResponse(true);
+  return id;
+}
+
 /* ───────────── projeto (escopo sonet_group) ───────────── */
 
 export async function findGroupByName(client: BitrixClient, name: string): Promise<{ id: string; name: string } | null> {

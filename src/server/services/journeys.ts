@@ -1,7 +1,7 @@
 import "server-only";
 import type { ActivityDTO, JourneyDTO, JourneyPreviewDTO } from "@/shared/contracts";
-import type { ActivityActionInput, CreateJourneyInput, JourneyActionInput } from "@/shared/schemas";
-import { applyActivityAction, applyJourneyAction, createJourney, linkJourneyPerson, previewJourney, type Actor } from "@/server/engine";
+import type { ActivityActionInput, CreateJourneyInput, JourneyActionInput, LinkPersonInput } from "@/shared/schemas";
+import { applyActivityAction, applyJourneyAction, createJourney, inviteJourneyPerson, linkJourneyPerson, previewJourney, type Actor } from "@/server/engine";
 import { getActivity } from "../db/repos/activities";
 import { getJourney } from "../db/repos/journeys";
 import { activityNotFound, buildActivityDTOById, buildJourneyDTO, journeyNotFound } from "./read/journeys";
@@ -27,9 +27,10 @@ export function runJourneyAction(id: string, input: JourneyActionInput, actor: A
   return buildJourneyDTO(id);
 }
 
-export function linkPerson(id: string, bitrixUserId: string, actor: Actor): JourneyDTO {
+export function linkPerson(id: string, input: LinkPersonInput, actor: Actor): JourneyDTO {
   requireJourney(id);
-  linkJourneyPerson(id, bitrixUserId, actor);
+  if ("inviteEmail" in input) inviteJourneyPerson(id, input.inviteEmail, actor);
+  else linkJourneyPerson(id, input.bitrixUserId, actor);
   return buildJourneyDTO(id);
 }
 

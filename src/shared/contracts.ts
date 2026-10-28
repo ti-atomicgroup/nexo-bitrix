@@ -42,6 +42,8 @@ export interface PersonDTO {
   department: string | null;
   active: boolean;
   source: "bitrix" | "manual" | "crm";
+  /** Convite para o Bitrix24 em andamento ou que falhou (pessoa ainda sem conta). */
+  invite?: { status: "sending" | "failed"; error: string | null } | null;
 }
 
 /* ───────────── Trilhas (modelos) ───────────── */
@@ -444,6 +446,8 @@ export interface SettingsDTO {
   features: { notifications: boolean; calendar: boolean; feed: boolean };
   /** Pedido de documentos: o webhook precisa da permissão Drive (disk). */
   documentsEnabled?: boolean;
+  /** Convite para o Bitrix24 na nova jornada: o webhook precisa da permissão Usuários (user). */
+  invitesEnabled?: boolean;
 }
 
 export interface AppUserDTO {

@@ -100,6 +100,7 @@ class FakeFailure extends Error {
 
 const SCOPE_BY_PREFIX: Array<[RegExp, string[]]> = [
   [/^user\.get$/, ["user", "user_brief", "user_basic"]],
+  [/^user\.add$/, ["user"]],
   [/^sonet_group\./, ["sonet_group", "sonet"]],
   [/^tasks?\./, ["task"]],
   [/^crm\./, ["crm"]],
@@ -153,6 +154,10 @@ export class FakeBitrix {
   readonly secret: string;
   scopes: string[];
   ownerId: number;
+  /** `user.add` só funciona para administrador do portal. */
+  ownerIsAdmin = true;
+  /** Departamento (`UF_DEPARTMENT`) de cada conta; sem registro, o departamento 1. */
+  departments = new Map<number, number[]>();
   now: () => Date = () => new Date();
 
   users = new Map<number, FakeUser>();
@@ -374,6 +379,8 @@ export class FakeBitrix {
         return { result: [...this.scopes] };
       case "user.get":
         return this.userGet(params);
+      case "user.add":
+        return { result: this.userAdd(params) };
       case "sonet_group.get":
         return this.groupGet(params);
       case "sonet_group.create":
@@ -556,7 +563,7 @@ export class FakeBitrix {
   }
 
   private userPayload(user: FakeUser): Record<string, unknown> {
-    return { ID: String(user.id), ACTIVE: user.active, NAME: user.name, LAST_NAME: user.lastName, EMAIL: user.email, WORK_POSITION: user.position, USER_TYPE: user.userType, UF_DEPARTMENT: [1] };
+    return { ID: String(user.id), ACTIVE: user.active, NAME: user.name, LAST_NAME: user.lastName, EMAIL: user.email, WORK_POSITION: user.position, USER_TYPE: user.userType, UF_DEPARTMENT: this.departments.get(user.id) ?? [1] };
   }
 
   private page<T>(items: T[], params: Record<string, unknown>): { page: T[]; next?: number; total: number } {
@@ -567,9 +574,29 @@ export class FakeBitrix {
 
   private userGet(params: Record<string, unknown>) {
     const filter = asObject(params.FILTER ?? params.filter);
-    const users = [...this.users.values()].filter((user) => (filter.ACTIVE === undefined ? true : truthy(filter.ACTIVE) === user.active)).sort((a, b) => a.id - b.id);
+    const users = [...this.users.values()]
+      .filter((user) => (filter.ACTIVE === undefined ? true : truthy(filter.ACTIVE) === user.active))
+      .filter((user) => filter.ID === undefined || String(filter.ID) === String(user.id))
+      .filter((user) => filter.EMAIL === undefined || String(filter.EMAIL).toLowerCase() === user.email.toLowerCase())
+      .sort((a, b) => a.id - b.id);
     const { page, next, total } = this.page(users, params);
     return { result: page.map((user) => this.userPayload(user)), total, ...(next !== undefined ? { next } : {}) };
+  }
+
+  /** Como o portal: só administrador convida, e-mail repetido é recusado, intranet exige departamento. */
+  private userAdd(params: Record<string, unknown>): number {
+    if (!this.ownerIsAdmin) throw new FakeFailure(403, "ACCESS_DENIED", "Access denied.");
+    const email = String(params.EMAIL ?? "").trim();
+    if (!email) throw new FakeFailure(400, "ERROR_CORE", "Email is required");
+    if ([...this.users.values()].some((user) => user.email.toLowerCase() === email.toLowerCase())) {
+      throw new FakeFailure(400, "ERROR_CORE", "User with this email already exists");
+    }
+    const departments = asList(params.UF_DEPARTMENT).map(Number).filter((id) => id > 0);
+    if (!truthy(params.EXTRANET) && !departments.length) throw new FakeFailure(400, "ERROR_CORE", "UF_DEPARTMENT is required");
+    const id = Math.max(...this.users.keys()) + 1;
+    this.addUser({ id, name: String(params.NAME ?? ""), lastName: String(params.LAST_NAME ?? ""), email });
+    this.departments.set(id, departments);
+    return id;
   }
 
   private groupGet(params: Record<string, unknown>) {

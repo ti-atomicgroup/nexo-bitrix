@@ -41,6 +41,7 @@ export function NewJourneyScreen({ detectionId }: { detectionId?: string }) {
           templates={templates}
           detection={detection.data ?? null}
           companyName={settings.data?.company.name ?? null}
+          invitesEnabled={Boolean(settings.data?.invitesEnabled)}
         />
       ) : (
         <LoadingArea label="Preparando o assistente…">

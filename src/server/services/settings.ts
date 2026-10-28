@@ -55,6 +55,7 @@ export function getSettings(): SettingsDTO {
     content: getContent(),
     features: { notifications: features.notifications, calendar: features.calendar, feed: features.feed },
     documentsEnabled: webhook ? scopeCheck(webhook.scopes).optional.disk : false,
+    invitesEnabled: webhook ? webhook.scopes.includes("user") : false,
   };
 }
 

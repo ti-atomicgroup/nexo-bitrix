@@ -7,9 +7,9 @@ import { getDb } from "../db";
 import { insertActivities, listActivities, updateActivity, type ActivityRow } from "../db/repos/activities";
 import { audit } from "../db/repos/audit";
 import { getDetection, updateDetection } from "../db/repos/detections";
-import { findJourneyBySourceKey, getJourney, insertJourney, listJourneys, updateJourney, type JourneyRow } from "../db/repos/journeys";
+import { findJourneyBySourceKey, getJourney, insertJourney, updateJourney, type JourneyRow } from "../db/repos/journeys";
 import { listActiveLedger, listLedger, updateLedgerItem, type LedgerRow } from "../db/repos/ledger";
-import { createPerson, findPerson, findPersonByBitrixId, linkPersonToBitrix, type PersonRow } from "../db/repos/people";
+import { createPerson, findPerson, findPersonByBitrixId, type PersonRow } from "../db/repos/people";
 import { getCompany, getDefaults, getSetupStage } from "../db/repos/settings";
 import { getTemplate } from "../db/repos/templates";
 import { getTrigger } from "../db/repos/triggers";
@@ -20,6 +20,7 @@ import { revokeChecklist } from "../domain/ledger";
 import { stagesToRelease } from "../domain/release";
 import { AppError, notFound } from "../errors";
 import { scheduleWelcomePost } from "./extras";
+import { attachBitrixAccount, INVITE_SCOPE_MESSAGE, invitesEnabled, requestInvite } from "./invite";
 import { enqueuePushes, releaseJourney } from "./release";
 import { kick } from "./scheduler";
 import { crmBinding } from "./triggers";
@@ -38,7 +39,7 @@ interface JourneyPlan {
   /** Cópia da trilha usada pela jornada (com a tarefa "Revogar e recolher" injetada na saída, se preciso). */
   snapshot: TemplateDTO;
   person: PersonRow | null;
-  draftPerson: { name: string; email: string | null } | null;
+  draftPerson: { name: string; email: string | null; invite: boolean } | null;
   participants: Participants;
   activities: ActivityRow[];
   missingRoles: ActivityRole[];
@@ -128,7 +129,7 @@ function planJourney(input: CreateJourneyInput, strict: boolean): JourneyPlan {
       throw new AppError("PERSON_NOT_FOUND", "Não encontramos essa pessoa na lista do Bitrix24. Atualize a lista de pessoas e tente de novo.", 422);
     }
   } else {
-    draftPerson = { name: input.person.name.trim(), email: input.person.email?.trim() || null };
+    draftPerson = { name: input.person.name.trim(), email: input.person.email?.trim() || null, invite: Boolean(input.person.invite) };
   }
   const participants = resolveParticipants(input.participants, strict);
   const revokeLedger = input.kind === "offboarding" && person ? listActiveLedger(person.id) : [];
@@ -216,6 +217,7 @@ export function createJourney(input: CreateJourneyInput, actor: Actor): { id: st
   if (existing) return { id: existing.id };
   if (getSetupStage() !== "ready") throw new AppError("SETUP_REQUIRED", "Conclua a preparação do Nexo antes de iniciar jornadas.", 409);
   const plan = planJourney(input, true);
+  if (plan.draftPerson?.invite && !invitesEnabled()) throw new AppError("INVITE_SCOPE", INVITE_SCOPE_MESSAGE, 409);
   if (plan.missingRoles.length) throw new AppError("ASSIGNEE_REQUIRED", missingAssigneeMessage(plan.missingRoles), 422, { roles: plan.missingRoles });
   const trigger = detection ? getTrigger(detection.triggerId) : null;
   const id = getDb().tx(() => {
@@ -257,6 +259,7 @@ export function createJourney(input: CreateJourneyInput, actor: Actor): { id: st
     });
     releaseJourney(journey, { timezone: plan.timezone, initial: true });
     enqueuePushes();
+    if (plan.draftPerson?.invite && plan.draftPerson.email) requestInvite(person.id, plan.draftPerson.email, journey.id);
     scheduleWelcomePost(journey, plan.timezone);
     return journey.id;
   });
@@ -347,16 +350,24 @@ export function linkJourneyPerson(journeyId: string, bitrixUserId: string, actor
   const target = findPersonByBitrixId(bitrixUserId);
   if (!target) throw new AppError("PERSON_NOT_FOUND", "Não encontramos essa conta na lista de pessoas. Atualize a lista e tente de novo.", 422);
   getDb().tx(() => {
-    const linked = linkPersonToBitrix(person.id, bitrixUserId);
-    for (const item of listJourneys({ personId: linked.id, status: ["active", "paused"] })) {
-      for (const activity of listActivities(item.id)) {
-        if (activity.role === "colaborador" && !activity.assigneeBitrixId && activity.status !== "done" && activity.status !== "cancelled") {
-          updateActivity(activity.id, { assigneeBitrixId: bitrixUserId, assigneeName: linked.name });
-        }
-      }
-    }
+    const linked = attachBitrixAccount(person.id, bitrixUserId);
     auditJourney(journey, actor, "Conta do Bitrix24 vinculada", `${person.name} agora é ${linked.name} no Bitrix24; as tarefas do colaborador vão para lá.`);
-    enqueuePushes();
+  });
+  kick();
+}
+
+/** Convida a pessoa sem conta para o Bitrix24 pelo e-mail (de novo, se o convite anterior falhou). */
+export function inviteJourneyPerson(journeyId: string, email: string, actor: Actor): void {
+  const journey = getJourney(journeyId);
+  if (!journey) throw notFound("Jornada");
+  if (journey.status === "completed" || journey.status === "cancelled") throw closedJourney();
+  const person = findPerson(journey.personId);
+  if (!person) throw notFound("Pessoa");
+  if (person.bitrixUserId) throw new AppError("PERSON_ALREADY_LINKED", "Esta pessoa já tem conta no Bitrix24.", 409);
+  if (!invitesEnabled()) throw new AppError("INVITE_SCOPE", INVITE_SCOPE_MESSAGE, 409);
+  getDb().tx(() => {
+    requestInvite(person.id, email, journey.id);
+    auditJourney(journey, actor, "Convite para o Bitrix24 pedido", `O Nexo vai convidar ${person.name} pelo e-mail ${email.trim()}.`);
   });
   kick();
 }

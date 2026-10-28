@@ -6,6 +6,7 @@ import { completeJob, failJob, takeDueJobs, type JobRow } from "../db/repos/jobs
 import { log } from "../log";
 import { handleDocumentSend, markDocumentFailed } from "./documents";
 import { handleFeedPost, handleMeetingCreate, handleNotify } from "./extras";
+import { handlePersonInvite, markInviteFailed } from "./invite";
 import { errorMessage, RetryLater } from "./job-errors";
 import { refreshPeople } from "./people";
 import { JOB_KINDS, PUSH_ALIASES } from "./queue";
@@ -29,6 +30,7 @@ const HANDLERS: Record<string, JobHandler> = {
   [JOB_KINDS.meetingCreate]: handleMeetingCreate,
   [JOB_KINDS.feedPost]: handleFeedPost,
   [JOB_KINDS.documentSend]: handleDocumentSend,
+  [JOB_KINDS.personInvite]: handlePersonInvite,
   ...Object.fromEntries(PUSH_ALIASES.map((alias) => [alias, handleActivityPush])),
 };
 
@@ -42,6 +44,7 @@ export function retryDelay(attempts: number): number {
 
 function finalFailure(job: JobRow, message: string): void {
   if (job.kind === JOB_KINDS.documentSend && typeof job.payload.documentId === "string") markDocumentFailed(job.payload.documentId, message);
+  if (job.kind === JOB_KINDS.personInvite && typeof job.payload.personId === "string") markInviteFailed(job.payload.personId, message);
   const activityId = typeof job.payload.activityId === "string" ? job.payload.activityId : null;
   if (activityId && ACTIVITY_SYNC_KINDS.has(job.kind) && getActivity(activityId)) {
     updateActivity(activityId, { syncState: "error", syncError: message });
