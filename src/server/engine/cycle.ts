@@ -2,11 +2,11 @@ import "server-only";
 import { isBitrixError } from "../bitrix/errors";
 import { rateLimitedUntil } from "../bitrix/limiter";
 import { purgeDoneJobs, requeueStuckJobs } from "../db/repos/jobs";
-import { acquireLease } from "../db/repos/leases";
+import { acquireLease, releaseLease } from "../db/repos/leases";
 import { getSetupStage, getWebhookRecord, patchSyncState } from "../db/repos/settings";
 import { log } from "../log";
 import { errorMessage } from "./job-errors";
-import { runDueJobs } from "./jobs";
+import { inFlightJobIds, runDueJobs } from "./jobs";
 import { refreshPeopleIfStale } from "./people";
 import { pollChecklists, pollOpenTasks } from "./poll";
 import { enqueuePushes, releaseDueStages } from "./release";
@@ -79,7 +79,7 @@ export async function runCycle(): Promise<CycleReport> {
   await local("context", () => {
     ctx = engineContext();
   });
-  await local("requeue", () => requeueStuckJobs(new Date(Date.now() - STUCK_JOB_MS).toISOString()));
+  await local("requeue", () => requeueStuckJobs(new Date(Date.now() - STUCK_JOB_MS).toISOString(), inFlightJobIds()));
   await local("release", () => releaseDueStages());
   await local("push", () => enqueuePushes());
   await remote("jobs", (context) => runDueJobs(context));
@@ -99,6 +99,12 @@ export async function runCycle(): Promise<CycleReport> {
     patchSyncState({ lastCycleAt: new Date(started).toISOString(), lastCycleMs: ms, lastError: errors[0] ?? null, rateLimitedUntil: rateLimitedUntil() });
   } catch (error) {
     log.error("cycle_state_failed", { error });
+  }
+  // Solta o lease ao terminar: um processo novo (republicação, reinício) não espera os 3 min do prazo para sincronizar.
+  try {
+    releaseLease("cycle", processId());
+  } catch (error) {
+    log.error("cycle_lease_release_failed", { error });
   }
   return { ran: true, errors, followUp, ms };
 }

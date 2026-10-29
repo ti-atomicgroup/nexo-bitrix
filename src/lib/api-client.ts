@@ -162,7 +162,8 @@ function isApiErrorBody(value: unknown): value is ApiErrorDTO {
 
 function fallbackMessage(status: number): string {
   if (status === 401) return "Sua sessão terminou. Entre de novo.";
-  if (status === 403) return "Seu acesso não permite esta ação. Fale com quem administra o Nexo.";
+  // O 403 do próprio Nexo vem em JSON com mensagem; sem JSON, quem recusou foi a hospedagem (na Onnira, a autorização do painel vence em 10 min).
+  if (status === 403) return "A autorização do painel da hospedagem venceu. Recarregue a página (F5) e abra o Nexo de novo.";
   if (status === 404) return "Não encontramos o que você procurou. Ele pode ter sido removido.";
   if (status === 409) return "Alguém mudou estes dados agora há pouco. Recarregue e tente de novo.";
   if (status === 429) return "Muitas tentativas seguidas. Espere um pouco e tente de novo.";

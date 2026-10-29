@@ -1,7 +1,7 @@
 import "server-only";
 import type { CrmSourceDTO, TriggerDTO } from "@/shared/contracts";
 import type { TriggerInput } from "@/shared/schemas";
-import { currentStageHistoryCursor, listCrmSources, type Actor } from "@/server/engine";
+import { currentStageHistoryCursor, listCrmSources, recentCrmSources, type Actor } from "@/server/engine";
 import { getTemplate } from "../../db/repos/templates";
 import { createTrigger, deleteTrigger, getTrigger, listTriggers, toTriggerDTO, updateTrigger } from "../../db/repos/triggers";
 import { AppError } from "../../errors";
@@ -27,10 +27,13 @@ function assertTemplate(input: TriggerInput): void {
   }
 }
 
-/** Nomes do funil e da etapa só para exibição; se o Bitrix não responder, ficam vazios e o gatilho funciona igual. */
+/**
+ * Nomes do funil e da etapa só para exibição; se o Bitrix não responder, ficam vazios e o gatilho funciona igual.
+ * Usa a leitura recente da tela de nova automação: reler todos os funis aqui faria o salvar passar do tempo limite da hospedagem.
+ */
 async function sourceNames(input: TriggerInput): Promise<{ sourceName: string | null; stageName: string | null }> {
   try {
-    const source = (await listCrmSources()).find((item) => item.entityTypeId === input.entityTypeId);
+    const source = (await recentCrmSources()).find((item) => item.entityTypeId === input.entityTypeId);
     if (!source) return { sourceName: null, stageName: null };
     const category =
       source.categories.find((item) => item.id === input.categoryId) ?? source.categories.find((item) => item.stages.some((stage) => stage.id === input.stageId));

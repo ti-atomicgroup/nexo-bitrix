@@ -4,6 +4,7 @@ import { getActivity, listActivities } from "@/server/db/repos/activities";
 import { listAudit } from "@/server/db/repos/audit";
 import { countJobs } from "@/server/db/repos/jobs";
 import { getJourney } from "@/server/db/repos/journeys";
+import { acquireLease } from "@/server/db/repos/leases";
 import { listLedger } from "@/server/db/repos/ledger";
 import { findPersonByBitrixId } from "@/server/db/repos/people";
 import { getDefaults, getProject, getSetupStage, getSyncState } from "@/server/db/repos/settings";
@@ -408,5 +409,11 @@ describe("robustez do ciclo", () => {
 
   it("não roda antes de a instalação ficar pronta", async () => {
     expect(await cycle()).toMatchObject({ ran: false, skipped: "not_ready" });
+  });
+
+  it("solta o lease ao terminar: um processo novo (republicação) sincroniza logo, sem esperar o prazo", async () => {
+    await prepare();
+    expect(await cycle()).toMatchObject({ ran: true });
+    expect(acquireLease("cycle", "processo-novo", 180_000)).toBe(true);
   });
 });

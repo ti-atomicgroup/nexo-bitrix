@@ -3,6 +3,10 @@
  * Mensagens em pt-BR, prontas para exibir ao lado do campo.
  */
 import { z } from "zod";
+import { ptBrErrorMap } from "./zod-pt-br";
+
+// Padrão do zod em pt-BR também no navegador: sem isto, `safeParse` nos formulários cai nas mensagens em inglês.
+z.config({ customError: ptBrErrorMap });
 import {
   ACTIVITY_KINDS,
   ACTIVITY_ROLES,

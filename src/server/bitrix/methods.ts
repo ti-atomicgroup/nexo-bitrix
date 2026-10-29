@@ -353,58 +353,98 @@ async function readStages(client: BitrixClient, entityIds: string[]): Promise<Re
   );
 }
 
-async function readCategories(client: BitrixClient, entityTypeId: number): Promise<Array<{ id: number; name: string }>> {
-  const raw = await client.list<Record<string, unknown>>("crm.category.list", { entityTypeId }, { itemsKey: "categories", maxPages: 5 });
-  return raw
+type CrmCategory = { id: number; name: string };
+
+const parseCategories = (raw: unknown): CrmCategory[] =>
+  (Array.isArray(raw) ? raw : Object.values(asRecord(raw)))
     .map(asRecord)
     .map((category) => ({ id: toNumber(category.id) ?? 0, name: text(category.name) || "Funil" }))
     .sort((a, b) => a.id - b.id);
-}
 
-async function readFields(client: BitrixClient, entityTypeId: number): Promise<CrmSourceDTO["fields"]> {
-  const result = asRecord(await client.call("crm.item.fields", { entityTypeId }));
-  return Object.entries(asRecord(result.fields))
+const parseFields = (raw: unknown): CrmSourceDTO["fields"] =>
+  Object.entries(asRecord(raw))
     .map(([id, value]) => {
       const field = asRecord(value);
       return { id, name: text(field.title) || id, type: text(field.type) || "unknown" };
     })
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+
+/**
+ * Funis e campos de várias entidades em lotes de 50 (`batch`), em vez de duas chamadas por entidade.
+ * Entidade sem acesso (erro no comando) fica de fora; limite de taxa interrompe a leitura toda.
+ */
+async function readCategoriesAndFields(
+  client: BitrixClient,
+  entityTypeIds: number[],
+): Promise<Map<number, { categories: CrmCategory[] | null; fields: CrmSourceDTO["fields"] | null }>> {
+  const commands: BatchCommands = {};
+  for (const entityTypeId of entityTypeIds) {
+    // Leads não têm funis (as etapas vêm de STATUS).
+    if (entityTypeId !== 1) commands[`c${entityTypeId}`] = { method: "crm.category.list", params: { entityTypeId } };
+    commands[`f${entityTypeId}`] = { method: "crm.item.fields", params: { entityTypeId } };
+  }
+  const { results, errors } = await client.batch(commands);
+  const rateLimited = Object.values(errors).find((error) => error.rateLimited);
+  if (rateLimited) throw rateLimited;
+  const out = new Map<number, { categories: CrmCategory[] | null; fields: CrmSourceDTO["fields"] | null }>();
+  for (const entityTypeId of entityTypeIds) {
+    const categories = errors[`c${entityTypeId}`] ? null : parseCategories(asRecord(results[`c${entityTypeId}`]).categories);
+    const fields = errors[`f${entityTypeId}`] ? null : parseFields(asRecord(results[`f${entityTypeId}`]).fields);
+    out.set(entityTypeId, { categories, fields });
+  }
+  // Um comando do lote devolve só a 1ª página (50): entidade com mais funis que isso é lida por inteiro.
+  for (const [entityTypeId, entry] of out) {
+    if (entry.categories?.length === 50) {
+      const all = await client.list<Record<string, unknown>>("crm.category.list", { entityTypeId }, { itemsKey: "categories", maxPages: 5 });
+      entry.categories = parseCategories(all);
+    }
+  }
+  return out;
 }
 
-/** Funis e etapas de leads (STATUS), negócios (DEAL_STAGE[_cat]) e processos inteligentes (DYNAMIC_<tipo>_STAGE_<cat>), com campos. */
+const dealStageEntity = (categoryId: number) => (categoryId === 0 ? "DEAL_STAGE" : `DEAL_STAGE_${categoryId}`);
+const dynamicStageEntity = (entityTypeId: number, categoryId: number) => `DYNAMIC_${entityTypeId}_STAGE_${categoryId}`;
+
+/**
+ * Funis e etapas de leads (STATUS), negócios (DEAL_STAGE[_cat]) e processos inteligentes (DYNAMIC_<tipo>_STAGE_<cat>), com campos.
+ * Tudo em lote: num portal com 80 processos inteligentes são ~6 chamadas, não ~240.
+ */
 export async function listCrmSources(client: BitrixClient): Promise<CrmSourceDTO[]> {
-  const sources: CrmSourceDTO[] = [];
-  const leadStages = await readStages(client, ["STATUS"]);
-  sources.push({
-    entityTypeId: 1,
-    kind: "lead",
-    name: "Leads",
-    categories: [{ id: null, name: "Leads", stages: leadStages.STATUS ?? [] }],
-    fields: await readFields(client, 1),
-  });
-  const dealCategories = await readCategories(client, 2);
-  const dealEntityIds = dealCategories.map((category) => (category.id === 0 ? "DEAL_STAGE" : `DEAL_STAGE_${category.id}`));
-  const dealStages = await readStages(client, dealEntityIds);
-  sources.push({
-    entityTypeId: 2,
-    kind: "deal",
-    name: "Negócios",
-    categories: dealCategories.map((category, index) => ({ id: category.id, name: category.name, stages: dealStages[dealEntityIds[index] ?? ""] ?? [] })),
-    fields: await readFields(client, 2),
-  });
-  const types = await client.list<Record<string, unknown>>("crm.type.list", {}, { itemsKey: "types", maxPages: 5 });
-  for (const type of types.map(asRecord)) {
-    const entityTypeId = toNumber(type.entityTypeId);
-    if (!entityTypeId || entityTypeId <= 0) continue;
-    const categories = await readCategories(client, entityTypeId);
-    const entityIds = categories.map((category) => `DYNAMIC_${entityTypeId}_STAGE_${category.id}`);
-    const stages = await readStages(client, entityIds);
+  const types = (await client.list<Record<string, unknown>>("crm.type.list", {}, { itemsKey: "types", maxPages: 5 }))
+    .map(asRecord)
+    .map((type) => ({ entityTypeId: toNumber(type.entityTypeId), title: text(type.title) }))
+    .filter((type): type is { entityTypeId: number; title: string } => type.entityTypeId !== null && type.entityTypeId > 0);
+  const meta = await readCategoriesAndFields(client, [1, 2, ...types.map((type) => type.entityTypeId)]);
+  const deal = meta.get(2);
+  if (!deal?.categories || !deal.fields) throw new BitrixError("CRM_UNAVAILABLE", {}, "O Bitrix24 não devolveu os funis de negócios. Confira o escopo crm do webhook.");
+  const dealCategories = deal.categories;
+
+  const stageEntities = [
+    "STATUS",
+    ...dealCategories.map((category) => dealStageEntity(category.id)),
+    ...types.flatMap((type) => (meta.get(type.entityTypeId)?.categories ?? []).map((category) => dynamicStageEntity(type.entityTypeId, category.id))),
+  ];
+  const stages = await readStages(client, stageEntities);
+
+  const sources: CrmSourceDTO[] = [
+    { entityTypeId: 1, kind: "lead", name: "Leads", categories: [{ id: null, name: "Leads", stages: stages.STATUS ?? [] }], fields: meta.get(1)?.fields ?? [] },
+    {
+      entityTypeId: 2,
+      kind: "deal",
+      name: "Negócios",
+      categories: dealCategories.map((category) => ({ id: category.id, name: category.name, stages: stages[dealStageEntity(category.id)] ?? [] })),
+      fields: deal.fields,
+    },
+  ];
+  for (const type of types) {
+    const entry = meta.get(type.entityTypeId);
+    if (!entry?.categories || !entry.fields) continue;
     sources.push({
-      entityTypeId,
+      entityTypeId: type.entityTypeId,
       kind: "smart_process",
-      name: text(type.title) || `Processo ${entityTypeId}`,
-      categories: categories.map((category, index) => ({ id: category.id, name: category.name, stages: stages[entityIds[index] ?? ""] ?? [] })),
-      fields: await readFields(client, entityTypeId),
+      name: type.title || `Processo ${type.entityTypeId}`,
+      categories: entry.categories.map((category) => ({ id: category.id, name: category.name, stages: stages[dynamicStageEntity(type.entityTypeId, category.id)] ?? [] })),
+      fields: entry.fields,
     });
   }
   return sources;

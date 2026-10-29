@@ -90,9 +90,11 @@ export function failJob(id: string, error: string, retryAt: string | null): void
     .run(error.slice(0, 500), retryAt ? "queued" : "failed", retryAt, nowIso(), id);
 }
 
-/** Jobs presos em "running" por um processo que caiu voltam para a fila. */
-export function requeueStuckJobs(olderThan: string): number {
-  return getDb().prepare("UPDATE jobs SET status = 'queued', updated_at = ? WHERE status = 'running' AND updated_at < ?").run(nowIso(), olderThan).changes;
+/** Jobs presos em "running" por um processo que caiu voltam para a fila; os que este processo ainda executa (`inFlight`) ficam. */
+export function requeueStuckJobs(olderThan: string, inFlight: readonly string[] = []): number {
+  return getDb()
+    .prepare("UPDATE jobs SET status = 'queued', updated_at = ? WHERE status = 'running' AND updated_at < ? AND id NOT IN (SELECT value FROM json_each(?))")
+    .run(nowIso(), olderThan, JSON.stringify(inFlight)).changes;
 }
 
 export function countJobs(status: JobStatus): number {

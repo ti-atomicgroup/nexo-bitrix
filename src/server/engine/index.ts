@@ -134,6 +134,11 @@ export async function listCrmSources(): Promise<CrmSourceDTO[]> {
   return triggers.listCrmSources();
 }
 
+/** Mesmos funis, reaproveitando a leitura dos últimos 10 min (só para nomes de exibição). */
+export async function recentCrmSources(): Promise<CrmSourceDTO[]> {
+  return triggers.recentCrmSources();
+}
+
 /** Maior ID atual de `crm.stagehistory.list` para a entidade: cursor inicial de um gatilho novo (não reprocessa o passado). */
 export async function currentStageHistoryCursor(entityTypeId: number): Promise<number | null> {
   return triggers.currentStageHistoryCursor(entityTypeId);

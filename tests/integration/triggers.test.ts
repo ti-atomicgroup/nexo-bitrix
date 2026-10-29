@@ -4,10 +4,13 @@ import { getDetection, listDetections } from "@/server/db/repos/detections";
 import { getJourney } from "@/server/db/repos/journeys";
 import { createTrigger, getTrigger } from "@/server/db/repos/triggers";
 import { createJourney, currentStageHistoryCursor, listCrmSources } from "@/server/engine";
+import { forgetCrmSourcesForTests } from "@/server/engine/triggers";
+import { createTriggerFromInput } from "@/server/services/read/triggers";
 import { activityByTitle, cycle, HR_ACTOR, prepare, setupEngine, templateId, type EngineEnv } from "../fakes/engine-setup";
 
 let env: EngineEnv;
 beforeEach(() => {
+  forgetCrmSourcesForTests();
   env = setupEngine();
 });
 afterEach(() => env.cleanup());
@@ -116,6 +119,19 @@ describe("gatilhos do CRM", () => {
     env.fake.statuses.set("STATUS", [{ id: "HIRED", name: "Contratado" }]);
     const sources = await listCrmSources();
     expect(sources[0]).toMatchObject({ entityTypeId: 1, kind: "lead", categories: [{ id: null, name: "Leads", stages: [{ id: "HIRED", name: "Contratado" }] }] });
+  });
+
+  it("salvar a automação reaproveita os funis lidos pela tela, sem reler o CRM inteiro", async () => {
+    await prepare();
+    env.fake.statuses.set("STATUS", [{ id: "HIRED", name: "Contratado" }]);
+    await listCrmSources();
+    const readsBefore = env.fake.countCalls("crm.type.list");
+    const trigger = await createTriggerFromInput(
+      { name: "Lead contratado", journeyKind: "onboarding", entityTypeId: 1, categoryId: null, stageId: "HIRED", templateId: templateId("Onboarding · Geral"), fieldMap: {}, enabled: true },
+      HR_ACTOR,
+    );
+    expect(env.fake.countCalls("crm.type.list")).toBe(readsBefore);
+    expect(trigger).toMatchObject({ sourceName: "Leads", stageName: "Contratado" });
   });
 
   it("um gatilho com erro registra o erro e não impede os outros", async () => {

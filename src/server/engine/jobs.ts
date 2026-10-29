@@ -51,12 +51,23 @@ function finalFailure(job: JobRow, message: string): void {
   }
 }
 
+/** Jobs que este processo está executando agora (em globalThis: cópias do módulo dividem o mesmo conjunto). */
+const IN_FLIGHT_KEY = Symbol.for("nexo.jobs.in-flight");
+type InFlightGlobal = typeof globalThis & { [IN_FLIGHT_KEY]?: Set<string> };
+const inFlight = (): Set<string> => ((globalThis as InFlightGlobal)[IN_FLIGHT_KEY] ??= new Set());
+
+/** Para a limpeza de jobs presos: um job lento ainda em execução aqui não é "preso" e não pode rodar duas vezes. */
+export function inFlightJobIds(): string[] {
+  return [...inFlight()];
+}
+
 export async function runJob(job: JobRow, ctx: EngineContext): Promise<void> {
   const handler = HANDLERS[job.kind];
   if (!handler) {
     failJob(job.id, `Tipo de envio desconhecido (${job.kind}).`, null);
     return;
   }
+  inFlight().add(job.id);
   try {
     await handler(job.payload, ctx);
     completeJob(job.id);
@@ -75,6 +86,8 @@ export async function runJob(job: JobRow, ctx: EngineContext): Promise<void> {
     failJob(job.id, message, null);
     finalFailure(job, message);
     log.warn("job_failed", { kind: job.kind, jobId: job.id, attempts, error });
+  } finally {
+    inFlight().delete(job.id);
   }
 }
 

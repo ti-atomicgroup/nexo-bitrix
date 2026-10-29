@@ -12,8 +12,28 @@ const MAX_HISTORY_PAGES = 10;
 const PAGE_SIZE = 50;
 const CONTACT_ENTITY_TYPE_ID = 3;
 
+/** Última leitura dos funis, por portal: a tela de nova automação acabou de ler e o salvar só precisa dos nomes. */
+const SOURCES_KEY = Symbol.for("nexo.crm-sources");
+export const CRM_SOURCES_TTL_MS = 10 * 60_000;
+type SourcesGlobal = typeof globalThis & { [SOURCES_KEY]?: { portal: string; at: number; sources: CrmSourceDTO[] } };
+
+/** Lê os funis do Bitrix24 (sempre fresco) e guarda a leitura para `recentCrmSources`. */
 export async function listCrmSources(): Promise<CrmSourceDTO[]> {
-  return readCrmSources(requireBitrix());
+  const client = requireBitrix();
+  const sources = await readCrmSources(client);
+  (globalThis as SourcesGlobal)[SOURCES_KEY] = { portal: client.portal, at: Date.now(), sources };
+  return sources;
+}
+
+/** Funis lidos há menos de 10 min (mesmo portal) ou, se não houver, uma leitura nova. */
+export async function recentCrmSources(now = Date.now()): Promise<CrmSourceDTO[]> {
+  const cached = (globalThis as SourcesGlobal)[SOURCES_KEY];
+  if (cached && now - cached.at < CRM_SOURCES_TTL_MS && cached.portal === requireBitrix().portal) return cached.sources;
+  return listCrmSources();
+}
+
+export function forgetCrmSourcesForTests(): void {
+  delete (globalThis as SourcesGlobal)[SOURCES_KEY];
 }
 
 export async function currentStageHistoryCursor(entityTypeId: number): Promise<number | null> {

@@ -163,6 +163,21 @@ describe("CRM", () => {
     expect(sources[2]?.fields).toContainEqual({ id: "ufCrm5Inicio", name: "Início", type: "date" });
   });
 
+  it("lê funis, etapas e campos em lote: muitos processos inteligentes não multiplicam as chamadas", async () => {
+    for (let index = 0; index < 60; index++) {
+      const entityTypeId = 200 + index;
+      fake.crmTypes.push({ id: 10 + index, entityTypeId, title: `Processo ${index}` });
+      fake.categories.set(entityTypeId, [{ id: 1, name: "Padrão" }]);
+      fake.statuses.set(`DYNAMIC_${entityTypeId}_STAGE_1`, [{ id: `DT${entityTypeId}_1:NEW`, name: "Novo" }]);
+    }
+    const sources = await listCrmSources(client);
+    expect(sources).toHaveLength(63);
+    expect(sources.at(-1)?.categories[0]?.stages).toEqual([{ id: "DT259_1:NEW", name: "Novo" }]);
+    // 2 páginas de crm.type.list + lotes de 50 (funis e campos de 62 entidades; etapas de 63 funis): antes eram ~190 chamadas.
+    const requests = fake.countCalls("batch") + fake.countCalls("crm.type.list");
+    expect(requests).toBeLessThanOrEqual(8);
+  });
+
   it("lê o histórico depois do cursor (lead com STATUS_ID) e o maior ID", async () => {
     expect(await maxStageHistoryId(client, 1)).toBeNull();
     fake.addCrmItem(1, { id: 5, title: "Ana", stageId: "NEW" });

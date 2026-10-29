@@ -83,6 +83,8 @@ describe("fila de jobs", () => {
     expect(takeDueJobs(new Date(Date.now() + 1000).toISOString())).toHaveLength(0);
     const stuck = enqueueJob({ kind: "poll" });
     takeDueJobs(new Date(Date.now() + 1000).toISOString());
+    // Um job lento que este processo ainda executa não é "preso": não volta para a fila (rodaria duas vezes).
+    expect(requeueStuckJobs("2999-01-01T00:00:00.000Z", [stuck.id])).toBe(0);
     expect(requeueStuckJobs("2999-01-01T00:00:00.000Z")).toBe(1);
     failJob(stuck.id, "definitivo", null);
     expect(countJobs("failed")).toBe(1);

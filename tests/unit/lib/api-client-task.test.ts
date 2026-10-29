@@ -58,3 +58,16 @@ describe("trabalho em segundo plano no cliente (202 + consulta)", () => {
     expect(await pending).toMatchObject({ code: "task_timeout" });
   });
 });
+
+describe("respostas recusadas", () => {
+  it("403 em JSON é do Nexo; 403 sem JSON é da hospedagem e pede para recarregar", async () => {
+    mockFetch([
+      json(403, { error: { code: "FORBIDDEN", message: "Peça a um administrador do Nexo para fazer isso." } }),
+      new Response("Acesso permitido somente dentro da Onnira", { status: 403, headers: { "Content-Type": "text/html" } }),
+    ]);
+    await expect(api.today()).rejects.toMatchObject({ status: 403, message: "Peça a um administrador do Nexo para fazer isso." });
+    const edge = await api.today().catch((error: unknown) => error);
+    expect(edge).toBeInstanceOf(ApiError);
+    expect((edge as ApiError).message).toMatch(/Recarregue a página/);
+  });
+});

@@ -33,6 +33,7 @@ export function engineMock(): typeof Engine {
       throw new Error("waiveLedgerItem não configurado no teste");
     }),
     listCrmSources: vi.fn(async () => []),
+    recentCrmSources: vi.fn(async () => []),
     currentStageHistoryCursor: vi.fn(async () => 100),
     starterTemplates: vi.fn(() => []),
     activityLibrary: vi.fn(() => []),
