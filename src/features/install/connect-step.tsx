@@ -77,7 +77,7 @@ export function ConnectStep({ check, onConnected, onContinue, reconnect = false 
 
       <ol className={styles.howto}>
         <li>
-          No Bitrix24, abra <strong>Aplicativos → Desenvolvedores → Outro → Webhook de entrada</strong>.
+          No Bitrix24, abra <strong>Recursos para desenvolvedores → Outro → Webhook de entrada</strong>.
         </li>
         <li>
           Em <strong>Configurar permissões</strong>, marque <strong>Tarefas, Usuários, CRM e Grupos de trabalho</strong>. Para os extras, marque também{" "}

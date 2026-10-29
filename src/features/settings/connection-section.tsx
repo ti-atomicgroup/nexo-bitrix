@@ -106,7 +106,7 @@ export function ConnectionSection({ settings, isAdmin, onSaved }: { settings: Se
               autoComplete="off"
               spellCheck={false}
               placeholder="https://suaempresa.bitrix24.com.br/rest/1/abc123/"
-              hint="Crie em Aplicativos → Desenvolvedores → Outro → Webhook de entrada, com as mesmas permissões."
+              hint="Crie em Recursos para desenvolvedores → Outro → Webhook de entrada, com as mesmas permissões."
               value={url}
               onChange={(event) => setUrl(event.target.value)}
               error={error}

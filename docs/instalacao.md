@@ -2,12 +2,12 @@
 
 Tempo estimado: **5 minutos**. Você vai precisar de:
 
-- acesso ao seu portal **Bitrix24** com permissão para criar webhooks (Aplicativos → Desenvolvedores);
+- acesso ao seu portal **Bitrix24** com permissão para criar webhooks (Recursos para desenvolvedores);
 - o Nexo aberto na **Onnira** (ou rodando localmente, para testes).
 
 ## 1. Crie o webhook no Bitrix24
 
-1. No Bitrix24, abra **Aplicativos → Desenvolvedores → Outro → Webhook de entrada**.
+1. No Bitrix24, abra **Recursos para desenvolvedores → Outro → Webhook de entrada**.
 2. Dê um nome, por exemplo **Nexo · Jornadas**.
 3. Marque as permissões:
    - **Obrigatórias:** Tarefas (`task`), Usuários (`user_brief` ou `user`), CRM (`crm`) e Grupos de trabalho (`sonet_group`).
