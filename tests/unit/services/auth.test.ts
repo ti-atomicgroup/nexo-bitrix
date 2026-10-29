@@ -71,6 +71,16 @@ describe("login", () => {
     expect(findUserById(user.id)).toMatchObject({ failedLogins: 0, lockedUntil: null });
   });
 
+  it("tentativas em paralelo não furam o limite: no máximo 5 conferências e a conta fica bloqueada", async () => {
+    const { user } = await seedUser({ email: "rita@empresa.com.br" });
+    const now = Date.parse("2026-10-26T12:00:00.000Z");
+    // Antes, todas passavam pela checagem enquanto o scrypt (assíncrono) rodava, e a gravação velha apagava o bloqueio.
+    const burst = await Promise.all(Array.from({ length: 12 }, (_, index) => failure(login({ email: "rita@empresa.com.br", password: `errada-${index}-000` }, now))));
+    expect(burst.filter((error) => error.code === "INVALID_CREDENTIALS").length).toBeLessThanOrEqual(4);
+    expect(findUserById(user.id)?.lockedUntil).toBe(new Date(now + LOCK_MS).toISOString());
+    expect((await failure(login({ email: "rita@empresa.com.br", password: PASSWORD }, now))).code).toBe("LOGIN_LOCKED");
+  });
+
   it("recomeça a contagem depois que o bloqueio vence", async () => {
     const { user } = await seedUser({ email: "rita@empresa.com.br" });
     updateUser(user.id, { failedLogins: 5, lockedUntil: "2026-10-26T11:00:00.000Z" });

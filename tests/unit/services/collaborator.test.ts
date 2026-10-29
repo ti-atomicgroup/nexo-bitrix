@@ -215,6 +215,18 @@ describe("POST /j/:token/feito", () => {
     expect((await post(token, mine.id)).status).toBe(404);
   });
 
+  it("rota pública: token inválido nem lê o corpo; corpo acima de 4 KB é recusado sem ir para a memória", async () => {
+    const { mine, token } = setup();
+    const unread = new Request(`http://localhost/j/${"z".repeat(43)}/feito`, { method: "POST", body: new URLSearchParams({ activityId: mine.id }) });
+    const response = await doneRoute(unread, { params: Promise.resolve({ token: "z".repeat(43) }) });
+    expect(response.status).toBe(404);
+    expect(unread.bodyUsed).toBe(false);
+    const huge = new URLSearchParams({ activityId: mine.id, lixo: "x".repeat(64 * 1024) });
+    const tooBig = await doneRoute(new Request(`http://localhost/j/${token}/feito`, { method: "POST", body: huge }), { params: Promise.resolve({ token }) });
+    expect(tooBig.headers.get("location")).toBe(`/j/${token}?erro=1`);
+    expect(engine.markDoneFromLink).not.toHaveBeenCalled();
+  });
+
   it("limita a 30 envios a cada 10 minutos por link", async () => {
     const { mine, token } = setup();
     for (let attempt = 0; attempt < 30; attempt++) expect((await post(token, mine.id)).headers.get("location")).toBe(`/j/${token}?feito=1`);

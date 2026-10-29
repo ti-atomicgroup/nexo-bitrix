@@ -7,7 +7,7 @@ import { purgeExpiredSessions } from "../db/repos/sessions";
 import { findUserByEmail, recordLoginFailure, recordLoginSuccess, updateUser, type AppUserRow } from "../db/repos/users";
 import { AppError } from "../errors";
 import { hashPassword, verifyAgainstDummy, verifyPassword } from "../security/passwords";
-import { clearRateLimit, peekRateLimit, recordHit } from "../security/rate-limit";
+import { clearRateLimit, rateLimit } from "../security/rate-limit";
 import { auditAs } from "./audit";
 import { startSession } from "./session";
 
@@ -27,27 +27,29 @@ function loginKey(email: string): string {
   return `login:${email.trim().toLowerCase()}`;
 }
 
-/** Registra a falha; a 5ª seguida bloqueia a conta por 15 min. Bloqueio vencido recomeça a contagem. */
-function registerFailure(user: AppUserRow | null, key: string, now: number): boolean {
-  const memory = recordHit(key, LOGIN_RULE, now);
-  if (!user) return !memory.allowed;
-  const lockExpired = user.lockedUntil !== null && !(Date.parse(user.lockedUntil) > now);
-  const previous = lockExpired ? 0 : user.failedLogins;
-  if (lockExpired) updateUser(user.id, { failedLogins: 0, lockedUntil: null });
-  const lockNow = previous + 1 >= MAX_LOGIN_FAILURES;
-  recordLoginFailure(user.id, lockNow ? new Date(now + LOCK_MS).toISOString() : null);
-  return lockNow;
+/**
+ * Registra a falha; a 5ª seguida bloqueia a conta por 15 min. Bloqueio vencido recomeça a contagem.
+ * A conta é atualizada no banco a partir da linha atual (falhas em paralelo não se sobrescrevem);
+ * `lastAttempt`: o limitador em memória já não aceita outra tentativa para este e-mail.
+ */
+function registerFailure(user: AppUserRow | null, lastAttempt: boolean, now: number): boolean {
+  if (!user) return lastAttempt;
+  const after = recordLoginFailure(user.id, { now: new Date(now).toISOString(), lockUntil: new Date(now + LOCK_MS).toISOString(), maxFailures: MAX_LOGIN_FAILURES });
+  return after.lockedUntil !== null && Date.parse(after.lockedUntil) > now;
 }
 
 export async function login(input: LoginInput, now = Date.now()): Promise<SessionDTO> {
   const key = loginKey(input.email);
   const user = findUserByEmail(input.email);
   const lockedInDb = user?.lockedUntil ? Date.parse(user.lockedUntil) > now : false;
-  if (lockedInDb || !peekRateLimit(key, LOGIN_RULE, now).allowed) throw locked();
+  if (lockedInDb) throw locked();
+  // A vaga é reservada antes de conferir a senha (scrypt é assíncrono): tentativas em paralelo não passam de 5 por janela.
+  const attempt = rateLimit(key, LOGIN_RULE, now);
+  if (!attempt.allowed) throw locked();
 
   const valid = user && user.active ? await verifyPassword(input.password, user.passwordHash) : await verifyAgainstDummy(input.password);
   if (!valid || !user || !user.active) {
-    throw registerFailure(user && user.active ? user : null, key, now) ? locked() : invalidCredentials();
+    throw registerFailure(user && user.active ? user : null, attempt.remaining === 0, now) ? locked() : invalidCredentials();
   }
 
   recordLoginSuccess(user.id);
@@ -63,15 +65,15 @@ export function logout(tokenHash: string): { ok: true } {
 
 export async function changePassword(user: AppUserRow, tokenHash: string, input: z.output<typeof changePasswordInput>): Promise<{ ok: true }> {
   const key = `password:${user.id}`;
-  if (!peekRateLimit(key, PASSWORD_RULE).allowed) throw new AppError("TOO_MANY_ATTEMPTS", LOCKED_MESSAGE, 429);
+  // Mesma regra do login: a vaga é reservada antes da conferência assíncrona da senha atual.
+  if (!rateLimit(key, PASSWORD_RULE).allowed) throw new AppError("TOO_MANY_ATTEMPTS", LOCKED_MESSAGE, 429);
   if (!(await verifyPassword(input.currentPassword, user.passwordHash))) {
-    recordHit(key, PASSWORD_RULE);
     throw new AppError("INVALID_PASSWORD", "A senha atual não confere.", 400, { field: "currentPassword" });
   }
+  clearRateLimit(key);
   if (input.newPassword === input.currentPassword) {
     throw new AppError("SAME_PASSWORD", "Escolha uma senha diferente da atual.", 400, { field: "newPassword" });
   }
-  clearRateLimit(key);
   updateUser(user.id, { passwordHash: await hashPassword(input.newPassword), mustChangePassword: false });
   revokeOtherSessions(user.id, tokenHash);
   auditAs({ type: "user", id: user.id, name: user.name }, "Senha alterada", "user", user.id);

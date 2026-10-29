@@ -9,6 +9,7 @@ import { findPerson } from "../db/repos/people";
 import { getCompany, getFeatures, getWebhookRecord } from "../db/repos/settings";
 import { daysBetween, formatInZone, todayIn, zonedInstant } from "../domain/dates";
 import { listTitles } from "../domain/completion";
+import { bbText } from "../domain/task-text";
 import { RetryLater } from "./job-errors";
 import { enqueueActivityJob, JOB_KINDS } from "./queue";
 import type { EngineContext } from "./runtime";
@@ -133,9 +134,11 @@ export async function handleFeedPost(payload: Record<string, unknown>, ctx: Engi
   if (late > 0) return;
   const person = findPerson(journey.personId);
   if (!person) return;
-  const mention = person.bitrixUserId ? `[USER=${person.bitrixUserId}]${person.name}[/USER]` : person.name;
+  // Nome e cargo vêm do perfil do Bitrix24 (a própria pessoa edita): sem colchetes, para não virarem marcação no post para todos.
+  const name = bbText(person.name);
+  const mention = person.bitrixUserId ? `[USER=${person.bitrixUserId}]${name}[/USER]` : name;
   const role = journey.personPosition ?? person.position;
-  const position = role ? `, ${role},` : "";
+  const position = role ? `, ${bbText(role)},` : "";
   const firstName = person.name.split(/\s+/)[0] ?? person.name;
   try {
     await sendOnce(`feed:post:${journey.id}`, () =>

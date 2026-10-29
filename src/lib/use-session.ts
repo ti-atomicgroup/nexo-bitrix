@@ -32,9 +32,24 @@ export function useNow(stepMs = 30_000): number | null {
   return useSyncExternalStore(subscribe, snapshot, serverSnapshot);
 }
 
-/** Aceita só caminhos internos ("/pessoas/1"), nunca "//outro-site" ou "https://...". */
+/** Base fictícia: só para o mesmo analisador de URL do navegador dizer se o caminho continua no próprio site. */
+const SAME_SITE = "http://nexo.invalid";
+
+/**
+ * Aceita só caminhos internos ("/pessoas/1"), nunca "//outro-site" ou "https://...". Compara a origem depois de o
+ * analisador de URL normalizar o valor, como o roteador fará: "/\t/outro-site" (tab ou quebra de linha somem) e
+ * "/\outro-site" viram "//outro-site" e são recusados. Devolve o caminho já normalizado, nunca o texto cru.
+ */
 export function safeReturnPath(value: string | null | undefined, fallback = "/hoje"): string {
-  if (!value || !value.startsWith("/") || value.startsWith("//") || value.startsWith("/\\")) return fallback;
-  if (value.startsWith("/entrar") || value.startsWith("/instalar")) return fallback;
-  return value;
+  if (!value || !value.startsWith("/")) return fallback;
+  let url: URL;
+  try {
+    url = new URL(value, SAME_SITE);
+  } catch {
+    return fallback;
+  }
+  if (url.origin !== SAME_SITE) return fallback;
+  const path = `${url.pathname}${url.search}${url.hash}`;
+  if (path.startsWith("/entrar") || path.startsWith("/instalar")) return fallback;
+  return path;
 }

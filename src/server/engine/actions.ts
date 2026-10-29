@@ -13,6 +13,7 @@ import { getCompany } from "../db/repos/settings";
 import { formatDateTimeBr } from "../domain/dates";
 import { documentKey } from "../domain/documents";
 import { revokeChecklist } from "../domain/ledger";
+import { bbText } from "../domain/task-text";
 import { AppError, notFound } from "../errors";
 import { resendDocuments } from "./documents";
 import { applyLedgerEffects } from "./ledger-effects";
@@ -76,9 +77,11 @@ function reopenActivity(journey: JourneyRow, activity: ActivityRow, actor: Actor
 }
 
 function nudgeMessage(activity: ActivityRow, journey: JourneyRow, custom: string | undefined): string {
-  const mention = activity.assigneeBitrixId ? `[USER=${activity.assigneeBitrixId}]${activity.assigneeName ?? "Responsável"}[/USER]` : (activity.assigneeName ?? "Olá");
+  // Nomes vêm do Bitrix24 ou do CRM: sem colchetes, para não virarem marcação no comentário.
+  const assignee = activity.assigneeName ? bbText(activity.assigneeName) : null;
+  const mention = activity.assigneeBitrixId ? `[USER=${activity.assigneeBitrixId}]${assignee ?? "Responsável"}[/USER]` : (assignee ?? "Olá");
   if (custom?.trim()) return `${mention}, ${custom.trim()}`;
-  const person = findPerson(journey.personId)?.name ?? "a pessoa";
+  const person = bbText(findPerson(journey.personId)?.name ?? "a pessoa");
   const due = formatDateTimeBr(activity.dueAt, getCompany().timezone);
   const overdue = Date.parse(activity.dueAt) < Date.now();
   return `${mention}, pode dar uma olhada nesta tarefa da jornada de ${person}? ${overdue ? `O prazo era ${due}.` : `O prazo é ${due}.`} Se precisar de algo, responda aqui. Obrigado!`;

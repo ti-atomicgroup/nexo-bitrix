@@ -23,14 +23,20 @@ export interface TaskDescriptionInput {
   documents?: DocumentRequest[];
 }
 
+/**
+ * Texto de fora (nome e cargo vindos do perfil do Bitrix24 ou do CRM, nome de arquivo) dentro de BBCode do Bitrix24:
+ * colchetes virariam marcação ([URL], [IMG], [USER]) publicada em nome da conta do webhook.
+ */
+export const bbText = (value: string) => value.replaceAll("[", "(").replaceAll("]", ")");
+
 /** Colchetes quebrariam a marcação [URL=…]…[/URL]. */
 const safeUrl = (url: string) => url.replaceAll("[", "%5B").replaceAll("]", "%5D");
-const safeLabel = (label: string) => label.replaceAll("[", "(").replaceAll("]", ")");
+const safeLabel = bbText;
 
 /** Descrição em BBCode do Bitrix24. Nunca inclui o motivo do desligamento. */
 export function taskDescription(input: TaskDescriptionInput): string {
   const lines = [
-    `[B]Pessoa:[/B] ${input.personName}`,
+    `[B]Pessoa:[/B] ${bbText(input.personName)}`,
     `[B]Jornada:[/B] ${KIND_LABEL[input.kind]} · ${ANCHOR_LABEL[input.kind]} ${formatDateBr(input.anchorDate)}`,
     `[B]Etapa:[/B] ${input.stageName}`,
   ];

@@ -13,6 +13,7 @@ import { beginOperation, confirmOperation, getOperation, markOperationFailed, ma
 import { findPerson } from "../db/repos/people";
 import { getWebhookRecord } from "../db/repos/settings";
 import { acceptedDocuments, driveFileName, journeyFolderName, missingRequired, type FileType } from "../domain/documents";
+import { bbText } from "../domain/task-text";
 import { AppError } from "../errors";
 import { log } from "../log";
 import { readDocumentFile, removeDocumentFile, storeDocumentFile } from "../security/document-vault";
@@ -239,7 +240,7 @@ export async function handleDocumentSend(payload: Record<string, unknown>, ctx: 
       await addTaskComment(
         ctx.client,
         taskId,
-        `${person?.name ?? "O colaborador"} enviou “${request?.name ?? document.fileName}” pelo link pessoal. O arquivo está anexado nesta tarefa e na pasta ${DOCUMENTS_ROOT_FOLDER} do projeto.`,
+        `${bbText(person?.name ?? "O colaborador")} enviou “${bbText(request?.name ?? document.fileName)}” pelo link pessoal. O arquivo está anexado nesta tarefa e na pasta ${DOCUMENTS_ROOT_FOLDER} do projeto.`,
       );
     } catch (error) {
       // Aviso é bônus: o arquivo já está anexado.

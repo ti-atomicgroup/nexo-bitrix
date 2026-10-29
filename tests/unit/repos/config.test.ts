@@ -39,8 +39,14 @@ describe("usuários e sessões", () => {
     const user = createUser({ name: "Marina RH", email: " Marina@Empresa.com ", passwordHash: "hash", role: "admin" });
     expect(user.email).toBe("marina@empresa.com");
     expect(findUserByEmail("MARINA@empresa.com")?.id).toBe(user.id);
-    recordLoginFailure(user.id, "2026-10-26T12:15:00.000Z");
+    const lock = { now: "2026-10-26T12:00:00.000Z", lockUntil: "2026-10-26T12:15:00.000Z", maxFailures: 2 };
+    expect(recordLoginFailure(user.id, lock)).toEqual({ failedLogins: 1, lockedUntil: null });
     expect(findUserByEmail("marina@empresa.com")?.failedLogins).toBe(1);
+    // A 2ª falha bloqueia; uma falha atrasada (de uma leitura antiga) nunca apaga o bloqueio em vigor.
+    expect(recordLoginFailure(user.id, lock)).toEqual({ failedLogins: 2, lockedUntil: "2026-10-26T12:15:00.000Z" });
+    expect(recordLoginFailure(user.id, lock).lockedUntil).toBe("2026-10-26T12:15:00.000Z");
+    // Bloqueio vencido recomeça a contagem.
+    expect(recordLoginFailure(user.id, { ...lock, now: "2026-10-26T13:00:00.000Z", lockUntil: "2026-10-26T13:15:00.000Z" })).toEqual({ failedLogins: 1, lockedUntil: null });
     recordLoginSuccess(user.id);
     const after = findUserByEmail("marina@empresa.com")!;
     expect(after.failedLogins).toBe(0);

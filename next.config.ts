@@ -14,8 +14,8 @@ function gitCommit(): string {
   }
 }
 
-// A Onnira exibe o app dentro do painel (iframe); localhost permite os testes locais.
-const frameAncestors = "'self' https://app.onnira.com https://app.onnira.com.br http://localhost:* http://127.0.0.1:*";
+// A Onnira exibe o app dentro do painel (iframe). Localhost só fora de produção (testes locais): em produção, nenhuma página local emoldura o Nexo.
+const frameAncestors = ["'self'", "https://app.onnira.com", "https://app.onnira.com.br", ...(production ? [] : ["http://localhost:*", "http://127.0.0.1:*"])].join(" ");
 
 const contentSecurityPolicy = [
   "default-src 'self'",

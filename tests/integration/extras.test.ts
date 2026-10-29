@@ -129,4 +129,13 @@ describe("extras (im, calendar, log)", () => {
       "Hoje é o primeiro dia de [USER=12]Ana Souza[/USER], Executiva de contas, na Empresa Teste. Deixe sua mensagem de boas-vindas!",
     );
   });
+
+  it("colchetes no cargo não viram link no post para todos", async () => {
+    env = setupEngine();
+    await prepare();
+    start(staged("onboarding").id, "onboarding", "Dev [URL=https://evil.example]Confirme[/URL]");
+    advance(Date.parse("2026-10-28T12:00:30Z") - Date.now());
+    await cycle();
+    expect(env.fake.posts[0]?.message).toContain(", Dev (URL=https://evil.example)Confirme(/URL), na Empresa Teste.");
+  });
 });

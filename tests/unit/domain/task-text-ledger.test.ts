@@ -33,6 +33,19 @@ describe("texto das tarefas", () => {
     expect(offboarding).not.toContain("[B]Documentos pedidos[/B]");
   });
 
+  it("nome vindo do Bitrix24 ou do CRM não vira marcação BBCode (link, imagem, menção)", () => {
+    const description = taskDescription({
+      personName: "Ana [/USER][URL=https://evil.example]Confirme seu acesso[/URL]",
+      kind: "onboarding",
+      anchorDate: "2026-11-02",
+      stageName: "Antes do 1º dia",
+      instructions: "",
+      links: [],
+    });
+    expect(description).toContain("[B]Pessoa:[/B] Ana (/USER)(URL=https://evil.example)Confirme seu acesso(/URL)");
+    expect(description).not.toContain("[URL=https://evil.example]");
+  });
+
   it("lista os documentos pedidos e avisa que chegam anexados", () => {
     const description = taskDescription({
       personName: "Ana",

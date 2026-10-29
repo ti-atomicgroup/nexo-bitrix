@@ -92,8 +92,25 @@ export function updateUser(id: string, patch: Partial<Omit<AppUserRow, "id" | "c
   return findUserById(id);
 }
 
-export function recordLoginFailure(id: string, lockedUntil: string | null): void {
-  getDb().prepare("UPDATE app_users SET failed_logins = failed_logins + 1, locked_until = ? WHERE id = ?").run(lockedUntil, id);
+/**
+ * Registra uma falha de login numa só instrução, a partir da linha atual (nunca de uma leitura feita antes de conferir a senha):
+ * bloqueio vencido recomeça a contagem; a `maxFailures`-ésima falha bloqueia até `lockUntil`; bloqueio em vigor nunca é apagado.
+ */
+export function recordLoginFailure(id: string, options: { now: string; lockUntil: string; maxFailures: number }): { failedLogins: number; lockedUntil: string | null } {
+  const row = getDb()
+    .prepare(
+      `UPDATE app_users SET
+         failed_logins = CASE WHEN locked_until IS NOT NULL AND locked_until <= ? THEN 1 ELSE failed_logins + 1 END,
+         locked_until = CASE
+           WHEN locked_until IS NOT NULL AND locked_until > ? THEN locked_until
+           WHEN (CASE WHEN locked_until IS NOT NULL AND locked_until <= ? THEN 1 ELSE failed_logins + 1 END) >= ? THEN ?
+           ELSE NULL
+         END
+       WHERE id = ?
+       RETURNING failed_logins, locked_until`,
+    )
+    .get<{ failed_logins: number; locked_until: string | null }>(options.now, options.now, options.now, options.maxFailures, options.lockUntil, id);
+  return { failedLogins: Number(row?.failed_logins ?? 0), lockedUntil: toStringOrNull(row?.locked_until) };
 }
 
 export function recordLoginSuccess(id: string): void {
