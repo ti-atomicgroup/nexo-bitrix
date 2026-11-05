@@ -17,7 +17,7 @@ export { FORBIDDEN_MESSAGE };
 
 /**
  * Envoltório das rotas da API: id da requisição → religa o agendador → recusa escrita vinda de outro site → sessão →
- * matriz de papel × operação → conta da pessoa no Bitrix24 → parâmetros → entrada validada (zod) → serviço → JSON sem cache.
+ * senha temporária → matriz de papel × operação → conta da pessoa no Bitrix24 → parâmetros → entrada validada (zod) → serviço → JSON sem cache.
  * Erros viram `ApiErrorDTO` em pt-BR; nada interno vaza.
  */
 export type AuthMode = "public" | "install" | "session";
@@ -51,6 +51,7 @@ export type RouteHandler<K extends string> = (request: Request, context: { param
 export const UNAUTHENTICATED_MESSAGE = "Sua sessão expirou. Entre de novo.";
 export const INTERNAL_MESSAGE = "Algo deu errado. Tente de novo.";
 export const CROSS_SITE_MESSAGE = "Este pedido veio de outra página e foi recusado.";
+export const PASSWORD_CHANGE_MESSAGE = "Troque a senha temporária para continuar.";
 
 const SCHEDULER_WARN_EVERY_MS = 10 * 60 * 1000;
 let schedulerWarnedAt = 0;
@@ -131,6 +132,11 @@ export function route<A extends AuthMode, S extends z.ZodType | undefined = unde
           return unauthenticated(request, requestId);
         }
         const operation = options.operation as Operation;
+        // Antes da matriz e do Bitrix24: com senha temporária, a sessão só serve para trocá-la, ver a própria conta e sair.
+        if (session.user.mustChangePassword && operation !== "session.self") {
+          status = 403;
+          return errorJson(requestId, 403, "PASSWORD_CHANGE_REQUIRED", PASSWORD_CHANGE_MESSAGE);
+        }
         assertCan(session.user, operation);
         user = await assertBitrixAccess(session.user, operation);
         tokenHash = session.tokenHash;

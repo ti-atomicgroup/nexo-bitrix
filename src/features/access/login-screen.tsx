@@ -47,7 +47,8 @@ export function LoginScreen() {
     setPending(true);
     try {
       const session = await api.login(parsed.data);
-      router.replace(session.me.setup.stage === "ready" ? returnPath() : "/instalar");
+      // Com senha temporária, a instalação não andaria: o console pede a troca primeiro e depois segue para ela.
+      router.replace(session.me.setup.stage === "ready" || session.me.user.mustChangePassword ? returnPath() : "/instalar");
     } catch (error) {
       setFailure(toApiError(error));
       setPending(false);

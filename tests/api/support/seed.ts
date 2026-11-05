@@ -23,13 +23,14 @@ export function passwordHash(): Promise<string> {
 
 let sequence = 0;
 
-export async function seedUser(options: { role?: AppRole; email?: string; name?: string; active?: boolean } = {}): Promise<{ user: AppUserRow; token: string }> {
+export async function seedUser(options: { role?: AppRole; email?: string; name?: string; active?: boolean; mustChangePassword?: boolean } = {}): Promise<{ user: AppUserRow; token: string }> {
   sequence += 1;
   let user = createUser({
     name: options.name ?? `Pessoa ${sequence}`,
     email: options.email ?? `pessoa${sequence}@empresa.com.br`,
     passwordHash: await passwordHash(),
     role: options.role ?? "rh",
+    mustChangePassword: options.mustChangePassword,
   });
   if (options.active === false) user = updateUser(user.id, { active: false }) ?? user;
   return { user, token: issueSession(user).token };

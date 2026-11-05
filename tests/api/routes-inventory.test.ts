@@ -133,6 +133,34 @@ describe("inventário de rotas da API", () => {
     }
   });
 
+  it("senha temporária: só as rotas de session.self respondem, para qualquer papel, antes da matriz e do Bitrix24", async () => {
+    const blocked: string[] = [];
+    const open: string[] = [];
+    for (const role of ["rh", "admin"] as const) {
+      const { user } = await seedUser({ role, mustChangePassword: true });
+      for (const entry of entries.filter((item) => !PUBLIC.has(item.route))) {
+        const { path, params } = concrete(entry.route);
+        const body = entry.method === "GET" || entry.method === "DELETE" ? undefined : {};
+        const operation = (specOf(entry.route, entry.method) as { operation: Operation }).operation;
+        const label = `${entry.method} ${path} (${role})`;
+        // Sessão nova a cada chamada: a rota de logout encerra a sessão usada.
+        const result = await call<ApiErrorBody, string>(entry.handler, { method: entry.method, path, params, body, token: issueSession(user).token });
+        if (operation === "session.self") {
+          expect(result.body.error?.code, label).not.toBe("PASSWORD_CHANGE_REQUIRED");
+          expect(result.status, `${label}: ${result.text}`).toBeLessThan(500);
+          open.push(label);
+        } else {
+          expect(result.status, label).toBe(403);
+          expect(result.body.error?.code, label).toBe("PASSWORD_CHANGE_REQUIRED");
+          blocked.push(label);
+        }
+      }
+    }
+    expect(open).toEqual(expect.arrayContaining(["POST /api/auth/logout (rh)", "GET /api/me (rh)", "POST /api/me/password (rh)"]));
+    expect(open).toHaveLength(6);
+    expect(blocked.length).toBeGreaterThan(0);
+  });
+
   it("as exceções públicas são exatamente as previstas na tabela", () => {
     const publicInTable = Object.values(API_ROUTES)
       .filter((spec) => spec.auth === "public" || spec.auth === "install")

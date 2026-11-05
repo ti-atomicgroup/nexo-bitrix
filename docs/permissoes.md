@@ -7,6 +7,7 @@ Quem fez o pedido dentro do Nexo é controlado pelo próprio Nexo, no servidor:
 
 1. **Matriz de papel × operação** (tabela abaixo). Toda rota com sessão declara a operação que executa, e o servidor recusa com 403 o que o papel não pode.
    A fonte é `src/shared/permissions.ts`. Um teste garante que esta página, a tabela da API e as rotas batem com ela.
+   Quem está com senha temporária, seja qual for o papel, só consegue ver a própria conta, trocar a senha e sair: as demais rotas respondem 403 (`PASSWORD_CHANGE_REQUIRED`) até a troca.
 2. **Validação equivalente às permissões individuais do Bitrix24.** Antes de uma operação de quem é **RH** chegar ao portal, o servidor confere:
    - o acesso ao Nexo está ligado a uma pessoa do portal. O vínculo é automático quando exatamente uma pessoa ativa tem o mesmo e-mail; a administração também pode vincular em Ajustes → Equipe;
    - a conta dessa pessoa está ativa no Bitrix24, com consulta ao próprio portal;

@@ -25,6 +25,8 @@
 .placeholderBar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
   min-height: var(--bar-height);
   padding: 0 var(--space-5);
   background: var(--forest);
@@ -41,6 +43,13 @@
 .main:focus {
   outline: none;
   box-shadow: none;
+}
+
+.gate {
+  display: grid;
+  align-content: start;
+  gap: var(--space-5);
+  max-width: 760px;
 }
 
 @media (max-width: 640px) {

@@ -54,6 +54,9 @@ O que é apagado ou substituído não fica legível no arquivo: o banco usa `sec
 - **Content-Security-Policy.** Com nonce novo a cada página (`src/proxy.ts`) e sem `unsafe-inline` nem `unsafe-eval` em produção, nem para scripts, nem
   para estilos. A API responde com `default-src 'none'`. `frame-ancestors` limitado ao painel da Onnira, mais `nosniff` e `Referrer-Policy`.
 - **Senhas.** scrypt com sal aleatório. Cinco tentativas erradas bloqueiam o login por 15 minutos.
+  - **Senha temporária.** Acesso criado em Ajustes → Equipe, ou com a senha redefinida ali, entra com senha temporária. O servidor recusa com 403 (`PASSWORD_CHANGE_REQUIRED`)
+    toda rota com sessão até a troca, salvo ver a própria conta, trocar a senha e sair. A nova senha precisa ser diferente da atual, e a tela pede a troca antes de abrir qualquer página.
+  - `npm run senha:redefinir`, no servidor, grava a senha digitada por quem tem acesso à máquina: ela não é temporária e não exige troca.
 - **Limites de tentativas.** Gravados no SQLite: continuam valendo depois de reiniciar e entre instâncias que dividem o volume.
   - Login: 5 por conta e 30 por origem, a cada 15 minutos. Sem teto geral, para ninguém conseguir trancar o login de todos.
   - Instalação: 20 conexões no total e 10 por origem, a cada 10 minutos.

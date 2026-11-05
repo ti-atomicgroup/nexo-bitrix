@@ -2,6 +2,7 @@
  * Mapa da API do Nexo: método, caminho, entrada (esquema em ./schemas) e saída (DTO em ./contracts).
  * Autenticação: `auth: "session"` exige sessão (cookie protegido ou, no modo alternativo, `X-Nexo-Session`) e a `operation`
  * da matriz em ./permissions diz quais papéis podem; `public` e `install` não exigem sessão.
+ * Com senha temporária, só as operações `session.self` respondem; as demais rotas de sessão devolvem 403 `PASSWORD_CHANGE_REQUIRED`.
  * Erros: status HTTP adequado + corpo `ApiErrorDTO` ({ error: { code, message } }), mensagem em pt-BR.
  *
  * A interface (src/lib/api-client.ts) e as rotas (src/app/api/**) seguem esta tabela.

@@ -110,7 +110,9 @@ export function Diagnostics({ variant }: { variant: "same-origin" | "no-referrer
       },
       (error: unknown) => {
         const denied = error instanceof ApiError && (error.status === 401 || error.status === 403);
-        put("full", { label: "Diagnóstico completo", status: "aviso", detail: denied ? "Entre com um acesso de administração para ver o ambiente do servidor." : "Sem resposta do servidor." });
+        const mustChangePassword = error instanceof ApiError && error.code === "PASSWORD_CHANGE_REQUIRED";
+        const detail = mustChangePassword ? error.message : denied ? "Entre com um acesso de administração para ver o ambiente do servidor." : "Sem resposta do servidor.";
+        put("full", { label: "Diagnóstico completo", status: "aviso", detail });
       },
     );
   }, [put]);
