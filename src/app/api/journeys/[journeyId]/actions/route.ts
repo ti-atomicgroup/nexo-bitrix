@@ -4,6 +4,6 @@ import { journeyActionInput } from "@/shared/schemas";
 
 export const dynamic = "force-dynamic";
 
-export const POST = route({ auth: "user", params: ["journeyId"], input: journeyActionInput }, ({ params, input, actor }) =>
+export const POST = route({ auth: "session", operation: "journey.manage", params: ["journeyId"], input: journeyActionInput }, ({ params, input, actor }) =>
   runJourneyAction(params.journeyId, input, actor),
 );

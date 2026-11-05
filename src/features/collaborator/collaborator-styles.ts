@@ -54,7 +54,7 @@ body:has(> .cp),body:has(> main.cp){margin:0}
 .cp-progress-text{font-weight:600}
 .cp-progress-text strong{font:700 24px/1 var(--cp-display)}
 .cp-bar{height:8px;border-radius:4px;background:var(--cp-line-pending);overflow:hidden}
-.cp-bar span{display:block;height:100%;border-radius:4px;background:var(--cp-forest)}
+.cp-bar svg{display:block;border-radius:4px;background:var(--cp-forest)}
 .cp-stations{display:grid}
 .cp-station{position:relative;display:grid;grid-template-columns:28px minmax(0,1fr);column-gap:14px;padding-bottom:28px}
 .cp-station:last-child{padding-bottom:0}

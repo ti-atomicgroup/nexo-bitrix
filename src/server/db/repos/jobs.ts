@@ -1,5 +1,6 @@
 import "server-only";
 import { getDb } from "..";
+import { openField, sealField } from "../../security/fields";
 import { newId, nowIso, parseJson, toStringOrNull } from "./util";
 
 export type JobStatus = "queued" | "running" | "done" | "failed";
@@ -22,7 +23,7 @@ function map(row: Record<string, unknown>): JobRow {
     id: String(row.id),
     kind: String(row.kind),
     dedupeKey: toStringOrNull(row.dedupe_key),
-    payload: parseJson<Record<string, unknown>>(row.payload, {}),
+    payload: parseJson<Record<string, unknown>>(openField(row.payload), {}),
     runAt: String(row.run_at),
     attempts: Number(row.attempts),
     lastError: toStringOrNull(row.last_error),
@@ -36,11 +37,17 @@ function map(row: Record<string, unknown>): JobRow {
  * Enfileira um job. Com `dedupeKey`: se já existe concluído ou falho, volta para a fila;
  * se está na fila, antecipa o horário quando o novo for mais cedo; se está rodando, mantém.
  */
+/** Falhas antigas: o texto delas (comentários, mensagens) pode citar pessoas. */
+export function purgeFailedJobs(beforeIso: string): number {
+  return getDb().prepare("DELETE FROM jobs WHERE status = 'failed' AND updated_at < ?").run(beforeIso).changes;
+}
+
 export function enqueueJob(input: { kind: string; payload?: Record<string, unknown>; dedupeKey?: string | null; runAt?: string }): JobRow {
   const db = getDb();
   const now = nowIso();
   const runAt = input.runAt ?? now;
-  const payload = JSON.stringify(input.payload ?? {});
+  // Comentários e mensagens citam motivo e nome: cifrados como o histórico.
+  const payload = sealField(JSON.stringify(input.payload ?? {})) as string;
   return db.tx(() => {
     if (input.dedupeKey) {
       const existing = db.prepare("SELECT * FROM jobs WHERE dedupe_key = ?").get(input.dedupeKey);

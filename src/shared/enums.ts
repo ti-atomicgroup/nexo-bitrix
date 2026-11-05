@@ -43,6 +43,10 @@ export type DocumentStatus = (typeof DOCUMENT_STATUSES)[number];
 export const SYNC_STATES = ["local", "queued", "synced", "error", "uncertain"] as const;
 export type SyncState = (typeof SYNC_STATES)[number];
 
+/** Como o token da sessão chega ao navegador: cookie protegido (o JavaScript não alcança) ou modo alternativo, se o cookie for bloqueado. */
+export const SESSION_TRANSPORTS = ["cookie", "bearer"] as const;
+export type SessionTransport = (typeof SESSION_TRANSPORTS)[number];
+
 export const APP_ROLES = ["admin", "rh"] as const;
 export type AppRole = (typeof APP_ROLES)[number];
 

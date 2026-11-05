@@ -4,6 +4,6 @@ import { triggerInput } from "@/shared/schemas";
 
 export const dynamic = "force-dynamic";
 
-export const GET = route({ auth: "user" }, () => listTriggerDTOs());
+export const GET = route({ auth: "session", operation: "trigger.read" }, () => listTriggerDTOs());
 
-export const POST = route({ auth: "admin", input: triggerInput }, ({ input, actor }) => createTriggerFromInput(input, actor));
+export const POST = route({ auth: "session", operation: "trigger.write", input: triggerInput }, ({ input, actor }) => createTriggerFromInput(input, actor));

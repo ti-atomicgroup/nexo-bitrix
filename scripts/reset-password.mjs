@@ -83,6 +83,8 @@ try {
   db.exec("BEGIN IMMEDIATE");
   db.prepare("UPDATE app_users SET password_hash = ?, failed_logins = 0, locked_until = NULL, must_change_password = 0 WHERE id = ?").run(hash, user.id);
   sessions = db.prepare("DELETE FROM sessions WHERE user_id = ?").run(user.id).changes;
+  // As chaves dos limites são HMAC, sem o e-mail: zera todas, para esta pessoa poder entrar já.
+  db.prepare("DELETE FROM rate_limit_hits").run();
   db.prepare("INSERT INTO audit_log (at, actor_type, actor_id, actor_name, action, entity, entity_id, detail) VALUES (?, 'system', NULL, NULL, ?, 'user', ?, ?)").run(
     now,
     "Senha redefinida pelo terminal do servidor",

@@ -1,8 +1,6 @@
 import type { NextConfig } from "next";
 import { execSync } from "node:child_process";
 
-const production = process.env.NODE_ENV === "production";
-
 /** Commit do build; "+ alterações" quando o build sai de arquivos ainda não commitados (ex.: build local). */
 function gitCommit(): string {
   const git = (command: string) => execSync(command, { stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
@@ -14,21 +12,8 @@ function gitCommit(): string {
   }
 }
 
-// A Onnira exibe o app dentro do painel (iframe). Localhost só fora de produção (testes locais): em produção, nenhuma página local emoldura o Nexo.
-const frameAncestors = ["'self'", "https://app.onnira.com", "https://app.onnira.com.br", ...(production ? [] : ["http://localhost:*", "http://127.0.0.1:*"])].join(" ");
-
-const contentSecurityPolicy = [
-  "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${production ? "" : " 'unsafe-eval'"}`,
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
-  "font-src 'self' data:",
-  `connect-src 'self'${production ? "" : " ws: wss:"}`,
-  `frame-ancestors ${frameAncestors}`,
-  "base-uri 'self'",
-  "form-action 'self'",
-  "object-src 'none'",
-].join("; ");
+// As páginas recebem a CSP com nonce em src/proxy.ts. A API só devolve dados: nada ali carrega, executa ou é emoldurado.
+const apiContentSecurityPolicy = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
@@ -48,12 +33,13 @@ const nextConfig: NextConfig = {
       {
         source: "/:path*",
         headers: [
-          { key: "Content-Security-Policy", value: contentSecurityPolicy },
           { key: "Referrer-Policy", value: "same-origin" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
         ],
       },
+      { source: "/api/:path*", headers: [{ key: "Content-Security-Policy", value: apiContentSecurityPolicy }] },
+      { source: "/health", headers: [{ key: "Content-Security-Policy", value: apiContentSecurityPolicy }] },
       {
         // Sonda: mesma página sem Referer, para descobrir se a borda da Onnira bloqueia os scripts.
         source: "/diagnostico/sem-referer",

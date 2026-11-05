@@ -5,4 +5,4 @@ import { prepareInput } from "@/shared/schemas";
 
 export const dynamic = "force-dynamic";
 
-export const POST = route({ auth: "admin", input: prepareInput }, ({ input, actor }) => taskStarted(startPrepare(input, actor)));
+export const POST = route({ auth: "session", operation: "workspace.prepare", input: prepareInput }, ({ input, actor }) => taskStarted(startPrepare(input, actor)));

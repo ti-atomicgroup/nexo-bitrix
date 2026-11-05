@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { CollaboratorPage, type CollaboratorFlash } from "@/features/collaborator/collaborator-page";
 import { loadCollaboratorView } from "@/server/services/collaborator";
@@ -18,7 +19,7 @@ export default async function CollaboratorRoute({
   const view = loadCollaboratorView(token);
   if (!view) notFound();
   const query = await searchParams;
-  return <CollaboratorPage view={view} token={token} flash={flashFrom(query)} />;
+  return <CollaboratorPage view={view} token={token} flash={flashFrom(query)} nonce={(await headers()).get("x-nonce")} />;
 }
 
 /** Resultado do último formulário (vem na query depois do redirecionamento 303). */

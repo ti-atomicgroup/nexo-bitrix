@@ -35,6 +35,7 @@ export const webhookRecordSchema = z.object({
   owner: userRefSchema,
   scopes: z.array(z.string()),
   verifiedAt: z.string(),
+  ownerIsPortalAdmin: z.boolean().nullable().optional(),
 });
 export type WebhookRecord = z.infer<typeof webhookRecordSchema>;
 
@@ -72,6 +73,9 @@ const syncStateSchema = z.object({
   rateLimitedUntil: z.string().nullable(),
   peopleRefreshedAt: z.string().nullable(),
   checklistsPolledAt: z.string().nullable(),
+  dataCareAt: z.string().nullable(),
+  lastBackupAt: z.string().nullable(),
+  lastBackupError: z.string().nullable(),
 });
 export type SyncState = z.infer<typeof syncStateSchema>;
 
@@ -105,6 +109,9 @@ const EMPTY_SYNC: SyncState = {
   rateLimitedUntil: null,
   peopleRefreshedAt: null,
   checklistsPolledAt: null,
+  dataCareAt: null,
+  lastBackupAt: null,
+  lastBackupError: null,
 };
 
 /* Acessores tipados */
@@ -133,6 +140,11 @@ export const setContent = (content: CollaboratorContentDTO): void => setSetting(
 
 export const getFeatures = (): FeatureToggles => getSetting("features", featuresSchema) ?? DEFAULT_FEATURES;
 export const setFeatures = (features: FeatureToggles): void => setSetting("features", features);
+
+/** Jornadas encerradas ficam guardadas por este tempo e depois são excluídas (ajustável em Ajustes). */
+export const DEFAULT_RETENTION_MONTHS = 24;
+export const getRetentionMonths = (): number => getSetting("retention.months", z.number().int()) ?? DEFAULT_RETENTION_MONTHS;
+export const setRetentionMonths = (months: number): void => setSetting("retention.months", months);
 
 export const getSyncState = (): SyncState => ({ ...EMPTY_SYNC, ...(getSetting("sync", syncStateSchema.partial()) ?? {}) });
 export function patchSyncState(patch: Partial<SyncState>): SyncState {

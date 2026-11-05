@@ -88,23 +88,30 @@ Nenhuma variável de ambiente é obrigatória. Opcionais:
 - `NEXO_DATA_DIR`: outra pasta de dados.
 - `NEXO_BUILD_HEAP_MB`: memória do build. Por padrão, 320 MB em ambientes de até 1,5 GB (como os 512 MB da Onnira)
   e metade da memória da máquina, até 4 GB, nos demais.
+- `NEXO_ENCRYPTION_KEY`: chave de cifragem (64 hex), fora do volume do banco. Recomendada com dados reais.
+- `NEXO_BITRIX_ALLOWED_HOSTS`: portais em domínio próprio, separados por vírgula.
+- `NEXO_TRUSTED_PROXY_HOPS`: quantos proxies há na frente do Nexo, para os limites por origem (padrão 1).
+- `NEXO_BACKUP_KEEP_DAYS`: dias que as cópias de segurança ficam guardadas (padrão 14).
 
 ## Documentação
 
 - [`docs/instalacao.md`](docs/instalacao.md): instalação passo a passo.
 - [`docs/escopos.md`](docs/escopos.md): por que o Nexo pede cada permissão do webhook.
 - [`docs/seguranca-lgpd.md`](docs/seguranca-lgpd.md): segurança e LGPD.
+- [`docs/permissoes.md`](docs/permissoes.md): matriz de papel × operação e o modelo de permissões do Bitrix24.
+- [`docs/onnira-seguranca.md`](docs/onnira-seguranca.md): o que confirmar com a Onnira antes de usar com dados reais.
 - [`docs/superpowers/specs/2026-10-26-nexo-v2-design.md`](docs/superpowers/specs/2026-10-26-nexo-v2-design.md):
   especificação aprovada.
 
 ## Diagnóstico
 
-- `/diagnostico`: confere o que a hospedagem oferece (Node, SQLite, pasta de dados persistente, iframe, armazenamento,
-  abas, cópia, download, e-mail e WhatsApp). O botão **Copiar relatório** gera um JSON sem dados pessoais nem segredos.
+- `/diagnostico`: confere o que o navegador e a hospedagem oferecem (iframe, armazenamento, cookie protegido, abas, cópia,
+  download, e-mail e WhatsApp). Com um acesso de administração, mostra também Node, SQLite, pasta de dados e o teste de
+  saída até o Bitrix24. O botão **Copiar relatório** gera um JSON sem dados pessoais nem segredos.
 - `/diagnostico/sem-referer`: a mesma verificação sem o cabeçalho Referer (descobre se a borda da hospedagem bloqueia
   scripts).
 - `/j/teste`: abra numa janela anônima para saber se o link pessoal do colaborador funciona fora da hospedagem.
-- `/health` e `/api/health`: versão, commit e Node que estão no ar.
+- `/health` e `/api/health`: só dizem que o processo está vivo. Versão e commit ficam em Ajustes → Diagnóstico.
 
 ## Verificação
 

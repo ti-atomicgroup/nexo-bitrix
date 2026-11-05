@@ -4,6 +4,6 @@ import { ledgerWaiveInput } from "@/shared/schemas";
 
 export const dynamic = "force-dynamic";
 
-export const PATCH = route({ auth: "user", params: ["ledgerItemId"], input: ledgerWaiveInput }, ({ params, input, actor }) =>
+export const PATCH = route({ auth: "session", operation: "ledger.waive", params: ["ledgerItemId"], input: ledgerWaiveInput }, ({ params, input, actor }) =>
   waiveItem(params.ledgerItemId, input.reason, actor),
 );

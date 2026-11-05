@@ -1,7 +1,8 @@
 /**
  * Cliente da API do Nexo (mesma origem, `/api/...`), uma função por rota de `src/shared/api.ts`.
- * Login sem cookie: token Bearer guardado em localStorage → sessionStorage → memória (o iframe da Onnira
- * pode bloquear o armazenamento). Erros viram `ApiError` com a mensagem pt-BR pronta para a tela.
+ * Sessão: cookie HttpOnly sempre que o navegador e a hospedagem aceitam (o token nunca passa pelo JavaScript). Se o cookie
+ * for bloqueado, modo alternativo: token só na memória e no sessionStorage, com janela menor. Nunca em localStorage.
+ * Erros viram `ApiError` com a mensagem pt-BR pronta para a tela.
  */
 import type { z } from "zod";
 import { API_ROUTES, type ApiRouteName } from "@/shared/api";
@@ -10,10 +11,13 @@ import type {
   ApiErrorDTO,
   AppUserDTO,
   AuditEntryDTO,
+  BasicProbeDTO,
   CollaboratorLinkDTO,
   CrmSourceDTO,
   DetectionDTO,
   DiagnosticsDTO,
+  ErasureReceiptDTO,
+  FullProbeDTO,
   JourneyDTO,
   JourneyPreviewDTO,
   JourneySummaryDTO,
@@ -21,7 +25,10 @@ import type {
   LibraryActivityDTO,
   MeDTO,
   PersonDTO,
+  PersonExportDTO,
+  PrivacyPersonDTO,
   SessionDTO,
+  SessionTransportDTO,
   SettingsDTO,
   SetupStateDTO,
   StatusDTO,
@@ -34,7 +41,7 @@ import type {
   TriggerDTO,
   WebhookCheckDTO,
 } from "@/shared/contracts";
-import type { JourneyKind, JourneyStatus } from "@/shared/enums";
+import type { JourneyKind, JourneyStatus, SessionTransport } from "@/shared/enums";
 import type * as Schemas from "@/shared/schemas";
 import { safeGet, safeRemove, safeSet } from "./storage";
 
@@ -67,6 +74,8 @@ export function toApiError(error: unknown): ApiError {
 /* ───────────── Token de sessão ───────────── */
 
 const TOKEN_KEY = "nexo.session";
+/** Dica sem segredo, gravada pelo servidor junto com o cookie HttpOnly: só diz que vale a pena pedir `/api/me`. */
+const SIGNED_COOKIE = "__Host-nexo_signed";
 let memoryToken: string | null = null;
 const tokenListeners = new Set<() => void>();
 
@@ -74,34 +83,64 @@ function notifyToken(): void {
   for (const listener of tokenListeners) listener();
 }
 
+/** Token do modo alternativo. Com cookie, é sempre nulo: o JavaScript não alcança a sessão. */
 export function getToken(): string | null {
-  return safeGet("local", TOKEN_KEY) ?? safeGet("session", TOKEN_KEY) ?? memoryToken;
+  return safeGet("session", TOKEN_KEY) ?? memoryToken;
 }
 
-export function setToken(token: string): void {
+function hasSignedCookie(): boolean {
+  if (typeof document === "undefined") return false;
+  try {
+    return document.cookie.split(";").some((part) => part.trim().startsWith(`${SIGNED_COOKIE}=`));
+  } catch {
+    return false;
+  }
+}
+
+/** Há sessão para tentar? A resposta definitiva é de `/api/me`: 401 limpa tudo. */
+export function hasSession(): boolean {
+  return hasSignedCookie() || getToken() !== null;
+}
+
+function setToken(token: string): void {
   memoryToken = token;
-  if (!safeSet("local", TOKEN_KEY, token)) safeSet("session", TOKEN_KEY, token);
+  safeSet("session", TOKEN_KEY, token);
   notifyToken();
 }
 
 export function clearToken(): void {
   memoryToken = null;
+  // A v2 guardava o token no localStorage: some daqui também.
   safeRemove("local", TOKEN_KEY);
   safeRemove("session", TOKEN_KEY);
+  if (typeof document !== "undefined") {
+    try {
+      document.cookie = `${SIGNED_COOKIE}=; Path=/; Secure; SameSite=None; Partitioned; Max-Age=0`;
+    } catch {
+      /* cookies bloqueados: não há dica a apagar */
+    }
+  }
   notifyToken();
 }
 
-/** Para `useSyncExternalStore`: avisa quando o token muda nesta aba ou em outra. */
+// Abrir a v3 já apaga o token antigo, mesmo sem entrar de novo.
+safeRemove("local", TOKEN_KEY);
+
+/** Para `useSyncExternalStore`: avisa quando a sessão muda nesta aba. Em outra aba, percebe ao voltar o foco. */
 export function subscribeToken(listener: () => void): () => void {
   tokenListeners.add(listener);
-  const onStorage = (event: StorageEvent) => {
-    if (event.key === TOKEN_KEY || event.key === null) listener();
-  };
-  if (typeof window !== "undefined") window.addEventListener("storage", onStorage);
+  if (typeof window !== "undefined") window.addEventListener("focus", listener);
   return () => {
     tokenListeners.delete(listener);
-    if (typeof window !== "undefined") window.removeEventListener("storage", onStorage);
+    if (typeof window !== "undefined") window.removeEventListener("focus", listener);
   };
+}
+
+/** Entrega feita pelo servidor: no modo alternativo, guarda o token; com cookie, só avisa que a sessão começou. */
+function sessionStarted(session: SessionDTO): SessionDTO {
+  if (session.token) setToken(session.token);
+  else notifyToken();
+  return session;
 }
 
 /* ───────────── Token de instalação (preso à aba que validou o webhook) ───────────── */
@@ -171,12 +210,18 @@ function fallbackMessage(status: number): string {
   return "Não foi possível concluir. Tente de novo.";
 }
 
-async function call<T>(name: ApiRouteName, options: RequestOptions = {}): Promise<T> {
-  const route = API_ROUTES[name];
-  const headers: Record<string, string> = { Accept: "application/json" };
+function requestHeaders(): Record<string, string> {
+  // X-Nexo-Client: sem ele o cookie não vale. Um site de fora não consegue mandá-lo, porque exigiria CORS, que o Nexo não libera.
+  const headers: Record<string, string> = { Accept: "application/json", "X-Nexo-Client": "web" };
   const token = getToken();
   // A borda da Onnira remove `Authorization`; o servidor lê primeiro o cabeçalho próprio.
   if (token) headers["X-Nexo-Session"] = token;
+  return headers;
+}
+
+async function call<T>(name: ApiRouteName, options: RequestOptions = {}): Promise<T> {
+  const route = API_ROUTES[name];
+  const headers = requestHeaders();
   if (options.body !== undefined) headers["Content-Type"] = "application/json";
 
   let response: Response;
@@ -205,8 +250,7 @@ async function call<T>(name: ApiRouteName, options: RequestOptions = {}): Promis
   }
 
   if (!response.ok) {
-    const sessionRoute = route.auth === "user" || route.auth === "admin";
-    if (response.status === 401 && sessionRoute) clearToken();
+    if (response.status === 401 && route.auth === "session") clearToken();
     if (isApiErrorBody(payload)) {
       const description = (payload.error as { details?: { description?: unknown } }).details?.description;
       throw new ApiError(payload.error.code || `http_${response.status}`, payload.error.message, response.status, typeof description === "string" ? description : null);
@@ -218,6 +262,35 @@ async function call<T>(name: ApiRouteName, options: RequestOptions = {}): Promis
     throw new ApiError("bad_response", "O servidor respondeu num formato inesperado. Tente de novo.", response.status);
   }
   return payload as T;
+}
+
+/** O cookie protegido funciona aqui? Duas chamadas: a primeira grava um cookie de teste, a segunda confere se ele voltou. */
+export async function negotiateTransport(options: CallOptions = {}): Promise<SessionTransport> {
+  try {
+    const first = await call<SessionTransportDTO>("sessionTransport", options);
+    if (first.cookie) return "cookie";
+    return (await call<SessionTransportDTO>("sessionTransport", options)).cookie ? "cookie" : "bearer";
+  } catch (error) {
+    if (isAbortError(error)) throw error;
+    return "bearer";
+  }
+}
+
+/** Arquivo em vez de JSON (cópia de segurança). */
+async function download(name: ApiRouteName, options: CallOptions = {}): Promise<{ blob: Blob; fileName: string }> {
+  let response: Response;
+  try {
+    response = await fetch(buildPath(name), { method: API_ROUTES[name].method, headers: requestHeaders(), cache: "no-store", credentials: "same-origin", signal: options.signal });
+  } catch (error) {
+    if (isAbortError(error)) throw error;
+    throw new ApiError("network", NETWORK_MESSAGE, 0);
+  }
+  if (!response.ok) {
+    if (response.status === 401) clearToken();
+    throw new ApiError(`http_${response.status}`, fallbackMessage(response.status), response.status);
+  }
+  const fileName = /filename="([^"]+)"/.exec(response.headers.get("content-disposition") ?? "")?.[1] ?? "nexo-backup.sqlite.enc";
+  return { blob: await response.blob(), fileName };
 }
 
 /* ───────────── Trabalho em segundo plano (202 + consulta) ───────────── */
@@ -289,14 +362,6 @@ export type ReplaceWebhookBody = In<typeof Schemas.replaceWebhookInput>;
 export type CreateUserBody = In<typeof Schemas.createUserInput>;
 export type UpdateUserBody = In<typeof Schemas.updateUserInput>;
 
-export interface HealthDTO {
-  ok: boolean;
-  version: string;
-  commit: string;
-  buildTime: string;
-  node: string;
-}
-
 export interface Ok {
   ok: true;
 }
@@ -305,25 +370,19 @@ export interface Ok {
 
 export const api = {
   /* Público */
-  health: (o?: CallOptions) => call<HealthDTO>("health", o),
+  health: (o?: CallOptions) => call<Ok>("health", o),
   status: (o?: CallOptions) => call<StatusDTO>("status", o),
+  probe: (o?: CallOptions) => call<BasicProbeDTO>("probe", o),
 
   /* Instalação */
   setupConnect: (body: ConnectWebhookBody, o?: CallOptions) => runTask<WebhookCheckDTO>("setupConnect", { ...o, body }),
-  setupAccount: async (body: CreateAccountBody, o?: CallOptions) => {
-    const session = await call<SessionDTO>("setupAccount", { ...o, body });
-    setToken(session.token);
-    return session;
-  },
+  setupAccount: async (body: CreateAccountBody, o?: CallOptions) => sessionStarted(await call<SessionDTO>("setupAccount", { ...o, body: { ...body, transport: await negotiateTransport(o) } })),
   setupPrepare: (body: PrepareBody, o?: CallOptions) => runTask<SetupStateDTO>("setupPrepare", { ...o, body }),
   task: (taskId: string, o?: CallOptions) => call<TaskStatusDTO>("task", { ...o, params: { taskId } }),
 
   /* Sessão */
-  login: async (body: LoginBody, o?: CallOptions) => {
-    const session = await call<SessionDTO>("login", { ...o, body });
-    setToken(session.token);
-    return session;
-  },
+  sessionTransport: (o?: CallOptions) => call<SessionTransportDTO>("sessionTransport", o),
+  login: async (body: LoginBody, o?: CallOptions) => sessionStarted(await call<SessionDTO>("login", { ...o, body: { ...body, transport: await negotiateTransport(o) } })),
   logout: async (o?: CallOptions) => {
     try {
       return await call<Ok>("logout", o);
@@ -391,7 +450,14 @@ export const api = {
   userCreate: (body: CreateUserBody, o?: CallOptions) => call<AppUserDTO>("userCreate", { ...o, body }),
   userUpdate: (userId: string, body: UpdateUserBody, o?: CallOptions) => call<AppUserDTO>("userUpdate", { ...o, params: { userId }, body }),
   diagnostics: (o?: CallOptions) => call<DiagnosticsDTO>("diagnostics", o),
+  probeFull: (query: { bitrix?: string } = {}, o?: CallOptions) => call<FullProbeDTO>("probeFull", { ...o, query }),
   audit: (query: { limit?: number } = {}, o?: CallOptions) => call<AuditEntryDTO[]>("audit", { ...o, query }),
+
+  /* Dados pessoais e cópia de segurança */
+  privacyPeople: (query: { query?: string } = {}, o?: CallOptions) => call<PrivacyPersonDTO[]>("privacyPeople", { ...o, query }),
+  privacyExport: (personId: string, o?: CallOptions) => call<PersonExportDTO>("privacyExport", { ...o, params: { personId } }),
+  privacyErase: (personId: string, body: { confirmName: string }, o?: CallOptions) => call<ErasureReceiptDTO>("privacyErase", { ...o, params: { personId }, body }),
+  backup: (o?: CallOptions) => download("backup", o),
 } satisfies Record<ApiRouteName, (...args: never[]) => Promise<unknown>>;
 
 export type Api = typeof api;

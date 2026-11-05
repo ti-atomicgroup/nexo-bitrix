@@ -20,6 +20,7 @@ import type {
   ParticipantRole,
   ReleaseMode,
   RequiredScope,
+  SessionTransport,
   SetupStage,
   SyncState,
   Visibility,
@@ -269,6 +270,10 @@ export interface AuditEntryDTO {
   actor: string;
   action: string;
   detail: string;
+  /** Conta técnica com que o Nexo age no Bitrix24 (ex.: "Conta Nexo (Bitrix24 #7)"). */
+  via?: string | null;
+  /** Conta da própria pessoa no Bitrix24, quando vinculada. */
+  actorBitrixId?: string | null;
 }
 
 export interface JourneyDTO {
@@ -386,6 +391,8 @@ export interface CrmSourceDTO {
 export interface ScopeCheckDTO {
   required: Record<RequiredScope, boolean>;
   optional: Record<OptionalScope, boolean>;
+  /** Escopos concedidos que o Nexo não usa: privilégio a mais na conta técnica. */
+  extra?: string[];
 }
 
 export interface SetupStateDTO {
@@ -395,11 +402,51 @@ export interface SetupStateDTO {
   scopes: ScopeCheckDTO | null;
 }
 
-/** Resposta pública de /api/status (sem segredos). */
+/** Resposta pública de /api/status: só a etapa, para decidir entre instalar e entrar. */
 export interface StatusDTO {
   setup: SetupStage;
-  version: string;
-  commit: string;
+}
+
+/** Resposta pública de /api/probe: serve ao suporte antes do login e não diz nada sobre o ambiente. */
+export interface BasicProbeDTO {
+  ok: boolean;
+  database: boolean;
+  /** Se os cabeçalhos que este navegador mandou chegaram ao servidor (a borda pode removê-los). Só sim ou não. */
+  sessionHeader: boolean;
+  authorizationHeader: boolean;
+}
+
+export interface EgressAttemptDTO {
+  ok: boolean;
+  ms: number;
+  status?: number;
+  error?: string;
+}
+
+/** GET /api/probe/full: diagnóstico do ambiente, só para a administração e com os campos mínimos. */
+export interface FullProbeDTO {
+  build: { version: string; commit: string; buildTime: string };
+  runtime: { node: string; platform: string; arch: string; uptimeSeconds: number; rssMb: number; totalMb: number; constrainedMb: number | null };
+  dataDir: { source: string; persistent: boolean; writable: boolean };
+  dataProtection: DataProtectionDTO;
+  boots: number | null;
+  sqlite: Array<{ driver: string; ok: boolean; journalMode?: string; error?: string }>;
+  bitrixWorker: boolean;
+  egress: {
+    host: string;
+    error?: string;
+    dns?: { ok: boolean; addresses?: string[]; error?: string };
+    bitrixFetch?: EgressAttemptDTO;
+    bitrixIpv4?: EgressAttemptDTO;
+    neutralFetch?: EgressAttemptDTO;
+    outboundIp?: { ok: boolean; ip?: string; error?: string };
+    worker?: Record<string, unknown> | null;
+  } | null;
+}
+
+export interface SessionTransportDTO {
+  /** O cookie de teste da chamada anterior voltou: o navegador e a hospedagem aceitam o cookie protegido. */
+  cookie: boolean;
 }
 
 export interface MeDTO {
@@ -408,7 +455,9 @@ export interface MeDTO {
 }
 
 export interface SessionDTO {
-  token: string;
+  transport: SessionTransport;
+  /** Só no modo alternativo. Com cookie, o token nunca passa pelo JavaScript. */
+  token?: string;
   expiresAt: string;
   me: MeDTO;
 }
@@ -426,6 +475,12 @@ export interface WebhookCheckDTO {
   portal: string;
   owner: UserRef;
   scopes: ScopeCheckDTO;
+  privilege: WebhookPrivilegeDTO;
+}
+
+/** O que a conta técnica pode além do necessário, para a administração enxergar. Nulo: o Bitrix24 não informou. */
+export interface WebhookPrivilegeDTO {
+  ownerIsPortalAdmin: boolean | null;
 }
 
 export interface CollaboratorContentDTO {
@@ -439,7 +494,7 @@ export interface CollaboratorContentDTO {
 export interface SettingsDTO {
   company: { name: string; timezone: string };
   portal: string | null;
-  webhook: { masked: string; owner: UserRef; scopes: ScopeCheckDTO; verifiedAt: string } | null;
+  webhook: { masked: string; owner: UserRef; scopes: ScopeCheckDTO; verifiedAt: string; privilege: WebhookPrivilegeDTO } | null;
   project: { id: string; name: string; url: string } | null;
   defaults: Partial<Record<ParticipantRole, UserRef>>;
   content: CollaboratorContentDTO;
@@ -448,6 +503,8 @@ export interface SettingsDTO {
   documentsEnabled?: boolean;
   /** Convite para o Bitrix24 na nova jornada: o webhook precisa da permissão Usuários (user). */
   invitesEnabled?: boolean;
+  /** Jornadas encerradas ficam guardadas por este número de meses e depois são excluídas. */
+  retentionMonths: number;
 }
 
 export interface AppUserDTO {
@@ -457,12 +514,43 @@ export interface AppUserDTO {
   role: AppRole;
   active: boolean;
   lastLoginAt: string | null;
+  /** Pessoa do portal ligada a este acesso. `member`: participa do projeto das tarefas (nulo: não deu para conferir agora). */
+  bitrix?: { id: string; name: string; active: boolean; member: boolean | null } | null;
+}
+
+/** Permissões dos arquivos de dados. `applies`: falso em sistema sem permissões POSIX (ex.: Windows). */
+export interface DataProtectionDTO {
+  applies: boolean;
+  ok: boolean;
+  /** Arquivos que outros usuários do sistema ainda alcançam (nomes relativos à pasta de dados). */
+  exposed: string[];
+  /** A chave da instância vem do ambiente, separada do volume do banco. */
+  keyFromEnv: boolean;
+}
+
+export interface BackupInfoDTO {
+  lastAt: string | null;
+  count: number;
+  keepDays: number;
+  lastError: string | null;
+}
+
+export interface SecurityEventsDTO {
+  /** Janela da contagem, em horas. */
+  hours: number;
+  loginFailures: number;
+  loginLocks: number;
+  rateLimited: number;
 }
 
 export interface DiagnosticsDTO {
   build: { version: string; commit: string; buildTime: string };
   node: string;
-  database: { driver: string; journalMode: string; dataDir: string };
+  database: { driver: string; journalMode: string; dataSource: string };
+  dataProtection: DataProtectionDTO;
+  backup: BackupInfoDTO;
+  security: SecurityEventsDTO;
+  bitrixWorker: boolean;
   scheduler: { running: boolean; lastCycleAt: string | null; lastCycleMs: number | null; lastError: string | null; nextCycleAt: string | null };
   queue: { queued: number; failed: number };
   rateLimitedUntil: string | null;
@@ -507,6 +595,55 @@ export interface CollaboratorViewDTO {
   completed: boolean;
   /** O link aceita envio de arquivos (webhook com Drive e jornada em andamento). */
   uploadsEnabled?: boolean;
+}
+
+/* ───────────── Dados pessoais (LGPD) ───────────── */
+
+export interface PrivacyPersonDTO {
+  id: string;
+  name: string;
+  email: string | null;
+  source: "bitrix" | "manual" | "crm";
+  active: boolean;
+  bitrixUserId: string | null;
+  journeys: number;
+  /** Jornadas em andamento: a exclusão espera o cancelamento ou a conclusão. */
+  openJourneys: number;
+}
+
+/** Tudo o que o Nexo guarda sobre a pessoa. Vai para o arquivo que o titular recebe. */
+export interface PersonExportDTO {
+  exportedAt: string;
+  person: { id: string; name: string; email: string | null; position: string | null; department: string | null; source: string; bitrixUserId: string | null };
+  journeys: Array<{
+    id: string;
+    kind: JourneyKind;
+    status: JourneyStatus;
+    anchorDate: string;
+    position: string | null;
+    offboardingReason: OffboardingReason | null;
+    cancelReason: string | null;
+    createdAt: string;
+    completedAt: string | null;
+    cancelledAt: string | null;
+    activities: Array<{ title: string; status: ActivityStatus; dueAt: string; doneAt: string | null; bitrixTaskId: string | null }>;
+    documents: Array<{ fileName: string; size: number; status: DocumentStatus; receivedAt: string; rejectedReason: string | null; bitrixUrl: string | null }>;
+    history: AuditEntryDTO[];
+  }>;
+  ledger: LedgerItemDTO[];
+}
+
+/** O que foi excluído e o que continua no Bitrix24, onde o Nexo não apaga nada. */
+export interface ErasureReceiptDTO {
+  journeys: number;
+  activities: number;
+  documents: number;
+  ledgerItems: number;
+  auditEntries: number;
+  /** Tarefas e arquivos que seguem no Bitrix24: quem responde pelo portal decide. */
+  bitrix: { taskIds: string[]; fileUrls: string[] };
+  /** Por quantos dias ainda há cópia nos backups cifrados. */
+  backupDays: number;
 }
 
 /** Erro padrão de toda a API: mensagem em pt-BR pronta para a tela. */

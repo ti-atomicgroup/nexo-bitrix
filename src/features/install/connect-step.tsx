@@ -13,6 +13,7 @@ import type { WebhookCheckDTO } from "@/shared/contracts";
 import { SCOPE_LABEL } from "@/shared/enums";
 import { connectWebhookInput } from "@/shared/schemas";
 import styles from "./install-step.module.css";
+import { PrivilegeNotice } from "./privilege-notice";
 import { missingRequiredScopes, ScopeList } from "./scope-list";
 
 export interface ConnectStepProps {
@@ -127,6 +128,7 @@ export function ConnectStep({ check, onConnected, onContinue, reconnect = false 
           headingLevel={3}
         >
           <div className={styles.result} role="status">
+            <PrivilegeNotice ownerName={check.owner.name} privilege={check.privilege} extraScopes={check.scopes.extra ?? []} />
             <ScopeList scopes={check.scopes} headingLevel={4} />
             {missing.length ? (
               <Notice tone="error" title="Falta marcar permissões obrigatórias">

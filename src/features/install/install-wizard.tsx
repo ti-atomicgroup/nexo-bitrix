@@ -11,7 +11,7 @@ import { Stepper } from "@/components/ui/stepper";
 import { BandLayout } from "@/features/access/access-layout";
 import { api, clearInstallToken, getInstallToken } from "@/lib/api-client";
 import { useApi } from "@/lib/use-api";
-import { useHasToken } from "@/lib/use-session";
+import { useHasSession } from "@/lib/use-session";
 import type { WebhookCheckDTO } from "@/shared/contracts";
 import type { SetupStage } from "@/shared/enums";
 import { AccountStep } from "./account-step";
@@ -24,9 +24,9 @@ type View = "connect" | "account" | "prepare" | "login" | "done";
 const STEPS = ["Conectar o Bitrix24", "Criar acesso de RH", "Preparar o Nexo"];
 const STEP_INDEX: Record<View, number> = { connect: 0, account: 1, prepare: 2, login: 2, done: 3 };
 
-function deriveView(stage: SetupStage, hasToken: boolean, hasInstallToken: boolean): View {
+function deriveView(stage: SetupStage, hasSession: boolean, hasInstallToken: boolean): View {
   if (stage === "ready") return "done";
-  if (stage === "prepare") return hasToken ? "prepare" : "login";
+  if (stage === "prepare") return hasSession ? "prepare" : "login";
   if (stage === "account") return hasInstallToken ? "account" : "connect";
   return "connect";
 }
@@ -37,14 +37,14 @@ function deriveView(stage: SetupStage, hasToken: boolean, hasInstallToken: boole
  */
 export function InstallWizard() {
   const router = useRouter();
-  const hasToken = useHasToken();
+  const hasSession = useHasSession();
   const status = useApi((signal) => api.status({ signal }), [], { revalidateOnFocus: false });
   const [override, setOverride] = useState<View | null>(null);
   const [check, setCheck] = useState<WebhookCheckDTO | null>(null);
 
   const stage = status.data?.setup;
   const installToken = check?.installToken ?? (stage ? getInstallToken() : null);
-  const derived = stage && hasToken !== null ? deriveView(stage, hasToken, installToken !== null) : null;
+  const derived = stage && hasSession !== null ? deriveView(stage, hasSession, installToken !== null) : null;
   const view = override ?? derived;
   const reconnect = stage === "account" && !installToken;
 
@@ -118,8 +118,8 @@ export function InstallWizard() {
         tone="success"
         title="O Nexo já está instalado"
         action={
-          <ButtonLink href={hasToken ? "/hoje" : "/entrar"} variant="primary" iconAfter={ArrowRight}>
-            {hasToken ? "Abrir o painel de hoje" : "Entrar"}
+          <ButtonLink href={hasSession ? "/hoje" : "/entrar"} variant="primary" iconAfter={ArrowRight}>
+            {hasSession ? "Abrir o painel de hoje" : "Entrar"}
           </ButtonLink>
         }
       >

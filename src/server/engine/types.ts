@@ -15,6 +15,8 @@ export interface WebhookCheck {
   scopes: string[];
   /** URL cifrada (AES-256-GCM), pronta para `setWebhookRecord`. */
   encryptedUrl: string;
+  /** A conta do webhook é administradora do portal (nulo: o Bitrix24 não informou). */
+  ownerIsPortalAdmin?: boolean | null;
 }
 
 export interface SchedulerStatus {

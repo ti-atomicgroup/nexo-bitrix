@@ -16,6 +16,7 @@ import { activityLibrary as library } from "../seeds/library";
 import { starterTemplates as starters } from "../seeds/templates";
 import type { JourneyRow } from "../db/repos/journeys";
 import * as actions from "./actions";
+import * as actorFacts from "./actor-facts";
 import * as documents from "./documents";
 import type { ReceivedFile, ReceiveResult } from "./documents";
 import * as journeys from "./journeys";
@@ -59,6 +60,16 @@ export async function sendChatMessage(userId: string, message: string): Promise<
 
 export async function refreshPeople(): Promise<number> {
   return people.refreshPeople();
+}
+
+/** O que o portal diz agora sobre a conta de quem pede uma ação: ativa? participa do projeto? (validação das permissões individuais) */
+export async function bitrixActorFacts(bitrixUserId: string, options: { membership: boolean }): Promise<{ active: boolean; member: boolean }> {
+  return actorFacts.bitrixActorFacts(bitrixUserId, options);
+}
+
+/** Quem participa do projeto das tarefas no Bitrix24 (para a tela de Equipe). */
+export async function projectMemberIds(): Promise<string[]> {
+  return actorFacts.projectMemberIds();
 }
 
 /* ───────────── Jornadas ───────────── */

@@ -11,11 +11,13 @@ import {
   getDefaults,
   getFeatures,
   getProject,
+  getRetentionMonths,
   getWebhookRecord,
   setCompany,
   setContent,
   setDefaults,
   setFeatures,
+  setRetentionMonths,
   setWebhookRecord,
   type WebhookRecord,
 } from "../db/repos/settings";
@@ -49,13 +51,16 @@ export function getSettings(): SettingsDTO {
   return {
     company: { name: company.name, timezone: company.timezone },
     portal: webhook?.portal ?? null,
-    webhook: webhook ? { masked: maskedWebhook(webhook), owner: webhook.owner, scopes: scopeCheck(webhook.scopes), verifiedAt: webhook.verifiedAt } : null,
+    webhook: webhook
+      ? { masked: maskedWebhook(webhook), owner: webhook.owner, scopes: scopeCheck(webhook.scopes), verifiedAt: webhook.verifiedAt, privilege: { ownerIsPortalAdmin: webhook.ownerIsPortalAdmin ?? null } }
+      : null,
     project: project ? { id: project.id, name: project.name, url: project.url } : null,
     defaults: getDefaults(),
     content: getContent(),
     features: { notifications: features.notifications, calendar: features.calendar, feed: features.feed },
     documentsEnabled: webhook ? scopeCheck(webhook.scopes).optional.disk : false,
     invitesEnabled: webhook ? webhook.scopes.includes("user") : false,
+    retentionMonths: getRetentionMonths(),
   };
 }
 
@@ -109,6 +114,10 @@ export function updateSettings(input: SettingsInput, actor: Actor): SettingsDTO 
       });
       changed.push("recursos opcionais");
     }
+    if (input.retentionMonths !== undefined) {
+      setRetentionMonths(input.retentionMonths);
+      changed.push(`retenção de ${input.retentionMonths} meses`);
+    }
     if (changed.length) auditAs(actor, "Ajustes atualizados", "settings", null, changed.join(", "));
   });
   return getSettings();
@@ -122,7 +131,14 @@ export async function replaceWebhook(url: string, actor: Actor): Promise<Setting
   if (current && portalHost(current.portal) !== portalHost(check.portal)) {
     throw new AppError("PORTAL_MISMATCH", `Use um webhook do mesmo portal (${current.portal}).`, 409);
   }
-  setWebhookRecord({ encryptedUrl: check.encryptedUrl, portal: check.portal, owner: check.owner, scopes: check.scopes, verifiedAt: new Date().toISOString() });
+  setWebhookRecord({
+    encryptedUrl: check.encryptedUrl,
+    portal: check.portal,
+    owner: check.owner,
+    scopes: check.scopes,
+    ownerIsPortalAdmin: check.ownerIsPortalAdmin ?? null,
+    verifiedAt: new Date().toISOString(),
+  });
   auditAs(actor, "Webhook do Bitrix24 trocado", "settings", null, `Conta ${check.owner.name}`);
   // Ex.: a permissão Drive acabou de ser marcada: os documentos que esperavam por ela seguem para o Bitrix.
   resendDocuments();

@@ -3,4 +3,4 @@ import { libraryActivities } from "@/server/services/read/templates";
 
 export const dynamic = "force-dynamic";
 
-export const GET = route({ auth: "user" }, () => libraryActivities());
+export const GET = route({ auth: "session", operation: "template.read" }, () => libraryActivities());

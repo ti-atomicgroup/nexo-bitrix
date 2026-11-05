@@ -1,6 +1,6 @@
 import { TriangleAlert } from "lucide-react";
 import Link from "next/link";
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Chip } from "@/components/ui/chip";
 import { cx } from "@/lib/cx";
 import type { BoardRowDTO } from "@/shared/contracts";
@@ -47,8 +47,8 @@ export function DepartureBoard({ rows, caption, renderAction, framed = true, cla
           </tr>
         </thead>
         <tbody role="rowgroup">
-          {rows.map((row, index) => (
-            <tr key={row.id} role="row" className={styles.row} style={{ "--i": Math.min(index, 12) } as CSSProperties}>
+          {rows.map((row) => (
+            <tr key={row.id} role="row" className={styles.row}>
               <td role="cell" className={styles.when}>
                 <span className={styles.time}>
                   {row.when.overdue ? <TriangleAlert className={styles.alert} size={20} strokeWidth={2.5} role="img" aria-label="Atrasada:" /> : null}

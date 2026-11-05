@@ -31,7 +31,7 @@ Ao abrir o Nexo pela primeira vez, o assistente pede três coisas:
    - carrega as trilhas iniciais (entrada geral, vendas, tecnologia; saída voluntária e involuntária);
    - abre o **Painel de hoje**.
 
-Pronto. Não há variáveis de ambiente para preencher nem chaves para gerar.
+Pronto. Não há variáveis de ambiente obrigatórias nem chaves para gerar. Para produção com dados reais, veja [Antes de usar com dados reais](#antes-de-usar-com-dados-reais).
 
 ## 3. Primeiros passos
 
@@ -39,6 +39,7 @@ Pronto. Não há variáveis de ambiente para preencher nem chaves para gerar.
 - **Link do colaborador:** na página da jornada, aba "Link do colaborador", envie pelo chat do Bitrix24 (para quem já
   tem conta) ou copie e mande por onde preferir. Na mesma aba, "Lembrar pelo Bitrix24" manda o que falta, com um
   atalho para cada tarefa.
+- **Outras pessoas do RH:** em Ajustes → Equipe → Novo acesso. Para agir no Bitrix24 pelo Nexo, a pessoa precisa ter conta ativa no portal, com o mesmo e-mail ou vinculada ali, e participar do projeto **Nexo · Jornadas**. Veja [`permissoes.md`](permissoes.md).
 - **Automação:** em Ajustes → Automações, escolha o funil e a etapa do CRM que significa "contratado". O Nexo passa a mostrar no Painel de hoje quem foi contratado, com a jornada pronta para iniciar.
 
 ## Publicação na Onnira (responsável técnico)
@@ -47,7 +48,7 @@ Pronto. Não há variáveis de ambiente para preencher nem chaves para gerar.
 2. Na Onnira, crie ou edite a aplicação apontando para o repositório e a branch. Diretório base `/`.
 3. Comandos padrão de Next.js: `npm ci`, `npm run build`, `npm start` (porta 3000). No envio por ZIP, escolha
    "Outro / configurar manualmente" e informe esses três comandos. Node 22 ou superior (`.nvmrc` e `engines`).
-   Teste de saúde: `/health` ou `/api/health`, que respondem 200 sem tocar no banco.
+   Teste de saúde: `/health` ou `/api/health`, que respondem 200 sem tocar no banco e sem dizer nada sobre o ambiente.
 4. Os dados ficam no volume persistente, a pasta oculta `.data` do projeto (`/app/.data`; equivale ao `./data` local): banco SQLite, chave da instância e registros. Em Ajustes → Diagnóstico, a pasta de dados deve aparecer como `onnira-volume`; se aparecer `local`, os dados se perdem a cada publicação.
 
 ### Worker do Bitrix24
@@ -59,10 +60,18 @@ Pronto. Não há variáveis de ambiente para preencher nem chaves para gerar.
   Bitrix24. O Nexo manda cada chamada para ele por `http://127.0.0.1`, sem passar pelo domínio público, e o worker
   acorda o motor a cada minuto por `POST http://127.0.0.1:${PORT}/api/jobs/tick`.
 
-Os dois combinam um token interno gerado na partida. O worker só aceita endereços `https://*.bitrix24.*/rest/` e nunca
-registra o endereço do webhook. Se ele cair, volta sozinho. `/api/health` mostra `bitrixWorker: "ligado"`, e
-`/api/probe?bitrix=<portal>` traz em `workerEgress` o teste de saída feito pelo próprio worker.
-`npm run start:web` sobe só o Nexo, que então chama o Bitrix24 direto.
+Os dois combinam um token interno gerado na partida. O worker e o transporte direto seguem a mesma política de destino
+([`seguranca-lgpd.md`](seguranca-lgpd.md)) e nunca registram o endereço do webhook. Se o worker cair, volta sozinho.
+Ajustes → Diagnóstico mostra se ele está ligado, e o teste de conexão em `/diagnostico`, só para a administração, inclui a saída feita por ele.
+`npm run start:web`, ou uma hospedagem que não sobe por `npm start`, roda só o Nexo, que então chama o Bitrix24 direto, com a mesma política.
+
+### Antes de usar com dados reais
+
+1. Responda à lista de [`onnira-seguranca.md`](onnira-seguranca.md) com o suporte da Onnira: cifragem e backups do volume.
+2. Defina `NEXO_ENCRYPTION_KEY` (64 caracteres hexadecimais; gere com `openssl rand -hex 32`), para a chave não ficar no volume do banco, e guarde uma cópia dela em lugar seguro. **Numa instalação que já tem dados, antes copie o valor atual de `.nexo-key`:** com outra chave, o que já foi cifrado deixa de abrir.
+3. Crie o webhook com uma conta dedicada e o mínimo de escopos. O Nexo avisa se houver privilégio a mais.
+4. Confira `/diagnostico` dentro do painel: "Sessão por cookie protegido" diz qual modo está em uso, e a CSP deve deixar a página funcionar normalmente.
+5. Baixe uma cópia em Ajustes → Dados pessoais e teste a restauração uma vez (`npm run backup:restaurar`).
 
 ## Problemas comuns
 
@@ -72,5 +81,9 @@ registra o endereço do webhook. Se ele cair, volta sozinho. `/api/health` mostr
 | "A conta que criou o webhook está inativa" | Crie o webhook com uma conta ativa. |
 | "Limite temporário do Bitrix24" | O Bitrix24 limita chamadas por segundo. O Nexo espera e tenta de novo sozinho. |
 | O link do colaborador abre "Acesso permitido somente dentro da Onnira" | A Onnira bloqueia acessos de fora do painel. Peça ao suporte da Onnira para liberar o caminho `/j/*`. |
-| Página em branco ou erro | Abra `/diagnostico` e use "Copiar relatório" para enviar ao suporte. |
+| Página em branco ou erro | Abra `/diagnostico` e use "Copiar relatório" para enviar ao suporte. Sem entrar no Nexo, o relatório traz só o básico; com um acesso de administração, traz o ambiente do servidor. |
+| "Seu acesso ao Nexo ainda não está ligado a uma pessoa do Bitrix24" | Em Ajustes → Equipe, vincule o acesso à pessoa certa. Se ela acabou de entrar no portal, atualize a lista de pessoas antes. |
+| "Você não participa do projeto" | No Bitrix24, inclua a pessoa no projeto **Nexo · Jornadas**. Em até 5 minutos, o Nexo reconhece. |
+| "Use o endereço do seu portal Bitrix24" com um portal em domínio próprio | O responsável técnico libera o domínio em `NEXO_BITRIX_ALLOWED_HOSTS` (separados por vírgula). |
+| Todo mundo entrou de novo depois de atualizar para a v3 | É esperado, uma vez só: as sessões antigas foram encerradas porque o token ficava no navegador. |
 | Esqueceu a senha ou o login ficou bloqueado | Outro administrador redefine em Ajustes → Equipe. Sem outro administrador, quem tem acesso ao servidor roda `npm run senha:redefinir -- <e-mail>` na pasta do Nexo: a nova senha é digitada no terminal, o bloqueio é desfeito e as sessões abertas desse acesso são encerradas. |

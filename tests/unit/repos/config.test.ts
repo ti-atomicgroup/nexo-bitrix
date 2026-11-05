@@ -59,8 +59,8 @@ describe("usuários e sessões", () => {
 
   it("encontra a sessão com o usuário e expurga as vencidas", () => {
     const user = createUser({ name: "Rita", email: "rita@empresa.com", passwordHash: "h", role: "rh" });
-    createSession({ tokenHash: "abc", userId: user.id, expiresAt: "2999-01-01T00:00:00.000Z" });
-    createSession({ tokenHash: "old", userId: user.id, expiresAt: "2000-01-01T00:00:00.000Z" });
+    createSession({ tokenHash: "abc", userId: user.id, expiresAt: "2999-01-01T00:00:00.000Z", transport: "bearer" });
+    createSession({ tokenHash: "old", userId: user.id, expiresAt: "2000-01-01T00:00:00.000Z", transport: "bearer" });
     expect(findSessionWithUser("abc")?.user.email).toBe("rita@empresa.com");
     expect(purgeExpiredSessions()).toBe(1);
     deleteUserSessions(user.id);

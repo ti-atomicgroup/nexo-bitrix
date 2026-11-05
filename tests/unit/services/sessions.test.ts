@@ -69,17 +69,18 @@ describe("sessões Bearer", () => {
     expect(findSessionWithUser(tokenHash)).toBeNull();
   });
 
-  it("nunca passa de 7 dias desde o login, mesmo em uso contínuo", () => {
-    const { token } = issueSession(user);
+  it("com cookie, nunca passa de 7 dias desde o login, mesmo em uso contínuo", () => {
+    const { token } = issueSession(user, Date.now(), "cookie");
+    const cookie = () => new Request("http://localhost/api/me", { headers: { cookie: `__Host-nexo_session=${token}`, "x-nexo-client": "web" } });
     const cap = T0.getTime() + SESSION_MAX_MS;
     for (let elapsed = 0; elapsed < SESSION_MAX_MS - 6 * HOUR; elapsed += 6 * HOUR) {
       advance(6 * HOUR);
-      const session = authenticate(bearer(token));
+      const session = authenticate(cookie());
       expect(session).not.toBeNull();
       expect(Date.parse(session!.expiresAt)).toBeLessThanOrEqual(cap);
     }
     vi.setSystemTime(new Date(cap));
-    expect(authenticate(bearer(token))).toBeNull();
+    expect(authenticate(cookie())).toBeNull();
   });
 
   it("recusa usuário desativado", () => {

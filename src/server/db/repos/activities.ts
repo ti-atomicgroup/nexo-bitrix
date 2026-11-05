@@ -2,6 +2,7 @@ import "server-only";
 import type { DocumentRequest, JourneyChecklistItem, LinkItem } from "@/shared/contracts";
 import type { ActivityKind, ActivityRole, ActivityStatus, SyncState, Visibility } from "@/shared/enums";
 import { getDb } from "..";
+import { openField, sealField } from "../../security/fields";
 import { buildSet, parseJson, toBool, toNumberOrNull, toStringOrNull } from "./util";
 
 export interface ActivityRow {
@@ -64,6 +65,11 @@ const COLUMNS = {
   lastNudgedAt: "last_nudged_at",
 };
 
+/** O checklist copia nome e detalhe dos itens do inventário ("Notebook · 4471"): cifrado como o próprio inventário. */
+function sealChecklist(checklist: JourneyChecklistItem[]): string {
+  return checklist.length ? (sealField(JSON.stringify(checklist)) as string) : "[]";
+}
+
 function map(row: Record<string, unknown>): ActivityRow {
   return {
     id: String(row.id),
@@ -83,7 +89,7 @@ function map(row: Record<string, unknown>): ActivityRow {
     requiresApproval: toBool(row.requires_approval),
     ledgerRole: row.ledger_role === "revoke_and_collect" ? "revoke_and_collect" : null,
     status: row.status as ActivityStatus,
-    checklist: parseJson<JourneyChecklistItem[]>(row.checklist, []),
+    checklist: parseJson<JourneyChecklistItem[]>(openField(row.checklist), []),
     links: parseJson<LinkItem[]>(row.links, []),
     documents: parseJson<DocumentRequest[]>(row.documents, []),
     bitrixTaskId: toStringOrNull(row.bitrix_task_id),
@@ -113,7 +119,7 @@ export function insertActivities(rows: ActivityRow[]): void {
       @calendarEventId, @lastNudgedAt)`);
   db.tx(() => {
     for (const row of rows) {
-      statement.run({ ...row, checklist: JSON.stringify(row.checklist), links: JSON.stringify(row.links), documents: JSON.stringify(row.documents) });
+      statement.run({ ...row, checklist: sealChecklist(row.checklist), links: JSON.stringify(row.links), documents: JSON.stringify(row.documents) });
     }
   });
 }
@@ -142,7 +148,7 @@ export function findActivityByTaskId(bitrixTaskId: string): ActivityRow | null {
 }
 
 export function updateActivity(id: string, patch: Partial<Pick<ActivityRow, keyof typeof COLUMNS>>): ActivityRow | null {
-  const { sql, params } = buildSet(patch, COLUMNS);
+  const { sql, params } = buildSet(patch.checklist ? { ...patch, checklist: sealChecklist(patch.checklist) } : patch, COLUMNS);
   if (sql) getDb().prepare(`UPDATE journey_activities SET ${sql} WHERE id = @id`).run({ ...params, id });
   return getActivity(id);
 }

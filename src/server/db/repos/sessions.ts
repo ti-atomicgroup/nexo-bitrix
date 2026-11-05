@@ -1,4 +1,5 @@
 import "server-only";
+import type { SessionTransport } from "@/shared/enums";
 import { getDb } from "..";
 import { findUserById, type AppUserRow } from "./users";
 import { nowIso } from "./util";
@@ -9,6 +10,7 @@ export interface SessionRow {
   createdAt: string;
   lastSeenAt: string;
   expiresAt: string;
+  transport: SessionTransport;
 }
 
 function map(row: Record<string, unknown>): SessionRow {
@@ -18,15 +20,16 @@ function map(row: Record<string, unknown>): SessionRow {
     createdAt: String(row.created_at),
     lastSeenAt: String(row.last_seen_at),
     expiresAt: String(row.expires_at),
+    transport: row.transport === "cookie" ? "cookie" : "bearer",
   };
 }
 
-export function createSession(input: { tokenHash: string; userId: string; expiresAt: string }): SessionRow {
+export function createSession(input: { tokenHash: string; userId: string; expiresAt: string; transport: SessionTransport }): SessionRow {
   const now = nowIso();
   getDb()
-    .prepare("INSERT INTO sessions (token_hash, user_id, created_at, last_seen_at, expires_at) VALUES (?, ?, ?, ?, ?)")
-    .run(input.tokenHash, input.userId, now, now, input.expiresAt);
-  return { tokenHash: input.tokenHash, userId: input.userId, createdAt: now, lastSeenAt: now, expiresAt: input.expiresAt };
+    .prepare("INSERT INTO sessions (token_hash, user_id, created_at, last_seen_at, expires_at, transport) VALUES (?, ?, ?, ?, ?, ?)")
+    .run(input.tokenHash, input.userId, now, now, input.expiresAt, input.transport);
+  return { tokenHash: input.tokenHash, userId: input.userId, createdAt: now, lastSeenAt: now, expiresAt: input.expiresAt, transport: input.transport };
 }
 
 export function findSessionWithUser(tokenHash: string): { session: SessionRow; user: AppUserRow } | null {

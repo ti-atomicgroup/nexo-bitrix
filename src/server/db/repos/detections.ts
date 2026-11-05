@@ -1,6 +1,7 @@
 import "server-only";
 import type { DetectionStatus } from "@/shared/enums";
 import { getDb } from "..";
+import { openField, sealField } from "../../security/fields";
 import { buildSet, newId, nowIso, toStringOrNull } from "./util";
 
 export interface DetectionRow {
@@ -29,7 +30,7 @@ function map(row: Record<string, unknown>): DetectionRow {
     entityId: Number(row.entity_id),
     title: String(row.title),
     personName: toStringOrNull(row.person_name),
-    personEmail: toStringOrNull(row.person_email),
+    personEmail: openField(row.person_email),
     bitrixUserId: toStringOrNull(row.bitrix_user_id),
     suggestedDate: toStringOrNull(row.suggested_date),
     crmUrl: toStringOrNull(row.crm_url),
@@ -47,7 +48,7 @@ export function insertDetectionIfNew(input: Omit<DetectionRow, "id" | "status" |
       INSERT INTO detections (id, trigger_id, entity_type_id, entity_id, title, person_name, person_email, bitrix_user_id, suggested_date, crm_url, status, detected_at)
       VALUES (@id, @triggerId, @entityTypeId, @entityId, @title, @personName, @personEmail, @bitrixUserId, @suggestedDate, @crmUrl, 'pending', @now)
       ON CONFLICT(trigger_id, entity_type_id, entity_id) DO NOTHING`)
-    .run({ ...input, id, now: nowIso() });
+    .run({ ...input, personEmail: sealField(input.personEmail), id, now: nowIso() });
   return result.changes > 0 ? getDetection(id) : null;
 }
 
@@ -64,7 +65,7 @@ export function getDetection(id: string): DetectionRow | null {
 }
 
 export function updateDetection(id: string, patch: Partial<Pick<DetectionRow, keyof typeof COLUMNS>>): DetectionRow | null {
-  const { sql, params } = buildSet(patch, COLUMNS);
+  const { sql, params } = buildSet("personEmail" in patch ? { ...patch, personEmail: sealField(patch.personEmail) } : patch, COLUMNS);
   if (sql) getDb().prepare(`UPDATE detections SET ${sql} WHERE id = @id`).run({ ...params, id });
   return getDetection(id);
 }

@@ -240,3 +240,52 @@ a.name:hover {
     flex: 1 1 auto;
   }
 }
+
+/* Entrada em sequência, por posição: a CSP não aceita o atributo style no HTML vindo do servidor. */
+.row:nth-child(2) {
+  --i: 1;
+}
+
+.row:nth-child(3) {
+  --i: 2;
+}
+
+.row:nth-child(4) {
+  --i: 3;
+}
+
+.row:nth-child(5) {
+  --i: 4;
+}
+
+.row:nth-child(6) {
+  --i: 5;
+}
+
+.row:nth-child(7) {
+  --i: 6;
+}
+
+.row:nth-child(8) {
+  --i: 7;
+}
+
+.row:nth-child(9) {
+  --i: 8;
+}
+
+.row:nth-child(10) {
+  --i: 9;
+}
+
+.row:nth-child(11) {
+  --i: 10;
+}
+
+.row:nth-child(12) {
+  --i: 11;
+}
+
+.row:nth-child(n + 13) {
+  --i: 12;
+}

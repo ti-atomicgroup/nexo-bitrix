@@ -4,6 +4,6 @@ import { updateUserInput } from "@/shared/schemas";
 
 export const dynamic = "force-dynamic";
 
-export const PATCH = route({ auth: "admin", params: ["userId"], input: updateUserInput }, ({ params, input, actor }) =>
+export const PATCH = route({ auth: "session", operation: "users.manage", params: ["userId"], input: updateUserInput }, ({ params, input, actor }) =>
   updateAppUser(params.userId, input, actor),
 );

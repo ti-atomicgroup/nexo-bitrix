@@ -4,6 +4,7 @@ import type { CreateAccountInput, PrepareInput } from "@/shared/schemas";
 import { prepareWorkspace, verifyWebhook, type Actor } from "@/server/engine";
 import { getDb } from "../db";
 import { clearInstallGrant, getInstallGrant, getWebhookRecord, setInstallGrant, setSetupStage, setWebhookRecord, type InstallGrant } from "../db/repos/settings";
+import { recordSecurityEvent } from "../db/repos/security-events";
 import { countUsers, createUser } from "../db/repos/users";
 import { AppError } from "../errors";
 import { hashToken, newToken, safeEqual } from "../security/crypto";
@@ -22,15 +23,19 @@ import { runningTask, startTask } from "./tasks";
  */
 const GRANT_TTL_MS = 30 * 60 * 1000;
 const CONNECT_RULE = { limit: 20, windowMs: 10 * 60 * 1000 };
+const ORIGIN_RULE = { limit: 10, windowMs: 10 * 60 * 1000 };
+const ACCOUNT_RULE = { limit: 20, windowMs: 10 * 60 * 1000 };
+const tooMany = () => new AppError("TOO_MANY_ATTEMPTS", "Muitas tentativas. Tente de novo em alguns minutos.", 429);
 
 const alreadyInstalled = () => new AppError("ALREADY_INSTALLED", "O Nexo já foi instalado. Entre com sua conta.", 409);
 const grantInvalid = () => new AppError("INSTALL_TOKEN_INVALID", "Valide o webhook de novo para continuar a instalação.", 403);
 
 /** Passo 1: confere na hora o que não depende do Bitrix24 e começa a validação do webhook. Devolve o id do trabalho. */
-export function startConnectWebhook(url: string): string {
+export function startConnectWebhook(url: string, origin = "desconhecida"): string {
   if (countUsers() > 0) throw alreadyInstalled();
-  if (!rateLimit("setup:connect", CONNECT_RULE).allowed) {
-    throw new AppError("TOO_MANY_ATTEMPTS", "Muitas tentativas. Tente de novo em alguns minutos.", 429);
+  if (!rateLimit(`setup-origin:${origin}`, ORIGIN_RULE).allowed || !rateLimit("setup:connect", CONNECT_RULE).allowed) {
+    recordSecurityEvent("rate_limited", { origin });
+    throw tooMany();
   }
   return startTask("setup.connect", () => connectWebhook(url));
 }
@@ -47,11 +52,18 @@ async function connectWebhook(url: string): Promise<WebhookCheckDTO> {
     setInstallGrant({
       tokenHash: hashToken(installToken),
       expiresAt: new Date(Date.now() + GRANT_TTL_MS).toISOString(),
-      webhook: { encryptedUrl: check.encryptedUrl, portal: check.portal, owner: check.owner, scopes: check.scopes, verifiedAt: new Date().toISOString() },
+      webhook: {
+        encryptedUrl: check.encryptedUrl,
+        portal: check.portal,
+        owner: check.owner,
+        scopes: check.scopes,
+        ownerIsPortalAdmin: check.ownerIsPortalAdmin ?? null,
+        verifiedAt: new Date().toISOString(),
+      },
     });
     setSetupStage("account");
   });
-  return { installToken, portal: check.portal, owner: check.owner, scopes };
+  return { installToken, portal: check.portal, owner: check.owner, scopes, privilege: { ownerIsPortalAdmin: check.ownerIsPortalAdmin ?? null } };
 }
 
 function validGrant(installToken: string): InstallGrant {
@@ -60,8 +72,12 @@ function validGrant(installToken: string): InstallGrant {
   return grant;
 }
 
-export async function createFirstAccount(input: CreateAccountInput): Promise<SessionDTO> {
+export async function createFirstAccount(input: CreateAccountInput, origin = "desconhecida"): Promise<SessionDTO> {
   if (countUsers() > 0) throw alreadyInstalled();
+  if (!rateLimit(`setup-account:${origin}`, ACCOUNT_RULE).allowed) {
+    recordSecurityEvent("rate_limited", { origin });
+    throw tooMany();
+  }
   validGrant(input.installToken);
   const passwordHash = await hashPassword(input.password);
   const user = getDb().tx(() => {
@@ -74,7 +90,7 @@ export async function createFirstAccount(input: CreateAccountInput): Promise<Ses
     auditAs({ type: "user", id: created.id, name: created.name }, "Acesso de administrador criado na instalação", "user", created.id, `Portal ${grant.webhook.portal}`);
     return created;
   });
-  return startSession(user);
+  return startSession(user, input.transport);
 }
 
 /** Passo 3 em segundo plano. Um segundo clique enquanto a preparação roda acompanha o mesmo trabalho. */

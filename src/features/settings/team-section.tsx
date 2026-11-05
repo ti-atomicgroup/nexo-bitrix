@@ -1,6 +1,6 @@
 "use client";
 
-import { KeyRound, UserPlus } from "lucide-react";
+import { KeyRound, Link2, UserPlus } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Chip } from "@/components/ui/chip";
@@ -18,6 +18,7 @@ import { useApi } from "@/lib/use-api";
 import { useNow } from "@/lib/use-session";
 import type { AppUserDTO, SettingsDTO, UserRef } from "@/shared/contracts";
 import { type AppRole, type ParticipantRole } from "@/shared/enums";
+import { can, OPERATIONS, operationRule, type BitrixReach, type Operation } from "@/shared/permissions";
 import { createUserInput, updateUserInput } from "@/shared/schemas";
 import styles from "./settings-section.module.css";
 
@@ -29,16 +30,62 @@ const DEFAULT_ROLES: Array<{ role: ParticipantRole; label: string; hint: string 
 ];
 
 const ROLE_LABEL: Record<AppRole, string> = { admin: "Administração", rh: "RH" };
+const REACH_LABEL: Record<BitrixReach, string> = { none: "Não", read: "Lê", write: "Grava" };
+
+/** Situação da pessoa no portal. Para o RH, é o que libera as ações que chegam ao Bitrix24. */
+function bitrixLine(user: AppUserDTO): string {
+  const consequence = user.role === "rh" ? ": não age no Bitrix24" : "";
+  if (!user.bitrix) return `Sem pessoa do Bitrix24 vinculada${consequence}`;
+  const name = `${user.bitrix.name} no Bitrix24`;
+  if (!user.bitrix.active) return `${name}, conta desativada${consequence}`;
+  if (user.bitrix.member === null) return `${name} (não deu para conferir o projeto agora)`;
+  if (!user.bitrix.member) return `${name}, fora do projeto das tarefas${user.role === "rh" ? ": inclua a pessoa no projeto para ela agir" : ""}`;
+  return `${name}, participa do projeto`;
+}
+
+function PermissionMatrix() {
+  return (
+    <details className={styles.box}>
+      <summary>O que cada papel pode fazer</summary>
+      <div className={styles.matrixScroll}>
+        <table className={styles.matrix}>
+          <thead>
+            <tr>
+              <th scope="col">Operação</th>
+              <th scope="col">Administração</th>
+              <th scope="col">RH</th>
+              <th scope="col">Chega ao Bitrix24</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(Object.keys(OPERATIONS) as Operation[]).map((operation) => {
+              const rule = operationRule(operation);
+              return (
+                <tr key={operation}>
+                  <td>{rule.label}</td>
+                  <td>{can("admin", operation) ? "Sim" : "Não"}</td>
+                  <td>{can("rh", operation) ? "Sim" : "Não"}</td>
+                  <td>{REACH_LABEL[rule.bitrix]}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  );
+}
 
 function UserRow({ user, onChanged }: { user: AppUserDTO; onChanged: () => void }) {
   const toast = useToast();
   const now = useNow(60_000);
   const [resetting, setResetting] = useState(false);
+  const [linking, setLinking] = useState(false);
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  const update = async (body: { active?: boolean; resetPassword?: string }, success: string) => {
+  const update = async (body: { active?: boolean; resetPassword?: string; bitrixUserId?: string | null }, success: string) => {
     const parsed = updateUserInput.safeParse(body);
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "Confira os dados.");
@@ -66,10 +113,15 @@ function UserRow({ user, onChanged }: { user: AppUserDTO; onChanged: () => void 
         <p className={styles.itemMeta}>
           {user.email} · {user.lastLoginAt && now !== null ? `entrou ${formatSince(user.lastLoginAt, now)}` : "ainda não entrou"}
         </p>
+        <p className={styles.itemMeta}>{bitrixLine(user)}</p>
         {error ? <p className={styles.error}>{error}</p> : null}
       </div>
       <Chip tone={user.role === "admin" ? "forest" : "neutral"}>{ROLE_LABEL[user.role]}</Chip>
       {!user.active ? <Chip tone="neutral">Desativado</Chip> : null}
+      <Button size="s" variant="ghost" icon={Link2} onClick={() => setLinking(!linking)} disabled={pending}>
+        {user.bitrix ? "Trocar vínculo" : "Vincular"}
+        <span className="sr-only"> {user.name} ao Bitrix24</span>
+      </Button>
       <Button size="s" variant="ghost" icon={KeyRound} onClick={() => setResetting(!resetting)} disabled={pending}>
         Nova senha
         <span className="sr-only"> para {user.name}</span>
@@ -78,10 +130,23 @@ function UserRow({ user, onChanged }: { user: AppUserDTO; onChanged: () => void 
         {user.active ? "Desativar" : "Reativar"}
         <span className="sr-only"> {user.name}</span>
       </Button>
+      {linking ? (
+        <div className={`${styles.box} ${styles.fullRow}`}>
+          <PersonPicker
+            label={`Pessoa do Bitrix24 de ${user.name}`}
+            hint="Antes de agir no Bitrix24 por alguém do RH, o Nexo confere se esta conta está ativa e participa do projeto das tarefas."
+            optional
+            value={user.bitrix ? { bitrixUserId: user.bitrix.id, name: user.bitrix.name, position: null } : null}
+            onChange={(ref) => {
+              setLinking(false);
+              void update({ bitrixUserId: ref ? ref.bitrixUserId : null }, ref ? `${user.name} ligado a ${ref.name}` : "Vínculo desfeito");
+            }}
+          />
+        </div>
+      ) : null}
       {resetting ? (
         <form
-          className={styles.box}
-          style={{ flexBasis: "100%" }}
+          className={`${styles.box} ${styles.fullRow}`}
           noValidate
           onSubmit={(event) => {
             event.preventDefault();
@@ -236,6 +301,7 @@ export function TeamSection({ settings, isAdmin, onSaved }: { settings: Settings
           </ul>
         )}
         {isAdmin ? <NewUserForm onCreated={users.reload} /> : null}
+        <PermissionMatrix />
       </div>
     </Panel>
   );

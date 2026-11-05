@@ -6,12 +6,14 @@ import { z } from "zod";
 import { ptBrErrorMap } from "./zod-pt-br";
 
 // Padrão do zod em pt-BR também no navegador: sem isto, `safeParse` nos formulários cai nas mensagens em inglês.
-z.config({ customError: ptBrErrorMap });
+// `jitless`: sem isso, o zod testa `new Function` para compilar validações, e a CSP registra uma violação a cada página.
+z.config({ customError: ptBrErrorMap, jitless: true });
 import {
   ACTIVITY_KINDS,
   ACTIVITY_ROLES,
   APP_ROLES,
   JOURNEY_KINDS,
+  SESSION_TRANSPORTS,
   LEDGER_KINDS,
   OFFBOARDING_REASONS,
   OFFSET_UNITS,
@@ -32,11 +34,14 @@ export const connectWebhookInput = z.object({
   webhookUrl: z.string().trim().min(1, "Cole o endereço do webhook.").max(500),
 });
 
+const sessionTransportSchema = z.enum(SESSION_TRANSPORTS).default("bearer");
+
 export const createAccountInput = z.object({
   installToken: z.string().min(20).max(200),
   name: text(120),
   email: emailSchema,
   password: passwordSchema,
+  transport: sessionTransportSchema,
 });
 
 export const prepareInput = z.object({
@@ -52,6 +57,7 @@ export const prepareInput = z.object({
 export const loginInput = z.object({
   email: emailSchema,
   password: z.string().min(1, "Informe a senha.").max(200),
+  transport: sessionTransportSchema,
 });
 
 export const changePasswordInput = z.object({
@@ -254,6 +260,8 @@ export const settingsInput = z
       .partial(),
     content: collaboratorContentInput,
     features: z.object({ notifications: z.boolean(), calendar: z.boolean(), feed: z.boolean() }).partial(),
+    /** Meses que as jornadas encerradas ficam guardadas antes de serem excluídas. */
+    retentionMonths: z.number().int().min(6, "Guarde por pelo menos 6 meses.").max(120, "Guarde por no máximo 120 meses."),
   })
   .partial();
 
@@ -270,6 +278,8 @@ export const updateUserInput = z.object({
   active: z.boolean().optional(),
   role: z.enum(APP_ROLES).optional(),
   resetPassword: passwordSchema.optional(),
+  /** Pessoa do Bitrix24 ligada a este acesso (nulo desfaz o vínculo). */
+  bitrixUserId: bitrixUserIdSchema.nullable().optional(),
 });
 
 export const peopleQueryInput = z.object({
@@ -277,14 +287,21 @@ export const peopleQueryInput = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 
+/* Dados pessoais (LGPD) */
+
+export const privacyQueryInput = z.object({ query: z.string().trim().max(80).default("") });
+
+/** A exclusão não tem volta: pede o nome da pessoa digitado, como confirmação. */
+export const eraseSubjectInput = z.object({ confirmName: z.string().trim().min(1, "Digite o nome da pessoa para confirmar.").max(200) });
+
 /** Formulário da página do colaborador (POST sem JavaScript). */
 export const collaboratorDoneInput = z.object({ activityId: z.string().min(1).max(64) });
 export const collaboratorDocumentInput = z.object({ activityId: z.string().min(1).max(64), key: z.string().regex(/^[a-z0-9-]{1,40}$/) });
 
 export type ConnectWebhookInput = z.infer<typeof connectWebhookInput>;
-export type CreateAccountInput = z.infer<typeof createAccountInput>;
+export type CreateAccountInput = z.input<typeof createAccountInput>;
 export type PrepareInput = z.infer<typeof prepareInput>;
-export type LoginInput = z.infer<typeof loginInput>;
+export type LoginInput = z.input<typeof loginInput>;
 export type TemplateInput = z.infer<typeof templateInput>;
 export type TemplateActivityInput = z.infer<typeof templateActivityInput>;
 export type CreateJourneyInput = z.infer<typeof createJourneyInput>;

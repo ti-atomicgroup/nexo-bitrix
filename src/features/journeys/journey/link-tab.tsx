@@ -8,6 +8,7 @@ import { Notice } from "@/components/ui/notice";
 import { LoadingArea, Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast";
 import { CollaboratorPage } from "@/features/collaborator/collaborator-page";
+import { CollaboratorPreviewStyles } from "@/features/collaborator/collaborator-preview-styles";
 import { api, toApiError } from "@/lib/api-client";
 import { firstName, relativeTo } from "@/lib/format";
 import { useApi } from "@/lib/use-api";
@@ -191,7 +192,10 @@ export function LinkTab({ journey, today, onChanged }: { journey: JourneyDTO; to
               <Skeleton height={200} radius={6} />
             </LoadingArea>
           ) : (
-            <CollaboratorPage view={toCollaboratorPreview(journey, settings.data ?? null, today)} token="previa" preview />
+            <>
+              <CollaboratorPreviewStyles />
+              <CollaboratorPage view={toCollaboratorPreview(journey, settings.data ?? null, today)} token="previa" preview omitStyles />
+            </>
           )}
         </div>
       </section>

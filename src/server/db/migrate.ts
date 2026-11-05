@@ -1,32 +1,51 @@
 import "server-only";
-import type { Db } from "./driver";
+import { flushDeleted, type Db } from "./driver";
 import { migration001 } from "./migrations/001-init";
 import { migration002 } from "./migrations/002-documents";
 import { migration003 } from "./migrations/003-stage-deadline";
 import { migration004 } from "./migrations/004-document-review";
 import { migration005 } from "./migrations/005-person-invite";
 import { migration006 } from "./migrations/006-journey-position";
+import { migration007 } from "./migrations/007-security-hardening";
+import { migration008 } from "./migrations/008-seal-fields";
+
+export interface MigrationContext {
+  /** Pasta de dados desta conexão (onde fica a chave da instância). */
+  dataDir?: string;
+}
 
 export interface Migration {
   id: number;
   name: string;
   sql: string;
+  /** Passo em código, depois do SQL e na mesma transação (ex.: cifrar dados que já existem). */
+  run?: (db: Db, context: MigrationContext) => void;
+  /** Reescreve o arquivo no fim: a migração trocou dados que não podem continuar legíveis nas páginas antigas. */
+  rewriteFile?: boolean;
 }
 
 /** Ordem de aplicação. Novas migrações entram no fim, com id crescente; nunca editar uma já publicada. */
-export const MIGRATIONS: Migration[] = [migration001, migration002, migration003, migration004, migration005, migration006];
+export const MIGRATIONS: Migration[] = [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration008];
 
-export function migrate(db: Db, migrations: Migration[] = MIGRATIONS): number[] {
+export function migrate(db: Db, migrations: Migration[] = MIGRATIONS, context: MigrationContext = {}): number[] {
   db.exec("CREATE TABLE IF NOT EXISTS schema_migrations (id INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL)");
   const applied = new Set(db.prepare("SELECT id FROM schema_migrations").all<{ id: number }>().map((row) => Number(row.id)));
   const done: number[] = [];
+  let rewrite = false;
   for (const migration of [...migrations].sort((a, b) => a.id - b.id)) {
     if (applied.has(migration.id)) continue;
     db.tx(() => {
-      db.exec(migration.sql);
+      if (migration.sql) db.exec(migration.sql);
+      migration.run?.(db, context);
       db.prepare("INSERT INTO schema_migrations (id, name, applied_at) VALUES (?, ?, ?)").run(migration.id, migration.name, new Date().toISOString());
     });
     done.push(migration.id);
+    rewrite ||= Boolean(migration.rewriteFile);
+  }
+  if (rewrite) {
+    flushDeleted(db);
+    db.exec("VACUUM");
+    flushDeleted(db);
   }
   return done;
 }

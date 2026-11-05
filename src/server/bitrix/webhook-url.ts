@@ -1,5 +1,6 @@
 import "server-only";
 import { isIP } from "node:net";
+import { isAllowedPortalHost } from "../../../scripts/lib/bitrix-policy.mjs";
 import { AppError } from "../errors";
 
 export interface BitrixCredentials {
@@ -15,8 +16,8 @@ const PRIVATE_SUFFIXES = [".localhost", ".local", ".internal", ".lan", ".home", 
 const invalid = (message: string) => new AppError("WEBHOOK_URL_INVALID", message, 400);
 
 /**
- * Valida o webhook de entrada do Bitrix24 e separa portal, usuário e segredo.
- * Aceita qualquer domínio público (inclusive domínio próprio), mas só https, sem porta, credenciais, parâmetros ou IP.
+ * Valida o webhook de entrada do Bitrix24 e separa portal, usuário e segredo. Só https, sem porta, credenciais, parâmetros
+ * ou IP, e o host precisa passar pela política de portais (scripts/lib/bitrix-policy.mjs): nuvem do Bitrix24 ou NEXO_BITRIX_ALLOWED_HOSTS.
  */
 export function parseWebhookUrl(value: string): BitrixCredentials {
   let url: URL;
@@ -34,6 +35,9 @@ export function parseWebhookUrl(value: string): BitrixCredentials {
   if (isIP(bare) || bare.includes(":")) throw invalid("Use o endereço do seu portal Bitrix24, não um endereço IP.");
   if (!hostname.includes(".") || hostname === "localhost" || PRIVATE_SUFFIXES.some((suffix) => hostname.endsWith(suffix))) {
     throw invalid("Use o endereço público do seu portal Bitrix24.");
+  }
+  if (!isAllowedPortalHost(hostname)) {
+    throw invalid("Use o endereço do seu portal Bitrix24, como suaempresa.bitrix24.com.br. Portal em domínio próprio precisa ser liberado pelo responsável técnico.");
   }
   const match = PATH_PATTERN.exec(url.pathname);
   if (!match?.[1] || !match[2]) throw invalid("O caminho do webhook deve ser /rest/<número>/<código>/, como o Bitrix24 mostra ao criá-lo.");

@@ -10,7 +10,7 @@ import { LoadingArea, Skeleton } from "@/components/ui/skeleton";
 import { ToastProvider, useToast } from "@/components/ui/toast";
 import { api, toApiError } from "@/lib/api-client";
 import { useApi } from "@/lib/use-api";
-import { useHasToken } from "@/lib/use-session";
+import { useHasSession } from "@/lib/use-session";
 import type { SyncStatusDTO } from "@/shared/contracts";
 import { ConsoleContext, type ConsoleContextValue } from "./console-context";
 import styles from "./console-shell.module.css";
@@ -21,7 +21,7 @@ const SYNC_FRESH_MS = 45_000;
 const SYNC_POLL_MS = 60_000;
 
 /**
- * Casca do console do RH. Exige sessão: sem token (ou com `/api/me` 401) volta para `/entrar`;
+ * Casca do console do RH. Exige sessão: sem sessão (ou com `/api/me` 401) volta para `/entrar`;
  * instalação incompleta volta para `/instalar`. As páginas só aparecem depois de saber quem está conectado.
  */
 export function ConsoleShell({ children }: { children: ReactNode }) {
@@ -36,14 +36,14 @@ function ShellFrame({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname() ?? "/hoje";
   const toast = useToast();
-  const hasToken = useHasToken();
+  const hasSession = useHasSession();
   const leavingRef = useRef(false);
-  const me = useApi((signal) => api.me({ signal }), [], { enabled: hasToken === true, revalidateOnFocus: false });
+  const me = useApi((signal) => api.me({ signal }), [], { enabled: hasSession === true, revalidateOnFocus: false });
 
   useEffect(() => {
-    if (hasToken !== false) return;
+    if (hasSession !== false) return;
     router.replace(leavingRef.current ? "/entrar" : `/entrar?voltar=${encodeURIComponent(pathname)}`);
-  }, [hasToken, pathname, router]);
+  }, [hasSession, pathname, router]);
 
   const stage = me.data?.setup.stage;
   useEffect(() => {

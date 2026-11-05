@@ -9,7 +9,7 @@ describe("teste de saúde", () => {
       const response = get();
       expect(response.status).toBe(200);
       expect(response.headers.get("cache-control")).toBe("no-store");
-      expect(await response.json()).toMatchObject({ ok: true, node: process.version });
+      expect(await response.json()).toEqual({ ok: true });
     }
   });
 });

@@ -4,6 +4,6 @@ import { collaboratorLinkInput } from "@/shared/schemas";
 
 export const dynamic = "force-dynamic";
 
-export const POST = route({ auth: "user", params: ["journeyId"], input: collaboratorLinkInput }, ({ params, input, actor }) =>
+export const POST = route({ auth: "session", operation: "journey.collaborator_link", params: ["journeyId"], input: collaboratorLinkInput }, ({ params, input, actor }) =>
   input.action === "create" ? createCollaboratorLink(params.journeyId, actor) : revokeCollaboratorLink(params.journeyId, actor),
 );

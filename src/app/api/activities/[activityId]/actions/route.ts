@@ -4,6 +4,6 @@ import { activityActionInput } from "@/shared/schemas";
 
 export const dynamic = "force-dynamic";
 
-export const POST = route({ auth: "user", params: ["activityId"], input: activityActionInput }, ({ params, input, actor }) =>
+export const POST = route({ auth: "session", operation: "activity.act", params: ["activityId"], input: activityActionInput }, ({ params, input, actor }) =>
   runActivityAction(params.activityId, input, actor),
 );

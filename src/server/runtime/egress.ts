@@ -1,12 +1,12 @@
 import "server-only";
 import { lookup } from "node:dns/promises";
 import { request } from "node:https";
+import { guardedLookup, isAllowedPortalHost, safeFetch } from "../../../scripts/lib/bitrix-policy.mjs";
 
-/** Só domínios do Bitrix24 na nuvem: a sonda nunca vira um proxy para qualquer endereço. */
-const BITRIX_HOST = /^[a-z0-9-]+(?:\.[a-z0-9-]+)*\.bitrix24\.[a-z]{2,6}(?:\.[a-z]{2})?$/i;
+/** Só portais permitidos pela política: a sonda nunca vira um proxy para qualquer endereço. */
 const TIMEOUT_MS = 10_000;
 
-export const isBitrixHost = (host: string): boolean => host.length <= 200 && BITRIX_HOST.test(host);
+export const isBitrixHost = (host: string): boolean => isAllowedPortalHost(host);
 
 interface Attempt {
   ok: boolean;
@@ -23,10 +23,10 @@ function describe(error: unknown): string {
   return [error.name, typeof code === "string" ? code : null, detail].filter(Boolean).join(" · ").slice(0, 300);
 }
 
-async function viaFetch(url: string): Promise<Attempt> {
+async function attempt(run: () => Promise<Response>): Promise<Attempt> {
   const started = Date.now();
   try {
-    const response = await fetch(url, { method: "GET", redirect: "manual", signal: AbortSignal.timeout(TIMEOUT_MS) });
+    const response = await run();
     await response.body?.cancel();
     return { ok: true, ms: Date.now() - started, status: response.status };
   } catch (error) {
@@ -34,11 +34,11 @@ async function viaFetch(url: string): Promise<Attempt> {
   }
 }
 
-/** O mesmo pedido pelo módulo https, forçando IPv4: separa falha de IPv6 ou do fetch (undici) de bloqueio de rede. */
+/** O mesmo pedido pelo módulo https, forçando IPv4: separa falha de IPv6 de bloqueio de rede. Com a mesma conferência de DNS. */
 function viaHttpsIpv4(host: string): Promise<Attempt> {
   const started = Date.now();
   return new Promise((resolve) => {
-    const req = request({ host, path: "/rest/", method: "GET", family: 4, timeout: TIMEOUT_MS }, (response) => {
+    const req = request({ host, path: "/rest/", method: "GET", family: 4, timeout: TIMEOUT_MS, lookup: guardedLookup as never }, (response) => {
       response.resume();
       resolve({ ok: true, ms: Date.now() - started, status: response.statusCode });
     });
@@ -62,7 +62,7 @@ async function publicIp(): Promise<{ ok: boolean; ip?: string; error?: string }>
   return { ok: false, error: "Resposta inesperada do serviço de IP." };
 }
 
-/** Testa a saída do servidor até o portal (sem webhook, sem segredo): DNS, fetch, https IPv4, um site neutro e o IP de saída. */
+/** Testa a saída do servidor até o portal (sem webhook, sem segredo): DNS, https, https IPv4, um site neutro e o IP de saída. Só para a administração. */
 export async function egressProbe(host: string) {
   let dns: { ok: boolean; addresses?: string[]; error?: string };
   try {
@@ -72,18 +72,10 @@ export async function egressProbe(host: string) {
     dns = { ok: false, error: describe(error) };
   }
   const [bitrixFetch, bitrixIpv4, neutralFetch, outboundIp] = await Promise.all([
-    viaFetch(`https://${host}/rest/`),
+    attempt(() => safeFetch(`https://${host}/rest/`, { method: "GET", redirect: "manual", signal: AbortSignal.timeout(TIMEOUT_MS) })),
     viaHttpsIpv4(host),
-    viaFetch("https://example.com/"),
+    attempt(() => fetch("https://example.com/", { method: "GET", redirect: "manual", signal: AbortSignal.timeout(TIMEOUT_MS) })),
     publicIp(),
   ]);
-  return {
-    host,
-    dns,
-    bitrixFetch,
-    bitrixIpv4,
-    neutralFetch,
-    outboundIp,
-    proxyEnv: ["HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy"].filter((name) => Boolean(process.env[name])),
-  };
+  return { host, dns, bitrixFetch, bitrixIpv4, neutralFetch, outboundIp };
 }

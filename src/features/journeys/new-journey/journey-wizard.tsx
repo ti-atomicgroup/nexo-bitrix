@@ -45,10 +45,12 @@ export interface JourneyWizardProps {
   companyName: string | null;
   /** O webhook tem a permissão Usuários (user): dá para convidar a pessoa para o Bitrix24 daqui. */
   invitesEnabled: boolean;
+  /** Convidar é da administração; o RH vê como pedir. */
+  canInvite: boolean;
 }
 
 /** Assistente de nova jornada: quem → trilha e data → participantes e resumo. */
-export function JourneyWizard({ initial, templates, detection, companyName, invitesEnabled }: JourneyWizardProps) {
+export function JourneyWizard({ initial, templates, detection, companyName, invitesEnabled, canInvite }: JourneyWizardProps) {
   const router = useRouter();
   const toast = useToast();
   const now = useNow(60_000);
@@ -215,7 +217,7 @@ export function JourneyWizard({ initial, templates, detection, companyName, invi
                     onChange={(event) => update({ manualEmail: event.target.value })}
                     error={errors.manualEmail}
                   />
-                  {invitesEnabled ? (
+                  {invitesEnabled && canInvite ? (
                     <Checkbox
                       className={styles.wide}
                       label="Convidar para o Bitrix24"
@@ -226,7 +228,9 @@ export function JourneyWizard({ initial, templates, detection, companyName, invi
                   ) : null}
                   {!state.invite ? (
                     <p className={styles.note}>
-                      {invitesEnabled
+                      {invitesEnabled && !canInvite
+                        ? "Quando a conta no Bitrix24 existir, vincule-a na página da jornada. Só a administração convida pelo Nexo, porque o convite cria uma conta no portal."
+                        : invitesEnabled
                         ? "Sem convite, vincule a conta na página da jornada quando ela existir no Bitrix24."
                         : "Quando a conta no Bitrix24 existir, vincule-a na página da jornada para as tarefas da pessoa serem criadas. Para convidar daqui, o webhook precisa da permissão Usuários (user) e ser de uma conta administradora."}
                     </p>
@@ -275,7 +279,7 @@ export function JourneyWizard({ initial, templates, detection, companyName, invi
                     value={state.templateId}
                     onChange={(templateId) => update({ templateId })}
                     error={errors.templateId}
-                    minWidth={260}
+                    wide
                     options={kindTemplates.map((template) => ({
                       value: template.id,
                       title: template.name,

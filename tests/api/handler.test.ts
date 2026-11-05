@@ -42,7 +42,7 @@ describe("envoltório das rotas", () => {
 
   it("devolve 401 sem token ou com token inválido, antes de ler o corpo", async () => {
     const service = vi.fn(() => ({ ok: true }));
-    const handler = route({ auth: "user", input: loginInput }, service);
+    const handler = route({ auth: "session", operation: "today.read", input: loginInput }, service);
     for (const token of [undefined, "token-que-nao-existe-1234567890"]) {
       const result = await call<ApiErrorBody>(handler, { token, rawBody: "{quebrado" });
       expect(result.status).toBe(401);
@@ -55,7 +55,7 @@ describe("envoltório das rotas", () => {
   it("devolve 403 para RH em rota de administrador e libera o administrador", async () => {
     const rh = await seedUser({ role: "rh" });
     const admin = await seedUser({ role: "admin" });
-    const handler = route({ auth: "admin" }, ({ user, actor }) => ({ user: user.id, actor }));
+    const handler = route({ auth: "session", operation: "users.manage" }, ({ user, actor }) => ({ user: user.id, actor }));
     const denied = await call<ApiErrorBody>(handler, { token: rh.token });
     expect(denied.status).toBe(403);
     expect(denied.body.error).toEqual({ code: "FORBIDDEN", message: FORBIDDEN_MESSAGE });

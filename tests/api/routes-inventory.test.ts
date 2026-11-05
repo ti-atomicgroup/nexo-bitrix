@@ -6,6 +6,7 @@ import { issueSession } from "@/server/auth/sessions";
 import type { RouteHandler } from "@/server/http/handler";
 import { FORBIDDEN_MESSAGE, UNAUTHENTICATED_MESSAGE } from "@/server/http/handler";
 import { API_ROUTES } from "@/shared/api";
+import { can, type Operation } from "@/shared/permissions";
 import { useTestDb } from "../support/db";
 import { call, seedUser, type ApiErrorBody } from "./support/seed";
 
@@ -18,8 +19,8 @@ vi.mock("@/server/domain", async () => (await import("./support/domain-fake")).d
  */
 const API_DIR = fileURLToPath(new URL("../../src/app/api", import.meta.url));
 const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
-// "jobs/tick" é interna (só o worker do Bitrix24, com token): fica fora da tabela da API, como a sonda.
-const PUBLIC = new Set(["health", "probe", "jobs/tick", "status", "setup/connect", "setup/account", "auth/login", "tasks/[taskId]"]);
+// "jobs/tick" é interna (só o worker do Bitrix24, com token): fica fora da tabela da API.
+const PUBLIC = new Set(["health", "probe", "jobs/tick", "status", "setup/connect", "setup/account", "auth/login", "auth/transport", "tasks/[taskId]"]);
 
 type Method = (typeof METHODS)[number];
 interface RouteEntry {
@@ -70,15 +71,15 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const authOf = (route: string, method: Method) =>
-  Object.values(API_ROUTES).find((spec) => spec.method === method && spec.path.split("?")[0] === `/api/${route.replace(/\[([^\]]+)\]/g, ":$1")}`)?.auth;
+const specOf = (route: string, method: Method) =>
+  Object.values(API_ROUTES).find((spec) => spec.method === method && spec.path.split("?")[0] === `/api/${route.replace(/\[([^\]]+)\]/g, ":$1")}`);
 
 describe("inventário de rotas da API", () => {
   it("encontra todas as rotas da tabela e nenhuma rota fora dela", () => {
     const found = new Set(entries.map((entry) => `${entry.method} /api/${entry.route.replace(/\[([^\]]+)\]/g, ":$1")}`));
     const expected = new Set(Object.values(API_ROUTES).map((spec) => `${spec.method} ${spec.path.split("?")[0]}`));
     expect([...expected].filter((key) => !found.has(key))).toEqual([]);
-    const extra = [...found].filter((key) => !expected.has(key) && !key.endsWith("/api/probe") && !key.endsWith("/api/jobs/tick"));
+    const extra = [...found].filter((key) => !expected.has(key) && !key.endsWith("/api/jobs/tick"));
     expect(extra).toEqual([]);
     expect(entries.length).toBeGreaterThanOrEqual(Object.keys(API_ROUTES).length);
   });
@@ -95,7 +96,7 @@ describe("inventário de rotas da API", () => {
       expect(result.headers.get("cache-control")).toBe("no-store");
       checked.push(`${entry.method} ${path}`);
     }
-    const protectedInTable = Object.values(API_ROUTES).filter((spec) => spec.auth === "user" || spec.auth === "admin");
+    const protectedInTable = Object.values(API_ROUTES).filter((spec) => spec.auth === "session");
     expect(checked).toHaveLength(protectedInTable.length);
   });
 
@@ -107,23 +108,24 @@ describe("inventário de rotas da API", () => {
     }
   });
 
-  it("matriz de papéis: RH recebe 403 nas rotas de administrador e passa da autenticação nas demais", async () => {
+  it("matriz de papéis: RH recebe 403 nas operações só de administrador e passa da autenticação nas demais", async () => {
     const rh = await seedUser({ role: "rh" });
     const admin = await seedUser({ role: "admin" });
     for (const entry of entries.filter((item) => !PUBLIC.has(item.route))) {
       const { path, params } = concrete(entry.route);
       const body = entry.method === "GET" || entry.method === "DELETE" ? undefined : {};
-      const auth = authOf(entry.route, entry.method);
+      const spec = specOf(entry.route, entry.method);
+      expect(spec?.auth, `${entry.method} ${path}`).toBe("session");
+      const allowedToRh = can("rh", (spec as { operation: Operation }).operation);
       // Sessão nova a cada chamada: a rota de logout encerra a sessão usada.
       const asRh = await call<ApiErrorBody, string>(entry.handler, { method: entry.method, path, params, body, token: issueSession(rh.user).token });
-      if (auth === "admin") {
+      if (!allowedToRh) {
         expect(asRh.status, `${entry.method} ${path} (rh)`).toBe(403);
         expect(asRh.body.error).toEqual({ code: "FORBIDDEN", message: FORBIDDEN_MESSAGE });
         const asAdmin = await call<ApiErrorBody, string>(entry.handler, { method: entry.method, path, params, body, token: issueSession(admin.user).token });
         expect([401, 403], `${entry.method} ${path} (admin)`).not.toContain(asAdmin.status);
         expect(asAdmin.status, `${entry.method} ${path} (admin): ${asAdmin.text}`).toBeLessThan(500);
       } else {
-        expect(auth, `${entry.method} ${path}`).toBe("user");
         expect([401, 403], `${entry.method} ${path} (rh)`).not.toContain(asRh.status);
         // Entrada vazia ou id inexistente: 2xx ou 4xx com mensagem, nunca erro interno.
         expect(asRh.status, `${entry.method} ${path} (rh): ${asRh.text}`).toBeLessThan(500);
@@ -135,7 +137,7 @@ describe("inventário de rotas da API", () => {
     const publicInTable = Object.values(API_ROUTES)
       .filter((spec) => spec.auth === "public" || spec.auth === "install")
       .map((spec) => spec.path.split("?")[0]!.replace(/^\/api\//, ""));
-    const publicRoutes = [...PUBLIC].filter((route) => route !== "probe" && route !== "jobs/tick").map((route) => route.replace(/\[([^\]]+)\]/g, ":$1"));
+    const publicRoutes = [...PUBLIC].filter((route) => route !== "jobs/tick").map((route) => route.replace(/\[([^\]]+)\]/g, ":$1"));
     expect(new Set(publicInTable)).toEqual(new Set(publicRoutes));
   });
 });

@@ -10,13 +10,15 @@
  * - GET  /health   vivo?
  * A cada minuto chama POST http://127.0.0.1:${PORT}/api/jobs/tick para o motor rodar os trabalhos pendentes.
  * Só escuta em 127.0.0.1 e exige o token interno (NEXO_WORKER_TOKEN). Nunca registra o endereço (ele tem o segredo).
+ * O destino passa pela política de scripts/lib/bitrix-policy.mjs, a mesma do transporte direto.
  */
 import { timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
 import { pathToFileURL } from "node:url";
+import { allowedTarget, isAllowedPortalHost, safeFetch } from "./lib/bitrix-policy.mjs";
 
-/** Só domínios do Bitrix24 na nuvem e só a API REST: o worker nunca vira um proxy para qualquer endereço. */
-const BITRIX_HOST = /^[a-z0-9-]+(?:\.[a-z0-9-]+)*\.bitrix24\.[a-z]{2,6}(?:\.[a-z]{2})?$/i;
+export { allowedTarget };
+
 const MAX_BODY_BYTES = 25 * 1024 * 1024; // documento de até 10 MB em base64, com folga
 const MAX_REQUEST_MS = 120_000;
 const PROBE_TIMEOUT_MS = 10_000;
@@ -32,17 +34,6 @@ export function errorCode(error) {
   if (error && (error.name === "TimeoutError" || error.name === "AbortError")) return "TimeoutError";
   const code = error?.cause?.code ?? error?.code;
   return typeof code === "string" ? code.slice(0, 60) : String(error?.name ?? "Error").slice(0, 60);
-}
-
-/** Endereço permitido: https, domínio do Bitrix24 na nuvem, caminho /rest/, sem usuário/senha nem porta. */
-export function allowedTarget(raw) {
-  try {
-    const url = new URL(raw);
-    const ok = url.protocol === "https:" && BITRIX_HOST.test(url.hostname) && url.pathname.startsWith("/rest/") && !url.username && !url.password && !url.port;
-    return ok ? url : null;
-  } catch {
-    return null;
-  }
 }
 
 /** Nome do método para o log ("user.current"), nunca o endereço inteiro. */
@@ -72,7 +63,7 @@ function readBody(req) {
 /**
  * Servidor do worker. `fetchImpl` permite testar sem rede. Devolve o servidor (ainda sem escutar) e o disparo do ciclo.
  */
-export function createWorker({ token, appPort, fetchImpl = fetch }) {
+export function createWorker({ token, appPort, fetchImpl = safeFetch }) {
   if (!token) throw new Error("NEXO_WORKER_TOKEN ausente");
   const expected = Buffer.from(`Bearer ${token}`);
   const authorized = (req) => {
@@ -120,7 +111,7 @@ export function createWorker({ token, appPort, fetchImpl = fetch }) {
   }
 
   async function probe(res, host) {
-    if (!host || host.length > 200 || !BITRIX_HOST.test(host)) return send(res, 400, { error: "host" });
+    if (!isAllowedPortalHost(host)) return send(res, 400, { error: "host" });
     const started = Date.now();
     try {
       const response = await fetchImpl(`https://${host}/rest/`, { method: "GET", redirect: "manual", signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
@@ -133,18 +124,20 @@ export function createWorker({ token, appPort, fetchImpl = fetch }) {
 
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
-    if (req.method === "GET" && url.pathname === "/health") return send(res, 200, { ok: true, pid: process.pid, uptimeSeconds: Math.round(process.uptime()) });
+    if (req.method === "GET" && url.pathname === "/health") return send(res, 200, { ok: true });
     if (!authorized(req)) return send(res, 401, { error: "unauthorized" });
     if (req.method === "POST" && url.pathname === "/bitrix") return void relay(req, res);
     if (req.method === "GET" && url.pathname === "/probe") return void probe(res, url.searchParams.get("host")?.trim().toLowerCase() ?? "");
     send(res, 404, { error: "not_found" });
   });
 
+  // A política vale para o Bitrix24; acordar o motor é uma chamada local, que ela recusaria.
+  const localFetch = fetchImpl === safeFetch ? fetch : fetchImpl;
   let failures = 0;
   /** Acorda o motor do Nexo pela rota interna (127.0.0.1), sem passar pelo domínio público. */
   async function tick() {
     try {
-      const response = await fetchImpl(`http://127.0.0.1:${appPort}/api/jobs/tick`, {
+      const response = await localFetch(`http://127.0.0.1:${appPort}/api/jobs/tick`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         signal: AbortSignal.timeout(10_000),

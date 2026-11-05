@@ -20,7 +20,7 @@ let token: string;
 beforeEach(async () => {
   cleanup = useTestDb().cleanup;
   vi.spyOn(console, "log").mockImplementation(() => undefined);
-  token = (await seedUser({ role: "rh", name: "Marina RH" })).token;
+  token = (await seedUser({ role: "admin", name: "Marina RH" })).token;
   setWebhookRecord({ encryptedUrl: "v1.x.y.z", portal: "empresa.bitrix24.com.br", owner: { bitrixUserId: "7", name: "Integração", position: null }, scopes: [], verifiedAt: "2026-10-26T12:00:00.000Z" });
   setProject({ id: "42", name: "Nexo · Jornadas", url: "https://empresa.bitrix24.com.br/workgroups/group/42/" });
 });

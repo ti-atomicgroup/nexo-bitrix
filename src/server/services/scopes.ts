@@ -12,7 +12,8 @@ export function scopeCheck(granted: string[]): ScopeCheckDTO {
     REQUIRED_SCOPES.map((scope) => [scope, has.has(scope) || (ALTERNATIVES[scope] ?? []).some((alternative) => has.has(alternative))]),
   ) as ScopeCheckDTO["required"];
   const optional = Object.fromEntries(OPTIONAL_SCOPES.map((scope) => [scope, has.has(scope)])) as ScopeCheckDTO["optional"];
-  return { required, optional };
+  const known = new Set<string>([...REQUIRED_SCOPES, ...OPTIONAL_SCOPES, ...Object.values(ALTERNATIVES).flat()]);
+  return { required, optional, extra: [...has].filter((scope) => !known.has(scope)).sort() };
 }
 
 export function missingRequiredScopes(check: ScopeCheckDTO): RequiredScope[] {

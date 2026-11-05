@@ -1,10 +1,12 @@
 "use client";
 
+import { useMe } from "@/components/shell/console-context";
 import { PageHeader } from "@/components/ui/page-header";
 import { Notice } from "@/components/ui/notice";
 import { LoadingArea, Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api-client";
 import { useApi } from "@/lib/use-api";
+import { can } from "@/shared/permissions";
 import { JourneyWizard } from "./journey-wizard";
 import { initialState } from "./wizard-state";
 
@@ -20,6 +22,7 @@ export function NewJourneyScreen({ detectionId }: { detectionId?: string }) {
     revalidateOnFocus: false,
   });
 
+  const me = useMe();
   const ready = (settings.data || settings.error) && (!detectionId || detection.data || detection.error);
 
   return (
@@ -42,6 +45,7 @@ export function NewJourneyScreen({ detectionId }: { detectionId?: string }) {
           detection={detection.data ?? null}
           companyName={settings.data?.company.name ?? null}
           invitesEnabled={Boolean(settings.data?.invitesEnabled)}
+          canInvite={can(me.user.role, "person.invite")}
         />
       ) : (
         <LoadingArea label="Preparando o assistente…">

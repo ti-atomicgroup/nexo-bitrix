@@ -12,7 +12,13 @@ import { useApi } from "@/lib/use-api";
 import { useNow } from "@/lib/use-session";
 import styles from "./settings-section.module.css";
 
-/** Diagnóstico técnico (último ciclo, fila, limite, banco, versão) e o registro de atividades. */
+const DATA_SOURCE: Record<string, string> = {
+  "onnira-volume": "Volume persistente (onnira-volume)",
+  NEXO_DATA_DIR: "Pasta definida em NEXO_DATA_DIR",
+  local: "Pasta local: na hospedagem, os dados se perdem a cada publicação",
+};
+
+/** Diagnóstico técnico (último ciclo, fila, limite, banco, proteção dos dados, versão) e o registro de atividades. */
 export function DiagnosticsSection() {
   const now = useNow(30_000);
   const diagnostics = useApi((signal) => api.diagnostics({ signal }), [], { refreshMs: 30_000 });
@@ -47,6 +53,11 @@ export function DiagnosticsSection() {
           </Notice>
         ) : data ? (
           <div className={styles.stack}>
+            {data.backup.lastError ? (
+              <Notice tone="warning" title="A última cópia de segurança falhou">
+                {data.backup.lastError}
+              </Notice>
+            ) : null}
             {data.scheduler.lastError ? (
               <Notice tone="warning" title="O último ciclo teve erro">
                 {data.scheduler.lastError}
@@ -82,7 +93,31 @@ export function DiagnosticsSection() {
               </div>
               <div>
                 <dt>Pasta de dados</dt>
-                <dd className={styles.mono}>{data.database.dataDir}</dd>
+                <dd>{DATA_SOURCE[data.database.dataSource] ?? data.database.dataSource}</dd>
+              </div>
+              <div>
+                <dt>Permissões dos dados</dt>
+                <dd>{!data.dataProtection.applies ? "Este sistema não usa permissões POSIX" : data.dataProtection.ok ? "Só o Nexo lê e grava" : `Ainda abertos: ${data.dataProtection.exposed.join(", ") || "não deu para conferir"}`}</dd>
+              </div>
+              <div>
+                <dt>Chave de cifragem</dt>
+                <dd>{data.dataProtection.keyFromEnv ? "No ambiente, separada do banco" : "No mesmo volume do banco"}</dd>
+              </div>
+              <div>
+                <dt>Cópia de segurança</dt>
+                <dd>
+                  {data.backup.lastAt ? `Última ${since(data.backup.lastAt)}` : "Ainda sem cópia"} · {data.backup.count} guardada(s) por {data.backup.keepDays} dias
+                </dd>
+              </div>
+              <div>
+                <dt>Tentativas suspeitas ({data.security.hours} h)</dt>
+                <dd>
+                  {data.security.loginFailures} senha(s) errada(s) · {data.security.loginLocks} bloqueio(s) · {data.security.rateLimited} acima do limite
+                </dd>
+              </div>
+              <div>
+                <dt>Worker do Bitrix24</dt>
+                <dd>{data.bitrixWorker ? "Ligado" : "Desligado: o Nexo chama o Bitrix24 direto, com a mesma política"}</dd>
               </div>
               <div>
                 <dt>Versão</dt>

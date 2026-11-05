@@ -1,11 +1,13 @@
 import "server-only";
+import { safeFetch } from "../../../scripts/lib/bitrix-policy.mjs";
 import { safeEqual } from "../security/crypto";
 import type { FetchLike } from "./transport";
 
 /**
  * Chamadas ao Bitrix24 pelo worker (scripts/bitrix-worker.mjs), como a Onnira pede: o servidor do Nexo não abre conexão
  * com o Bitrix; manda cada chamada ao worker por http://127.0.0.1 e recebe a resposta como veio do Bitrix.
- * Sem o worker configurado (testes, `next dev`, `npm run start:web`), chama o Bitrix direto.
+ * Sem o worker configurado (`next dev`, `npm run start:web`, hospedagem que não sobe por `npm start`), chama o Bitrix direto,
+ * com a mesma política de destino do worker (scripts/lib/bitrix-policy.mjs).
  */
 export interface WorkerConfig {
   url: string;
@@ -52,7 +54,7 @@ export function relayTransport(config: WorkerConfig, transport: FetchLike = (inp
 /** Transporte padrão do cliente Bitrix: pelo worker quando ele está configurado; senão, direto. */
 export function bitrixTransport(): FetchLike {
   const config = workerConfig();
-  return config ? relayTransport(config) : (input, init) => fetch(input, init);
+  return config ? relayTransport(config) : (input, init) => safeFetch(input, init);
 }
 
 /** Pedido interno do worker (rota /api/jobs/tick): só com o token combinado no `npm start`. */

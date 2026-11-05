@@ -4,4 +4,4 @@ import { changePasswordInput } from "@/shared/schemas";
 
 export const dynamic = "force-dynamic";
 
-export const POST = route({ auth: "user", input: changePasswordInput }, ({ user, tokenHash, input }) => changePassword(user, tokenHash, input));
+export const POST = route({ auth: "session", operation: "session.self", input: changePasswordInput }, ({ user, tokenHash, input }) => changePassword(user, tokenHash, input));

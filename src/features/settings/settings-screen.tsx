@@ -14,19 +14,21 @@ import { CompanySection } from "./company-section";
 import { ConnectionSection } from "./connection-section";
 import { ContentSection } from "./content-section";
 import { DiagnosticsSection } from "./diagnostics-section";
+import { PrivacySection } from "./privacy-section";
 import styles from "./settings-screen.module.css";
 import { TeamSection } from "./team-section";
 import { TriggersSection } from "./triggers-section";
 
 const SECTIONS = [
-  ["conexao", "Conexão com o Bitrix24"],
-  ["automacoes", "Automações do CRM"],
-  ["equipe", "Equipe"],
-  ["conteudo", "Conteúdo do colaborador"],
-  ["empresa", "Empresa e recursos"],
-  ["diagnostico", "Diagnóstico"],
-  ["registro", "Registro de atividades"],
-  ["conta", "Sua conta"],
+  ["conexao", "Conexão com o Bitrix24", false],
+  ["automacoes", "Automações do CRM", false],
+  ["equipe", "Equipe", false],
+  ["conteudo", "Conteúdo do colaborador", false],
+  ["empresa", "Empresa e recursos", false],
+  ["dados", "Dados pessoais", true],
+  ["diagnostico", "Diagnóstico", true],
+  ["registro", "Registro de atividades", true],
+  ["conta", "Sua conta", false],
 ] as const;
 
 /** `/ajustes`: configuração do Nexo. Quem é RH vê; só a administração muda. */
@@ -45,7 +47,7 @@ export function SettingsScreen() {
       <div className={styles.layout}>
         <nav className={styles.nav} aria-label="Seções de Ajustes">
           <ul>
-            {SECTIONS.map(([id, label]) => (
+            {SECTIONS.filter(([, , adminOnly]) => isAdmin || !adminOnly).map(([id, label]) => (
               <li key={id}>
                 <a href={`#${id}`}>{label}</a>
               </li>
@@ -78,9 +80,10 @@ export function SettingsScreen() {
               <TeamSection settings={settings.data} isAdmin={isAdmin} onSaved={saved} />
               <ContentSection key={JSON.stringify(settings.data.content)} settings={settings.data} isAdmin={isAdmin} onSaved={saved} />
               <CompanySection key={`${settings.data.company.name}|${settings.data.company.timezone}`} settings={settings.data} isAdmin={isAdmin} onSaved={saved} />
+              {isAdmin ? <PrivacySection settings={settings.data} onSaved={saved} /> : null}
             </>
           )}
-          <DiagnosticsSection />
+          {isAdmin ? <DiagnosticsSection /> : null}
           <AccountSection me={me} />
         </div>
       </div>

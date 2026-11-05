@@ -54,15 +54,30 @@ export const toUserRef = (user: Pick<BitrixUserInfo, "bitrixUserId" | "name" | "
   position: user.position,
 });
 
-/** `user.current` + `scope`: dono do webhook e escopos concedidos. */
-export async function checkWebhook(client: BitrixClient): Promise<{ owner: UserRef; scopes: string[] }> {
+/** `user.admin`: a conta do webhook é administradora do portal? Nulo se o Bitrix24 não responder: é só um aviso, nunca impede a conexão. */
+async function isPortalAdmin(client: BitrixClient): Promise<boolean | null> {
+  try {
+    const result = await client.call<unknown>("user.admin");
+    return result === true || result === "Y" || result === 1 || result === "1";
+  } catch (error) {
+    if (isBitrixError(error)) return null;
+    throw error;
+  }
+}
+
+/** `user.current`, `scope` e `user.admin`: dono do webhook, escopos concedidos e se a conta é administradora do portal. */
+export async function checkWebhook(client: BitrixClient): Promise<{ owner: UserRef; scopes: string[]; ownerIsPortalAdmin: boolean | null }> {
   const user = parseUser(await client.call("user.current"));
   if (!user.bitrixUserId) throw new BitrixError("RESPONSE_INVALID", {}, "O Bitrix24 não confirmou a conta dona do webhook.");
   if (!user.active) {
     throw new AppError("WEBHOOK_USER_INACTIVE", "A conta dona do webhook está inativa no Bitrix24. Crie o webhook com uma conta ativa.", 400);
   }
   const scopes = await client.call<unknown>("scope");
-  return { owner: toUserRef(user), scopes: Array.isArray(scopes) ? scopes.filter((scope): scope is string => typeof scope === "string") : [] };
+  return {
+    owner: toUserRef(user),
+    scopes: Array.isArray(scopes) ? scopes.filter((scope): scope is string => typeof scope === "string") : [],
+    ownerIsPortalAdmin: await isPortalAdmin(client),
+  };
 }
 
 /** Colaboradores do portal (sem extranet, bots e e-mail). Com `includeInactive`, traz os desligados para atualizar o cache. */
@@ -85,6 +100,13 @@ export async function findUserByEmail(client: BitrixClient, email: string): Prom
     .filter((user) => !EXTERNAL_USER_TYPES.has(text(asRecord(user).USER_TYPE)))
     .map(parseUser)
     .find((user) => user.bitrixUserId && user.email?.toLowerCase() === wanted);
+  return match ?? null;
+}
+
+/** Uma conta pelo ID, ativa ou não; nulo se não existe. */
+export async function getUserById(client: BitrixClient, userId: string): Promise<BitrixUserInfo | null> {
+  const raw = await client.call<unknown>("user.get", { FILTER: { ID: userId } });
+  const match = (Array.isArray(raw) ? raw : []).map(parseUser).find((user) => user.bitrixUserId === userId);
   return match ?? null;
 }
 
@@ -113,6 +135,12 @@ export async function findGroupByName(client: BitrixClient, name: string): Promi
   const wanted = normalizeName(name);
   const match = groups.map(asRecord).find((group) => normalizeName(text(group.NAME)) === wanted && text(group.CLOSED) !== "Y");
   return match ? { id: text(match.ID), name: text(match.NAME) } : null;
+}
+
+/** `sonet_group.user.get`: quem participa do projeto (dono, moderadores e membros), em IDs de usuário. */
+export async function listGroupMemberIds(client: BitrixClient, groupId: string): Promise<string[]> {
+  const members = await client.list<Record<string, unknown>>("sonet_group.user.get", { ID: groupId }, { maxPages: 50 });
+  return members.map((member) => text(asRecord(member).USER_ID)).filter(Boolean);
 }
 
 /** Projeto privado (invisível, fechado, convites por dono e moderadores). Devolve o ID. */

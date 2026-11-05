@@ -3,4 +3,4 @@ import { getDiagnostics } from "@/server/services/diagnostics";
 
 export const dynamic = "force-dynamic";
 
-export const GET = route({ auth: "user" }, () => getDiagnostics());
+export const GET = route({ auth: "session", operation: "diagnostics.read" }, () => getDiagnostics());

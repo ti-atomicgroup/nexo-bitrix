@@ -4,6 +4,7 @@ import type { SessionDTO } from "@/shared/contracts";
 import type { changePasswordInput, LoginInput } from "@/shared/schemas";
 import { revoke, revokeOtherSessions } from "../auth/sessions";
 import { purgeExpiredSessions } from "../db/repos/sessions";
+import { recordSecurityEvent } from "../db/repos/security-events";
 import { findUserByEmail, recordLoginFailure, recordLoginSuccess, updateUser, type AppUserRow } from "../db/repos/users";
 import { AppError } from "../errors";
 import { hashPassword, verifyAgainstDummy, verifyPassword } from "../security/passwords";
@@ -11,10 +12,14 @@ import { clearRateLimit, rateLimit } from "../security/rate-limit";
 import { auditAs } from "./audit";
 import { startSession } from "./session";
 
-/** 5 erros seguidos bloqueiam o login por 15 min (no banco para contas existentes, em memória para qualquer e-mail). */
+/**
+ * 5 erros seguidos bloqueiam o login por 15 min: na conta, para quem existe, e no limitador persistente, para qualquer e-mail.
+ * Além da conta, há limite por origem (quem testa muitas contas de um lugar só). Sem teto geral: alguém com poucos endereços trancaria o login de todo mundo.
+ */
 export const MAX_LOGIN_FAILURES = 5;
 export const LOCK_MS = 15 * 60 * 1000;
 const LOGIN_RULE = { limit: MAX_LOGIN_FAILURES, windowMs: LOCK_MS };
+export const LOGIN_ORIGIN_RULE = { limit: 30, windowMs: LOCK_MS };
 const PASSWORD_RULE = { limit: 5, windowMs: LOCK_MS };
 
 export const INVALID_CREDENTIALS_MESSAGE = "E-mail ou senha incorretos.";
@@ -23,7 +28,7 @@ export const LOCKED_MESSAGE = "Muitas tentativas. Tente de novo em alguns minuto
 const invalidCredentials = () => new AppError("INVALID_CREDENTIALS", INVALID_CREDENTIALS_MESSAGE, 401);
 const locked = () => new AppError("LOGIN_LOCKED", LOCKED_MESSAGE, 429);
 
-function loginKey(email: string): string {
+export function loginKey(email: string): string {
   return `login:${email.trim().toLowerCase()}`;
 }
 
@@ -38,24 +43,33 @@ function registerFailure(user: AppUserRow | null, lastAttempt: boolean, now: num
   return after.lockedUntil !== null && Date.parse(after.lockedUntil) > now;
 }
 
-export async function login(input: LoginInput, now = Date.now()): Promise<SessionDTO> {
+export async function login(input: LoginInput, now = Date.now(), origin = "desconhecida"): Promise<SessionDTO> {
   const key = loginKey(input.email);
   const user = findUserByEmail(input.email);
   const lockedInDb = user?.lockedUntil ? Date.parse(user.lockedUntil) > now : false;
-  if (lockedInDb) throw locked();
+  const refuse = () => {
+    recordSecurityEvent("login_locked", { account: input.email, origin });
+    return locked();
+  };
+  if (lockedInDb) throw refuse();
+  if (!rateLimit(`login-origin:${origin}`, LOGIN_ORIGIN_RULE, now).allowed) {
+    recordSecurityEvent("rate_limited", { account: input.email, origin });
+    throw locked();
+  }
   // A vaga é reservada antes de conferir a senha (scrypt é assíncrono): tentativas em paralelo não passam de 5 por janela.
   const attempt = rateLimit(key, LOGIN_RULE, now);
-  if (!attempt.allowed) throw locked();
+  if (!attempt.allowed) throw refuse();
 
   const valid = user && user.active ? await verifyPassword(input.password, user.passwordHash) : await verifyAgainstDummy(input.password);
   if (!valid || !user || !user.active) {
-    throw registerFailure(user && user.active ? user : null, attempt.remaining === 0, now) ? locked() : invalidCredentials();
+    recordSecurityEvent("login_failed", { account: input.email, origin });
+    throw registerFailure(user && user.active ? user : null, attempt.remaining === 0, now) ? refuse() : invalidCredentials();
   }
 
   recordLoginSuccess(user.id);
   clearRateLimit(key);
   purgeExpiredSessions();
-  return startSession(user);
+  return startSession(user, input.transport);
 }
 
 export function logout(tokenHash: string): { ok: true } {

@@ -7,6 +7,7 @@ import { Field } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
 import { Panel } from "@/components/ui/panel";
 import { useToast } from "@/components/ui/toast";
+import { PrivilegeNotice } from "@/features/install/privilege-notice";
 import { ScopeList } from "@/features/install/scope-list";
 import { api, toApiError } from "@/lib/api-client";
 import { formatSince } from "@/lib/format";
@@ -82,6 +83,8 @@ export function ConnectionSection({ settings, isAdmin, onSaved }: { settings: Se
             Sem webhook, nenhuma tarefa vai para o Bitrix24. {isAdmin ? "Conecte abaixo." : "Peça a quem administra o Nexo para conectar."}
           </Notice>
         )}
+
+        {webhook ? <PrivilegeNotice ownerName={webhook.owner.name} privilege={webhook.privilege} extraScopes={webhook.scopes.extra ?? []} /> : null}
 
         {webhook ? <ScopeList scopes={webhook.scopes} /> : null}
 

@@ -5,6 +5,7 @@ import { purgeDoneJobs, requeueStuckJobs } from "../db/repos/jobs";
 import { acquireLease, releaseLease } from "../db/repos/leases";
 import { getSetupStage, getWebhookRecord, patchSyncState } from "../db/repos/settings";
 import { log } from "../log";
+import { runDataCareIfDue } from "./data-care";
 import { errorMessage } from "./job-errors";
 import { inFlightJobIds, runDueJobs } from "./jobs";
 import { refreshPeopleIfStale } from "./people";
@@ -39,6 +40,7 @@ const STEP_LABEL: Record<string, string> = {
   triggers: "Gatilhos do CRM",
   people: "Atualização de pessoas",
   housekeeping: "Limpeza da fila",
+  data_care: "Cuidado com os dados",
 };
 
 /**
@@ -93,6 +95,7 @@ export async function runCycle(): Promise<CycleReport> {
   await remote("triggers", (context) => runTriggers(context));
   await remote("people", () => refreshPeopleIfStale());
   await local("housekeeping", () => purgeDoneJobs(new Date(Date.now() - KEEP_DONE_JOBS_MS).toISOString()));
+  await local("data_care", () => runDataCareIfDue());
 
   const ms = Date.now() - started;
   try {

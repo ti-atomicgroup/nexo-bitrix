@@ -26,8 +26,8 @@ type PrepareGlobal = typeof globalThis & { [PREPARE_KEY]?: boolean };
 /** Valida o formato do URL, chama `user.current` e `scope` no Bitrix e devolve o dono, os escopos e o URL cifrado. Não grava nada. */
 export async function verifyWebhook(url: string): Promise<WebhookCheck> {
   const credentials = parseWebhookUrl(url);
-  const { owner, scopes } = await checkWebhook(createRuntimeClient(credentials));
-  return { portal: credentials.portal, owner, scopes, encryptedUrl: encrypt(normalizeWebhookUrl(credentials)) };
+  const { owner, scopes, ownerIsPortalAdmin } = await checkWebhook(createRuntimeClient(credentials));
+  return { portal: credentials.portal, owner, scopes, ownerIsPortalAdmin, encryptedUrl: encrypt(normalizeWebhookUrl(credentials)) };
 }
 
 /**

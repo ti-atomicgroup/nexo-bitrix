@@ -4,6 +4,6 @@ import { templateInput } from "@/shared/schemas";
 
 export const dynamic = "force-dynamic";
 
-export const GET = route({ auth: "user" }, () => listTemplateSummaries());
+export const GET = route({ auth: "session", operation: "template.read" }, () => listTemplateSummaries());
 
-export const POST = route({ auth: "user", input: templateInput }, ({ input, actor }) => createTemplateFromInput(input, actor));
+export const POST = route({ auth: "session", operation: "template.write", input: templateInput }, ({ input, actor }) => createTemplateFromInput(input, actor));

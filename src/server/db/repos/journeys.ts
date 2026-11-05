@@ -2,6 +2,7 @@ import "server-only";
 import type { TemplateDTO, UserRef } from "@/shared/contracts";
 import type { JourneyKind, JourneyStatus, OffboardingReason, ParticipantRole } from "@/shared/enums";
 import { getDb } from "..";
+import { openField, sealField } from "../../security/fields";
 import { buildSet, nowIso, parseJson, toStringOrNull } from "./util";
 
 export interface JourneyRow {
@@ -43,7 +44,7 @@ const COLUMNS = {
   status: "status",
   anchorDate: "anchor_date",
   personId: "person_id",
-  offboardingReason: "offboarding_reason",
+  offboardingReason: "offboarding_reason_sealed",
   participants: "participants",
   sourceLabel: "source_label",
   crmBinding: "crm_binding",
@@ -65,7 +66,7 @@ function map(row: Record<string, unknown>): JourneyRow {
     snapshot: parseJson<TemplateDTO>(row.template_snapshot, null as unknown as TemplateDTO),
     anchorDate: String(row.anchor_date),
     status: row.status as JourneyStatus,
-    offboardingReason: (toStringOrNull(row.offboarding_reason) as OffboardingReason | null) ?? null,
+    offboardingReason: (openField(row.offboarding_reason_sealed) as OffboardingReason | null) ?? null,
     personPosition: toStringOrNull(row.person_position),
     participants: parseJson<Partial<Record<ParticipantRole, UserRef>>>(row.participants, {}),
     sourceType: row.source_type as JourneyRow["sourceType"],
@@ -80,7 +81,7 @@ function map(row: Record<string, unknown>): JourneyRow {
     updatedAt: String(row.updated_at),
     completedAt: toStringOrNull(row.completed_at),
     cancelledAt: toStringOrNull(row.cancelled_at),
-    cancelReason: toStringOrNull(row.cancel_reason),
+    cancelReason: openField(row.cancel_reason),
   };
 }
 
@@ -88,7 +89,7 @@ export function insertJourney(journey: NewJourney): JourneyRow {
   const now = nowIso();
   getDb()
     .prepare(`
-      INSERT INTO journeys (id, kind, person_id, template_id, template_version, template_snapshot, anchor_date, status, offboarding_reason, person_position,
+      INSERT INTO journeys (id, kind, person_id, template_id, template_version, template_snapshot, anchor_date, status, offboarding_reason_sealed, person_position,
         participants, source_type, source_key, source_label, crm_binding, crm_url, link_token_hash, link_expires_at, created_by, created_at, updated_at)
       VALUES (@id, @kind, @personId, @templateId, @templateVersion, @snapshot, @anchorDate, @status, @offboardingReason, @personPosition,
         @participants, @sourceType, @sourceKey, @sourceLabel, @crmBinding, @crmUrl, @linkTokenHash, @linkExpiresAt, @createdBy, @now, @now)`)
@@ -101,7 +102,7 @@ export function insertJourney(journey: NewJourney): JourneyRow {
       snapshot: JSON.stringify(journey.snapshot),
       anchorDate: journey.anchorDate,
       status: journey.status,
-      offboardingReason: journey.offboardingReason,
+      offboardingReason: sealField(journey.offboardingReason),
       personPosition: journey.personPosition?.trim() || null,
       participants: JSON.stringify(journey.participants),
       sourceType: journey.sourceType,
@@ -155,7 +156,12 @@ export function listJourneys(filter: { status?: JourneyStatus[]; kind?: JourneyK
 }
 
 export function updateJourney(id: string, patch: Partial<Pick<JourneyRow, keyof typeof COLUMNS>>): JourneyRow | null {
-  const { sql, params } = buildSet(patch, COLUMNS);
+  const sealed = {
+    ...patch,
+    ...("offboardingReason" in patch ? { offboardingReason: sealField(patch.offboardingReason) } : {}),
+    ...("cancelReason" in patch ? { cancelReason: sealField(patch.cancelReason) } : {}),
+  };
+  const { sql, params } = buildSet(sealed, COLUMNS);
   getDb()
     .prepare(`UPDATE journeys SET ${sql ? `${sql}, ` : ""}updated_at = @updatedAt WHERE id = @id`)
     .run({ ...params, updatedAt: nowIso(), id });

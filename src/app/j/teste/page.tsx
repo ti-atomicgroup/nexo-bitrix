@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 
 export const metadata: Metadata = { title: "Teste do link público", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
@@ -17,9 +18,10 @@ const css = `
 export default async function LinkPublicoTeste({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
   const enviado = params.enviado === "1";
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     <main className="jt">
-      <style>{css}</style>
+      <style nonce={nonce}>{css}</style>
       <div className="jt-card">
         <div className="jt-head">
           <span>nexo · link pessoal</span>

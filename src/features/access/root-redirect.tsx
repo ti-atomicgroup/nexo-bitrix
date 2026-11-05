@@ -7,7 +7,7 @@ import { Logo } from "@/components/brand/logo";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { api } from "@/lib/api-client";
 import { useApi } from "@/lib/use-api";
-import { useHasToken } from "@/lib/use-session";
+import { useHasSession } from "@/lib/use-session";
 import styles from "./root-redirect.module.css";
 
 /**
@@ -15,10 +15,10 @@ import styles from "./root-redirect.module.css";
  */
 export function RootRedirect() {
   const router = useRouter();
-  const hasToken = useHasToken();
+  const hasSession = useHasSession();
   const status = useApi((signal) => api.status({ signal }), [], { revalidateOnFocus: false });
 
-  const target = hasToken === null || !status.data ? null : status.data.setup !== "ready" ? "/instalar" : hasToken ? "/hoje" : "/entrar";
+  const target = hasSession === null || !status.data ? null : status.data.setup !== "ready" ? "/instalar" : hasSession ? "/hoje" : "/entrar";
 
   useEffect(() => {
     if (target) router.replace(target);

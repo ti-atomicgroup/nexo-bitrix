@@ -1,6 +1,7 @@
 import "server-only";
 import type { DocumentStatus } from "@/shared/enums";
 import { getDb } from "..";
+import { openField, sealField } from "../../security/fields";
 import { buildSet, newId, nowIso, toStringOrNull } from "./util";
 
 /** Arquivo enviado pelo colaborador. `localFile` só existe enquanto o arquivo (cifrado) espera para ir ao Drive. */
@@ -48,7 +49,7 @@ function map(row: Record<string, unknown>): DocumentRow {
     journeyId: String(row.journey_id),
     activityId: String(row.activity_id),
     requestKey: String(row.request_key),
-    fileName: String(row.file_name),
+    fileName: openField(row.file_name) ?? "",
     mimeType: String(row.mime_type),
     size: Number(row.size),
     sha256: String(row.sha256),
@@ -61,7 +62,7 @@ function map(row: Record<string, unknown>): DocumentRow {
     receivedAt: String(row.received_at),
     sentAt: toStringOrNull(row.sent_at),
     rejectedAt: toStringOrNull(row.rejected_at),
-    rejectedReason: toStringOrNull(row.rejected_reason),
+    rejectedReason: openField(row.rejected_reason),
   };
 }
 
@@ -71,7 +72,7 @@ export function insertDocument(input: Pick<DocumentRow, "journeyId" | "activityI
     .prepare(`
       INSERT INTO documents (id, journey_id, activity_id, request_key, file_name, mime_type, size, sha256, status, local_file, received_at)
       VALUES (@id, @journeyId, @activityId, @requestKey, @fileName, @mimeType, @size, @sha256, 'received', @localFile, @receivedAt)`)
-    .run({ ...input, id, receivedAt: nowIso() });
+    .run({ ...input, fileName: sealField(input.fileName), id, receivedAt: nowIso() });
   return getDocument(id)!;
 }
 
@@ -93,7 +94,7 @@ export function listDocumentsByStatus(status: DocumentStatus): DocumentRow[] {
 }
 
 export function updateDocument(id: string, patch: DocumentPatch): DocumentRow | null {
-  const { sql, params } = buildSet(patch, COLUMNS);
+  const { sql, params } = buildSet("rejectedReason" in patch ? { ...patch, rejectedReason: sealField(patch.rejectedReason) } : patch, COLUMNS);
   if (sql) getDb().prepare(`UPDATE documents SET ${sql} WHERE id = @id`).run({ ...params, id });
   return getDocument(id);
 }

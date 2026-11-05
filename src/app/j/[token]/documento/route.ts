@@ -1,3 +1,4 @@
+import { linkGoneResponse as gone } from "@/server/http/link-gone";
 import { log } from "@/server/log";
 import { MAX_DOCUMENT_BYTES } from "@/server/domain/documents";
 import { isCollaboratorLinkActive, receiveDocumentFromLinkToken, type LinkDocumentOutcome } from "@/server/services/collaborator";
@@ -24,14 +25,6 @@ const FLASH: Record<Exclude<LinkDocumentOutcome, "not_found">, string> = {
 function backTo(token: string, outcome: Exclude<LinkDocumentOutcome, "not_found">, activityId: string | null): Response {
   const anchor = activityId ? `#atividade-${encodeURIComponent(activityId)}` : "";
   return new Response(null, { status: 303, headers: { ...NO_STORE, Location: `/j/${encodeURIComponent(token)}?${FLASH[outcome]}${anchor}` } });
-}
-
-function gone(): Response {
-  const html =
-    '<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Link indisponível</title>' +
-    '<body style="font:16px/1.5 system-ui,sans-serif;background:#eef3ef;color:#0e2a21;padding:24px"><main style="max-width:520px;margin:0 auto">' +
-    "<h1>Este link não está mais ativo</h1><p>Peça um novo link pessoal ao RH da sua empresa.</p></main></body></html>";
-  return new Response(html, { status: 404, headers: { ...NO_STORE, "Content-Type": "text/html; charset=utf-8" } });
 }
 
 /** Documento enviado pela página do colaborador (formulário multipart, sem JavaScript). */

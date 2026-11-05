@@ -3,4 +3,4 @@ import { buildToday } from "@/server/services/read/today";
 
 export const dynamic = "force-dynamic";
 
-export const GET = route({ auth: "user" }, ({ user }) => buildToday(user));
+export const GET = route({ auth: "session", operation: "today.read" }, ({ user }) => buildToday(user));

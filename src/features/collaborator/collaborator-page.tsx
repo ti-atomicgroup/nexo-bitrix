@@ -23,6 +23,10 @@ export interface CollaboratorPageProps {
   token: string;
   /** Resultado do último formulário (vem da query depois do redirecionamento 303). */
   flash?: CollaboratorFlash | null;
+  /** Nonce da página (a CSP só aceita a tag de estilo com ele). */
+  nonce?: string | null;
+  /** O CSS já entrou por outro caminho (a prévia no console, renderizada no navegador). */
+  omitStyles?: boolean;
   /** Prévia dentro do console do RH: sem formulários e sem `<main>` próprio. */
   preview?: boolean;
 }
@@ -64,7 +68,7 @@ function ContactValue({ value }: { value: string }) {
  * Saída: cabeçalho laranja e respeitoso, o que devolver e quando, o que vai acontecer, contatos e FAQ.
  * Nunca mostra o motivo do desligamento (o DTO nem o traz).
  */
-export function CollaboratorPage({ view, token, flash = null, preview = false }: CollaboratorPageProps) {
+export function CollaboratorPage({ view, token, flash = null, preview = false, nonce = null, omitStyles = false }: CollaboratorPageProps) {
   const Root = preview ? "div" : "main";
   const onboarding = view.kind === "onboarding";
   const today = addDays(view.anchorDate, -view.daysUntilAnchor);
@@ -81,7 +85,7 @@ export function CollaboratorPage({ view, token, flash = null, preview = false }:
 
   return (
     <Root className={`cp cp--${view.kind}${preview ? " cp--preview" : ""}`}>
-      <style>{COLLABORATOR_CSS}</style>
+      {omitStyles ? null : <style nonce={nonce ?? undefined}>{COLLABORATOR_CSS}</style>}
       <header className="cp-top">
         <div className="cp-top-in">
           <span className="cp-brand">
@@ -185,7 +189,7 @@ export function CollaboratorPage({ view, token, flash = null, preview = false }:
               <strong>{view.progress.done}</strong> de {plural(view.progress.total, "passo feito", "passos feitos")}
             </p>
             <div className="cp-bar" aria-hidden="true">
-              <span style={{ width: `${Math.max(0, Math.min(100, view.progress.percent))}%` }} />
+              <svg width={`${Math.max(0, Math.min(100, view.progress.percent))}%`} height="100%" focusable="false" />
             </div>
           </div>
         ) : null}

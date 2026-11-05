@@ -29,6 +29,7 @@ export function HistoryTab({ entries }: { entries: AuditEntryDTO[] }) {
               <time dateTime={entry.at} title={absoluteTime(entry.at)}>
                 {now === null ? absoluteTime(entry.at) : formatSince(entry.at, now)}
               </time>
+              {entry.via ? <span> · no Bitrix24, age a conta técnica {entry.via}</span> : null}
             </p>
           </div>
         </li>

@@ -12,9 +12,9 @@ export function RotaNMark({ size = 32, startColor = "#FFFFFF" }: { size?: number
 }
 
 /** Logotipo completo. `onDark` para a barra verde-floresta; `onLight` para fundos claros. */
-export function Logo({ tone = "onDark", size = 28 }: { tone?: "onDark" | "onLight"; size?: number }) {
+export function Logo({ tone = "onDark", size = 28 }: { tone?: "onDark" | "onLight"; size?: 26 | 28 | 30 | 40 }) {
   return (
-    <span className={`${styles.logo} ${tone === "onDark" ? styles.onDark : styles.onLight}`} style={{ fontSize: size }}>
+    <span className={`${styles.logo} ${styles[`size${size}`]} ${tone === "onDark" ? styles.onDark : styles.onLight}`}>
       <RotaNMark size={Math.round(size * 1.15)} startColor={tone === "onDark" ? "#FFFFFF" : "#0B3B2C"} />
       <span className={styles.word}>nexo</span>
     </span>

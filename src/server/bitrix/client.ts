@@ -1,4 +1,5 @@
 import "server-only";
+import { safeFetch } from "../../../scripts/lib/bitrix-policy.mjs";
 import { logBitrixCall } from "../db/repos/api-log";
 import { BitrixError, classifyBitrixError, isBitrixError } from "./errors";
 import { blockedUntil, noteRateLimit, noteSuccess, takeToken } from "./limiter";
@@ -74,7 +75,7 @@ function keyed(value: unknown): Record<string, unknown> {
 }
 
 export function createBitrixClient(options: BitrixClientOptions): BitrixClient {
-  const transport: FetchLike = options.transport ?? ((input, init) => fetch(input, init));
+  const transport: FetchLike = options.transport ?? ((input, init) => safeFetch(input, init));
   const sleep = options.sleep ?? defaultSleep;
   const now = options.now ?? Date.now;
   const log = options.log ?? safeLog;

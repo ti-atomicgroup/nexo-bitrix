@@ -2,6 +2,7 @@
 
 import { Link2, MailPlus } from "lucide-react";
 import { useState } from "react";
+import { useMe } from "@/components/shell/console-context";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
@@ -10,6 +11,7 @@ import { PersonPicker } from "@/features/people/person-picker";
 import { api, toApiError } from "@/lib/api-client";
 import { firstName } from "@/lib/format";
 import { useApi } from "@/lib/use-api";
+import { can } from "@/shared/permissions";
 import type { JourneyDTO, UserRef } from "@/shared/contracts";
 import styles from "./link-person-notice.module.css";
 
@@ -22,8 +24,10 @@ export function LinkPersonNotice({ journey, onLinked }: { journey: JourneyDTO; o
   const person = journey.summary.person;
   const first = firstName(person.name);
   const invite = person.invite ?? null;
+  const me = useMe();
   const settings = useApi((signal) => api.settings({ signal }), [], { revalidateOnFocus: false });
-  const canInvite = Boolean(settings.data?.invitesEnabled);
+  // Convidar cria conta no portal: só a administração (matriz em src/shared/permissions.ts).
+  const canInvite = Boolean(settings.data?.invitesEnabled) && can(me.user.role, "person.invite");
   const [mode, setMode] = useState<"link" | "invite" | null>(null);
   const [account, setAccount] = useState<UserRef | null>(null);
   const [email, setEmail] = useState(person.email ?? "");

@@ -152,3 +152,100 @@
 .hereEnd::after {
   right: 10px;
 }
+
+/* Número de estações em atributo: a CSP não aceita o atributo style no HTML vindo do servidor. As trilhas têm até 12 etapas. */
+.line[data-count="1"] {
+  --count: 1;
+}
+
+.line[data-count="2"] {
+  --count: 2;
+}
+
+.line[data-count="3"] {
+  --count: 3;
+}
+
+.line[data-count="4"] {
+  --count: 4;
+}
+
+.line[data-count="5"] {
+  --count: 5;
+}
+
+.line[data-count="6"] {
+  --count: 6;
+}
+
+.line[data-count="7"] {
+  --count: 7;
+}
+
+.line[data-count="8"] {
+  --count: 8;
+}
+
+.line[data-count="9"] {
+  --count: 9;
+}
+
+.line[data-count="10"] {
+  --count: 10;
+}
+
+.line[data-count="11"] {
+  --count: 11;
+}
+
+.line[data-count="12"] {
+  --count: 12;
+}
+
+.line[data-reached="0"] {
+  --reached: 0;
+}
+
+.line[data-reached="1"] {
+  --reached: 1;
+}
+
+.line[data-reached="2"] {
+  --reached: 2;
+}
+
+.line[data-reached="3"] {
+  --reached: 3;
+}
+
+.line[data-reached="4"] {
+  --reached: 4;
+}
+
+.line[data-reached="5"] {
+  --reached: 5;
+}
+
+.line[data-reached="6"] {
+  --reached: 6;
+}
+
+.line[data-reached="7"] {
+  --reached: 7;
+}
+
+.line[data-reached="8"] {
+  --reached: 8;
+}
+
+.line[data-reached="9"] {
+  --reached: 9;
+}
+
+.line[data-reached="10"] {
+  --reached: 10;
+}
+
+.line[data-reached="11"] {
+  --reached: 11;
+}

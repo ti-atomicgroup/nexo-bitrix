@@ -162,6 +162,7 @@ export class FakeBitrix {
 
   users = new Map<number, FakeUser>();
   groups = new Map<number, FakeGroup>();
+  private groupExtraMembers = new Map<number, number[]>();
   tasks = new Map<number, FakeTask>();
   checklist = new Map<number, FakeChecklistItem>();
   comments: Array<{ id: number; taskId: number; message: string }> = [];
@@ -387,6 +388,10 @@ export class FakeBitrix {
         return this.groupGet(params);
       case "sonet_group.create":
         return { result: this.groupCreate(params) };
+      case "sonet_group.user.get":
+        return this.groupMembers(params);
+      case "user.admin":
+        return { result: this.ownerIsAdmin };
       case "tasks.task.add":
         return { result: { task: this.taskPayload(this.taskAdd(asObject(params.fields))) } };
       case "tasks.task.list":
@@ -626,6 +631,19 @@ export class FakeBitrix {
       total,
       ...(next !== undefined ? { next } : {}),
     };
+  }
+
+  /** Como o portal: dono, moderadores e membros, com o papel de cada um. */
+  private groupMembers(params: Record<string, unknown>) {
+    const id = Number(params.ID);
+    if (!this.groups.has(id)) throw new FakeFailure(400, "ERROR_CORE", "Group not found");
+    const members = [this.ownerId, ...(this.groupExtraMembers.get(id) ?? [])];
+    return { result: members.map((userId, index) => ({ USER_ID: String(userId), ROLE: index === 0 ? "A" : "K" })) };
+  }
+
+  /** Inclui alguém no projeto, como faria o dono no Bitrix24. */
+  addGroupMember(groupId: number, userId: number): void {
+    this.groupExtraMembers.set(groupId, [...(this.groupExtraMembers.get(groupId) ?? []), userId]);
   }
 
   private groupCreate(params: Record<string, unknown>): number {

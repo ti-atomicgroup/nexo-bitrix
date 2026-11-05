@@ -4,8 +4,8 @@ import { ledgerItemInput } from "@/shared/schemas";
 
 export const dynamic = "force-dynamic";
 
-export const GET = route({ auth: "user", params: ["personId"] }, ({ params }) => listPersonLedger(params.personId));
+export const GET = route({ auth: "session", operation: "ledger.read", params: ["personId"] }, ({ params }) => listPersonLedger(params.personId));
 
-export const POST = route({ auth: "user", params: ["personId"], input: ledgerItemInput }, ({ params, input, actor }) =>
+export const POST = route({ auth: "session", operation: "ledger.add", params: ["personId"], input: ledgerItemInput }, ({ params, input, actor }) =>
   addPersonLedgerItem(params.personId, input, actor),
 );

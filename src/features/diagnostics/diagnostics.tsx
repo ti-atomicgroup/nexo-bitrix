@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Logo } from "@/components/brand/logo";
+import { api, ApiError, hasSession, negotiateTransport } from "@/lib/api-client";
+import type { BasicProbeDTO, EgressAttemptDTO } from "@/shared/contracts";
 import styles from "./diagnostics.module.css";
 
 type Status = "ok" | "falha" | "aviso" | "manual" | "aguardando";
@@ -32,20 +34,13 @@ function storageCheck(kind: "localStorage" | "sessionStorage"): Check {
   }
 }
 
-function cookieCheck(): Check {
-  try {
-    document.cookie = "nexo_sonda=1; Path=/; SameSite=None; Secure; Partitioned";
-    const ok = document.cookie.includes("nexo_sonda=1");
-    return { label: "Cookie particionado", status: ok ? "ok" : "aviso", detail: ok ? "Aceito neste contexto." : "Bloqueado. O Nexo não depende de cookies." };
-  } catch {
-    return { label: "Cookie particionado", status: "aviso", detail: "Bloqueado. O Nexo não depende de cookies." };
-  }
-}
+const COOKIE_CHECK = "Sessão por cookie protegido";
 
 export function Diagnostics({ variant }: { variant: "same-origin" | "no-referrer" }) {
   const [jsReady, setJsReady] = useState(false);
   const [checks, setChecks] = useState<Record<string, Check>>({});
-  const [server, setServer] = useState<unknown>(null);
+  const [server, setServer] = useState<object>({});
+  const [canTestEgress, setCanTestEgress] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
 
   const put = useCallback((id: string, check: Check) => setChecks((current) => ({ ...current, [id]: check })), []);
@@ -59,51 +54,65 @@ export function Diagnostics({ variant }: { variant: "same-origin" | "no-referrer
     put("referrer", { label: "document.referrer", status: "ok", detail: document.referrer || "(vazio)" });
     put("local", storageCheck("localStorage"));
     put("session", storageCheck("sessionStorage"));
-    put("cookie", cookieCheck());
     /* eslint-enable react-hooks/set-state-in-effect */
+
+    negotiateTransport().then((transport) =>
+      put("cookie", {
+        label: COOKIE_CHECK,
+        status: transport === "cookie" ? "ok" : "aviso",
+        detail: transport === "cookie" ? "Funciona: o token da sessão fica fora do alcance do JavaScript." : "Bloqueado aqui: o Nexo usa o modo alternativo, com sessão mais curta.",
+      }),
+    );
 
     const started = performance.now();
     fetch("/api/probe", { headers: { Authorization: "Bearer sonda-sem-valor", "X-Nexo-Session": "sonda-sem-valor-0000000000" }, cache: "no-store" })
       .then(async (response) => {
-        const body = await response.json();
-        setServer(body);
+        const body = (await response.json()) as Partial<BasicProbeDTO>;
+        setServer((current: object) => ({ ...current, basic: body }));
         const ms = Math.round(performance.now() - started);
         put("api", { label: "API do servidor", status: response.ok ? "ok" : "falha", detail: `HTTP ${response.status} em ${ms} ms` });
-        const request = body?.request ?? {};
+        if (!response.ok) return;
         put("auth", {
           label: "Cabeçalho Authorization chega ao servidor",
-          status: request.authorizationPresent ? "ok" : "falha",
-          detail: request.authorizationPresent ? "Sim: chega ao servidor." : "Não: a borda remove este cabeçalho (o Nexo usa X-Nexo-Session).",
+          status: body.authorizationHeader ? "ok" : "aviso",
+          detail: body.authorizationHeader ? "Sim: chega ao servidor." : "Não: a borda remove este cabeçalho (o Nexo usa X-Nexo-Session).",
         });
         put("sessionHeader", {
           label: "Cabeçalho X-Nexo-Session chega ao servidor",
-          status: request.sessionHeaderPresent ? "ok" : "falha",
-          detail: request.sessionHeaderPresent ? "Sim: o login do Nexo funciona dentro da Onnira." : "Não: a borda remove o cabeçalho próprio também.",
+          status: body.sessionHeader ? "ok" : "aviso",
+          detail: body.sessionHeader ? "Sim: o modo alternativo funciona aqui." : "Não: a borda remove o cabeçalho próprio também.",
         });
-        const sqlite: Array<{ driver: string; ok: boolean; rows?: number; journalMode?: string; error?: string }> = body?.sqlite ?? [];
-        for (const item of sqlite) {
-          put(`sqlite-${item.driver}`, {
-            label: `SQLite (${item.driver})`,
-            status: item.ok ? "ok" : "aviso",
-            detail: item.ok ? `${item.rows} gravações acumuladas · diário ${item.journalMode}` : (item.error ?? "indisponível"),
-          });
-        }
-        const boots = body?.boot?.record?.count;
-        put("boots", {
-          label: "Inicializações registradas na pasta de dados",
-          status: boots ? "ok" : "falha",
-          detail: boots ? `${boots} (aumenta a cada reinício; se voltar a 1 após republicar, o volume não persiste)` : (body?.boot?.error ?? "sem registro"),
-        });
-        put("dir", {
-          label: "Pasta de dados",
-          status: body?.dataDir?.chosen?.source === "onnira-volume" ? "ok" : "aviso",
-          detail: `${body?.dataDir?.chosen?.path ?? "?"} (${body?.dataDir?.chosen?.source ?? "?"})`,
-        });
-        put("node", { label: "Node.js no servidor", status: "ok", detail: `${body?.runtime?.node} · ${body?.runtime?.platform}/${body?.runtime?.arch} · memória ${body?.runtime?.memory?.rssMb} MB em uso` });
+        put("database", { label: "Banco de dados", status: body.database ? "ok" : "falha", detail: body.database ? "Responde normalmente." : "O servidor não conseguiu abrir o banco." });
       })
       .catch((error: unknown) => {
         put("api", { label: "API do servidor", status: "falha", detail: error instanceof Error ? error.message : "Sem resposta." });
       });
+
+    // O restante do ambiente só para a administração.
+    if (!hasSession()) {
+      put("full", { label: "Diagnóstico completo", status: "aviso", detail: "Entre com um acesso de administração para ver o ambiente do servidor." });
+      return;
+    }
+    api.probeFull().then(
+      (full) => {
+        setServer((current: object) => ({ ...current, full }));
+        setCanTestEgress(true);
+        for (const item of full.sqlite) {
+          put(`sqlite-${item.driver}`, { label: `SQLite (${item.driver})`, status: item.ok ? "ok" : "aviso", detail: item.ok ? `Grava e lê · diário ${item.journalMode}` : (item.error ?? "indisponível") });
+        }
+        put("boots", {
+          label: "Inicializações registradas na pasta de dados",
+          status: full.boots ? "ok" : "falha",
+          detail: full.boots ? `${full.boots} (aumenta a cada reinício; se voltar a 1 após republicar, o volume não persiste)` : "sem registro",
+        });
+        put("dir", { label: "Pasta de dados", status: full.dataDir.persistent && full.dataDir.writable ? "ok" : "aviso", detail: `${full.dataDir.source}${full.dataDir.writable ? "" : " · sem permissão de gravar"}` });
+        put("node", { label: "Node.js no servidor", status: "ok", detail: `${full.runtime.node} · ${full.runtime.platform}/${full.runtime.arch} · memória ${full.runtime.rssMb} MB em uso` });
+      },
+      (error: unknown) => {
+        const denied = error instanceof ApiError && (error.status === 401 || error.status === 403);
+        put("full", { label: "Diagnóstico completo", status: "aviso", detail: denied ? "Entre com um acesso de administração para ver o ambiente do servidor." : "Sem resposta do servidor." });
+      },
+    );
   }, [put]);
 
   const manualClipboard = async () => {
@@ -121,24 +130,26 @@ export function Diagnostics({ variant }: { variant: "same-origin" | "no-referrer
     if (!host) return;
     put("egress", { label: "Saída até o Bitrix24", status: "aguardando", detail: `Testando ${host}…` });
     try {
-      const response = await fetch(`/api/probe?bitrix=${encodeURIComponent(host)}`, { cache: "no-store" });
-      const egress = (await response.json())?.egress;
-      setServer((current: unknown) => ({ ...(current as object), egress }));
+      const { egress } = await api.probeFull({ bitrix: host });
+      setServer((current: object) => ({ ...current, egress }));
       if (!egress || egress.error) {
         put("egress", { label: "Saída até o Bitrix24", status: "falha", detail: egress?.error ?? "Sem resposta da sonda." });
         return;
       }
-      const line = (attempt: { ok: boolean; status?: number; error?: string; ms: number }) => (attempt.ok ? `HTTP ${attempt.status} em ${attempt.ms} ms` : `${attempt.error} (${attempt.ms} ms)`);
-      put("egress-dns", { label: "DNS do portal", status: egress.dns.ok ? "ok" : "falha", detail: egress.dns.ok ? egress.dns.addresses.join(", ") : egress.dns.error });
-      put("egress", { label: "Saída até o Bitrix24 (fetch)", status: egress.bitrixFetch.ok ? "ok" : "falha", detail: line(egress.bitrixFetch) });
-      put("egress-ipv4", { label: "Saída até o Bitrix24 (IPv4)", status: egress.bitrixIpv4.ok ? "ok" : "falha", detail: line(egress.bitrixIpv4) });
-      put("egress-neutral", { label: "Saída para a internet (example.com)", status: egress.neutralFetch.ok ? "ok" : "falha", detail: line(egress.neutralFetch) });
+      const attempted = (label: string, attempt: EgressAttemptDTO | undefined): Check => ({
+        label,
+        status: attempt?.ok ? "ok" : "falha",
+        detail: !attempt ? "Sem resposta." : attempt.ok ? `HTTP ${attempt.status} em ${attempt.ms} ms` : `${attempt.error} (${attempt.ms} ms)`,
+      });
+      put("egress-dns", { label: "DNS do portal", status: egress.dns?.ok ? "ok" : "falha", detail: egress.dns?.ok ? (egress.dns.addresses ?? []).join(", ") : (egress.dns?.error ?? "Sem resposta.") });
+      put("egress", attempted("Saída até o Bitrix24", egress.bitrixFetch));
+      put("egress-ipv4", attempted("Saída até o Bitrix24 (IPv4)", egress.bitrixIpv4));
+      put("egress-neutral", attempted("Saída para a internet (example.com)", egress.neutralFetch));
       put("egress-ip", {
         label: "IP de saída do servidor",
         status: egress.outboundIp?.ok ? "ok" : "aviso",
         detail: egress.outboundIp?.ok ? `${egress.outboundIp.ip} (é este IP que o Bitrix24 vê)` : (egress.outboundIp?.error ?? "Não informado."),
       });
-      put("egress-proxy", { label: "Proxy no ambiente", status: "ok", detail: egress.proxyEnv.length ? egress.proxyEnv.join(", ") : "Nenhum" });
     } catch (error) {
       put("egress", { label: "Saída até o Bitrix24", status: "falha", detail: error instanceof Error ? error.message : "Sem resposta." });
     }
@@ -209,7 +220,8 @@ export function Diagnostics({ variant }: { variant: "same-origin" | "no-referrer
           ))}
         </div>
 
-        <h2 className={styles.subtitle}>Conexão com o Bitrix24</h2>
+        {canTestEgress ? <h2 className={styles.subtitle}>Conexão com o Bitrix24</h2> : null}
+        {canTestEgress ? (
         <form
           className={styles.actions}
           onSubmit={(event) => {
@@ -233,6 +245,7 @@ export function Diagnostics({ variant }: { variant: "same-origin" | "no-referrer
             Testar conexão
           </button>
         </form>
+        ) : null}
 
         <h2 className={styles.subtitle}>Testes que dependem de um clique</h2>
         <div className={styles.actions}>

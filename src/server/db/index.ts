@@ -1,8 +1,10 @@
 import "server-only";
+import { closeSync, openSync } from "node:fs";
 import { join } from "node:path";
+import { hardenDataDir } from "../runtime/data-protection";
 import { resolveDataDir } from "../runtime/data-dir";
 import { openDb, type Db } from "./driver";
-import { migrate } from "./migrate";
+import { migrate, MIGRATIONS } from "./migrate";
 
 const DB_KEY = Symbol.for("nexo.db");
 type DbGlobal = typeof globalThis & { [DB_KEY]?: { db: Db; dataDir: string } };
@@ -16,9 +18,13 @@ export function getDb(): Db {
   const existing = global[DB_KEY];
   if (existing) return existing.db;
   const dataDir = resolveDataDir().path;
-  const db = openDb(join(dataDir, "nexo.sqlite"));
-  migrate(db);
+  const file = join(dataDir, "nexo.sqlite");
+  // O banco nasce fechado: os arquivos -wal e -shm herdam a permissão dele.
+  closeSync(openSync(file, "a", 0o600));
+  const db = openDb(file);
+  migrate(db, MIGRATIONS, { dataDir });
   global[DB_KEY] = { db, dataDir };
+  hardenDataDir(dataDir);
   return db;
 }
 
@@ -31,7 +37,7 @@ export function getDataDir(): string {
 export function setDbForTests(db: Db | null, dataDir = ""): void {
   const global = globalThis as DbGlobal;
   if (db) {
-    migrate(db);
+    migrate(db, MIGRATIONS, { dataDir });
     global[DB_KEY] = { db, dataDir };
   } else {
     delete global[DB_KEY];

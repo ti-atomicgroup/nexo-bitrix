@@ -25,13 +25,13 @@ export interface ChoiceCardsProps<T extends string> {
   value: T | null;
   onChange: (value: T) => void;
   error?: string | null;
-  /** Largura mínima de cada cartão na grade. */
-  minWidth?: number;
+  /** Cartões mais largos na grade (260 px em vez de 220 px). */
+  wide?: boolean;
   className?: string;
 }
 
 /** Escolha única em cartões (rádios nativos). O cartão escolhido ganha borda grossa e o selo "Escolhida". */
-export function ChoiceCards<T extends string>({ legend, hideLegend = false, hint, options, value, onChange, error, minWidth = 220, className }: ChoiceCardsProps<T>) {
+export function ChoiceCards<T extends string>({ legend, hideLegend = false, hint, options, value, onChange, error, wide = false, className }: ChoiceCardsProps<T>) {
   const name = useId();
   const hintId = `${name}-hint`;
   const errorId = `${name}-error`;
@@ -44,7 +44,7 @@ export function ChoiceCards<T extends string>({ legend, hideLegend = false, hint
           {hint}
         </p>
       ) : null}
-      <div className={styles.grid} style={{ gridTemplateColumns: `repeat(auto-fill, minmax(min(${minWidth}px, 100%), 1fr))` }}>
+      <div className={cx(styles.grid, wide && styles.wide)}>
         {options.map((option) => {
           const Icon = option.icon;
           const checked = option.value === value;

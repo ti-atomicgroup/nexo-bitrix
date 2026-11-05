@@ -36,7 +36,7 @@ describe("login", () => {
     const session = await login({ email: " MARINA@empresa.com.br ", password: PASSWORD });
     expect(session.me.user).toEqual({ id: user.id, name: "Marina Souza", email: "marina@empresa.com.br", role: "admin", mustChangePassword: false });
     expect(session.me.setup.stage).toBe("connect");
-    expect(authenticate(bearer(session.token))?.user.id).toBe(user.id);
+    expect(authenticate(bearer(session.token!))?.user.id).toBe(user.id);
     expect(findUserById(user.id)?.lastLoginAt).not.toBeNull();
   });
 

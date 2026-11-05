@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { connection } from "next/server";
 import "@fontsource/barlow/400.css";
 import "@fontsource/barlow/500.css";
 import "@fontsource/barlow/600.css";
@@ -20,7 +21,9 @@ export const viewport: Viewport = {
   themeColor: "#0b3b2c",
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  // Renderização a cada pedido: a CSP (src/proxy.ts) usa um nonce novo por página, e HTML pré-gerado não teria como carregá-lo.
+  await connection();
   return (
     <html lang="pt-BR">
       <body>{children}</body>

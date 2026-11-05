@@ -18,3 +18,20 @@
 .onLight .word {
   color: var(--forest);
 }
+
+/* Tamanhos em classe: a CSP não aceita o atributo style no HTML vindo do servidor. */
+.size26 {
+  font-size: 26px;
+}
+
+.size28 {
+  font-size: 28px;
+}
+
+.size30 {
+  font-size: 30px;
+}
+
+.size40 {
+  font-size: 40px;
+}

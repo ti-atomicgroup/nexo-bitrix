@@ -24,9 +24,9 @@ describe("buildQuery (http_build_query do PHP)", () => {
 });
 
 describe("parseWebhookUrl", () => {
-  it("separa portal, usuário e segredo (barra final opcional, domínio próprio aceito)", () => {
+  it("separa portal, usuário e segredo (barra final opcional)", () => {
     expect(parseWebhookUrl("https://Empresa.Bitrix24.com.br/rest/1/abc123def456/")).toEqual({ portal: "https://empresa.bitrix24.com.br", userId: "1", secret: "abc123def456" });
-    expect(parseWebhookUrl(" https://crm.minhaempresa.com/rest/27/k3y_value ")).toEqual({ portal: "https://crm.minhaempresa.com", userId: "27", secret: "k3y_value" });
+    expect(parseWebhookUrl(" https://empresa.bitrix24.com/rest/27/k3y_value ")).toEqual({ portal: "https://empresa.bitrix24.com", userId: "27", secret: "k3y_value" });
     expect(parseWebhookUrl("https://empresa.bitrix24.com:443/rest/1/abc123/").portal).toBe("https://empresa.bitrix24.com");
   });
 

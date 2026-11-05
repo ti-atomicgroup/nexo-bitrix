@@ -96,6 +96,11 @@ function openRaw(path: string, preferred?: DriverName): { raw: RawDatabase; driv
   throw new Error(`Nenhum driver SQLite disponível (Node ${process.version}). Use Node 22.13+ ou instale better-sqlite3.`);
 }
 
+/** Tira do diário (WAL) as versões antigas das páginas. Depois de excluir dados pessoais: lá ainda estaria o texto de antes. */
+export function flushDeleted(db: Pick<Db, "exec">): void {
+  db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+}
+
 export function openDb(path: string, options: { driver?: DriverName } = {}): Db {
   const { raw, driver } = openRaw(path, options.driver);
   const cache = new Map<string, RawStatement>();
@@ -123,6 +128,8 @@ export function openDb(path: string, options: { driver?: DriverName } = {}): Db 
 
   raw.exec("PRAGMA busy_timeout = 5000");
   raw.exec("PRAGMA foreign_keys = ON");
+  // Sem isto, o SQLite só marca como livre o que foi apagado ou trocado: o texto continuaria legível no arquivo.
+  raw.exec("PRAGMA secure_delete = ON");
   const requested = prepare("PRAGMA journal_mode = WAL").get<{ journal_mode: string }>();
   let journalMode = String(requested?.journal_mode ?? "").toLowerCase();
   if (journalMode !== "wal") {

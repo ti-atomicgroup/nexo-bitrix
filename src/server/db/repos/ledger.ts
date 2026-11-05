@@ -2,6 +2,7 @@ import "server-only";
 import type { LedgerItemDTO } from "@/shared/contracts";
 import type { LedgerKind, LedgerStatus } from "@/shared/enums";
 import { getDb } from "..";
+import { openField, sealField } from "../../security/fields";
 import { buildSet, newId, nowIso, toStringOrNull } from "./util";
 
 export interface LedgerRow {
@@ -41,7 +42,7 @@ function map(row: Record<string, unknown>): LedgerRow {
     personId: String(row.person_id),
     kind: row.kind as LedgerKind,
     name: String(row.name),
-    detail: String(row.detail ?? ""),
+    detail: openField(row.detail) ?? "",
     status: row.status as LedgerStatus,
     source: row.source as LedgerRow["source"],
     grantedJourneyId: toStringOrNull(row.granted_journey_id),
@@ -49,7 +50,7 @@ function map(row: Record<string, unknown>): LedgerRow {
     grantedItemKey: toStringOrNull(row.granted_item_key),
     closingJourneyId: toStringOrNull(row.closing_journey_id),
     closingActivityId: toStringOrNull(row.closing_activity_id),
-    waivedReason: toStringOrNull(row.waived_reason),
+    waivedReason: openField(row.waived_reason),
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
     grantedAt: toStringOrNull(row.granted_at),
@@ -93,7 +94,7 @@ export function insertLedgerItem(input: {
       personId: input.personId,
       kind: input.kind,
       name: input.name,
-      detail: input.detail ?? "",
+      detail: sealField(input.detail ?? ""),
       status: input.status,
       source: input.source,
       grantedJourneyId: input.grantedJourneyId ?? null,
@@ -117,7 +118,12 @@ export function findLedgerByGrant(activityId: string, itemKey: string): LedgerRo
 }
 
 export function updateLedgerItem(id: string, patch: Partial<Pick<LedgerRow, keyof typeof COLUMNS>>): LedgerRow | null {
-  const { sql, params } = buildSet(patch, COLUMNS);
+  const sealed = {
+    ...patch,
+    ...("detail" in patch ? { detail: sealField(patch.detail) } : {}),
+    ...("waivedReason" in patch ? { waivedReason: sealField(patch.waivedReason) } : {}),
+  };
+  const { sql, params } = buildSet(sealed, COLUMNS);
   getDb()
     .prepare(`UPDATE ledger_items SET ${sql ? `${sql}, ` : ""}updated_at = @updatedAt WHERE id = @id`)
     .run({ ...params, updatedAt: nowIso(), id });

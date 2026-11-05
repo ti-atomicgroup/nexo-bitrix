@@ -23,7 +23,8 @@ export function ProgressBar({ value, label, tone = "forest", className }: Progre
       aria-valuenow={percent}
       aria-valuetext={`${percent}%`}
     >
-      <span className={styles.fill} style={{ width: `${percent}%` }} />
+      {/* Largura em atributo de SVG: a CSP não aceita o atributo style no HTML vindo do servidor. */}
+      <svg className={styles.fill} width={`${percent}%`} height="100%" aria-hidden="true" focusable="false" />
     </div>
   );
 }

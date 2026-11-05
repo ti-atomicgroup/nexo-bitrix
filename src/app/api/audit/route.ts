@@ -3,4 +3,4 @@ import { auditQueryInput, recentAudit } from "@/server/services/audit";
 
 export const dynamic = "force-dynamic";
 
-export const GET = route({ auth: "user", input: auditQueryInput }, ({ input }) => recentAudit(input.limit));
+export const GET = route({ auth: "session", operation: "audit.read", input: auditQueryInput }, ({ input }) => recentAudit(input.limit));

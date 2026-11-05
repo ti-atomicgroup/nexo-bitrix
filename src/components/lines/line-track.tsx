@@ -1,5 +1,4 @@
 import { Check } from "lucide-react";
-import type { CSSProperties } from "react";
 import { cx } from "@/lib/cx";
 import type { LineStationDTO } from "@/shared/contracts";
 import type { JourneyKind } from "@/shared/enums";
@@ -31,10 +30,9 @@ export function LineTrack({ stations, kind, label, size = "full", hereLabel = "V
   const reached = currentIndex >= 0 ? currentIndex : Math.max(lastDone, 0);
   const align = currentIndex <= 0 ? "Start" : currentIndex === count - 1 ? "End" : "Center";
   const showHere = size === "full" && currentIndex >= 0;
-  const style = { "--count": count, "--reached": reached } as CSSProperties;
 
   return (
-    <div className={cx(styles.line, styles[kind], styles[size], showHere && styles.withHere, className)} style={style}>
+    <div className={cx(styles.line, styles[kind], styles[size], showHere && styles.withHere, className)} data-count={count} data-reached={reached}>
       <ol className={styles.stations} aria-label={label}>
         {stations.map((station, index) => (
           <li key={station.position} className={cx(styles.station, styles[station.state], index <= reached && styles.reached)}>

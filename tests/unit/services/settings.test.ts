@@ -52,8 +52,9 @@ describe("ajustes", () => {
     expect(settings.webhook).toEqual({
       masked: "https://empresa.bitrix24.com.br/rest/7/••••••/",
       owner: OWNER,
-      scopes: { required: { task: true, user_brief: true, crm: true, sonet_group: true }, optional: { im: false, calendar: true, log: false, disk: false } },
+      scopes: { required: { task: true, user_brief: true, crm: true, sonet_group: true }, optional: { im: false, calendar: true, log: false, disk: false }, extra: [] },
       verifiedAt: "2026-10-26T12:00:00.000Z",
+      privilege: { ownerIsPortalAdmin: null },
     });
     expect(JSON.stringify(settings)).not.toContain(SECRET);
   });

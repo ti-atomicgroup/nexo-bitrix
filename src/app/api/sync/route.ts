@@ -3,4 +3,4 @@ import { syncNow } from "@/server/services/sync";
 
 export const dynamic = "force-dynamic";
 
-export const POST = route({ auth: "user" }, ({ requestId }) => syncNow(requestId));
+export const POST = route({ auth: "session", operation: "sync.run" }, ({ requestId }) => syncNow(requestId));

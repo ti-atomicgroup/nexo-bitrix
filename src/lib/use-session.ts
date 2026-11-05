@@ -1,15 +1,11 @@
 "use client";
 
 import { useCallback, useSyncExternalStore } from "react";
-import { getToken, subscribeToken } from "./api-client";
+import { hasSession, subscribeToken } from "./api-client";
 
-/** `null` enquanto renderiza no servidor (o token só existe no navegador); depois, se há sessão guardada. */
-export function useHasToken(): boolean | null {
-  return useSyncExternalStore(subscribeToken, hasTokenSnapshot, serverSnapshot);
-}
-
-function hasTokenSnapshot(): boolean {
-  return getToken() !== null;
+/** `null` enquanto renderiza no servidor (a sessão só se conhece no navegador); depois, se há sessão para tentar. */
+export function useHasSession(): boolean | null {
+  return useSyncExternalStore(subscribeToken, hasSession, serverSnapshot);
 }
 
 function serverSnapshot(): null {

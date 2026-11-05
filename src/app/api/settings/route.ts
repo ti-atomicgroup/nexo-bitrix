@@ -4,6 +4,6 @@ import { settingsInput } from "@/shared/schemas";
 
 export const dynamic = "force-dynamic";
 
-export const GET = route({ auth: "user" }, () => getSettings());
+export const GET = route({ auth: "session", operation: "settings.read" }, () => getSettings());
 
-export const PUT = route({ auth: "admin", input: settingsInput }, ({ input, actor }) => updateSettings(input, actor));
+export const PUT = route({ auth: "session", operation: "settings.write", input: settingsInput }, ({ input, actor }) => updateSettings(input, actor));

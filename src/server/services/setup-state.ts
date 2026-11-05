@@ -1,7 +1,6 @@
 import "server-only";
 import type { SetupStateDTO, StatusDTO } from "@/shared/contracts";
 import { getSetupStage, getWebhookRecord } from "../db/repos/settings";
-import { buildInfo } from "../runtime/build-info";
 import { scopeCheck } from "./scopes";
 
 /** Etapa da instalação e a conexão já gravada (nunca o URL do webhook). */
@@ -15,8 +14,7 @@ export function setupState(): SetupStateDTO {
   };
 }
 
-/** Resposta pública de /api/status: só a etapa e a versão. */
+/** Resposta pública de /api/status: só a etapa. */
 export function publicStatus(): StatusDTO {
-  const { version, commit } = buildInfo();
-  return { setup: getSetupStage(), version, commit };
+  return { setup: getSetupStage() };
 }

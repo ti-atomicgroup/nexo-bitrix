@@ -1,5 +1,5 @@
 import "server-only";
-import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { closeSync, existsSync, openSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { getDataDir } from "../db";
@@ -86,6 +86,11 @@ export function newToken(): string {
 /** Só o hash do token vai para o banco. */
 export function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
+}
+
+/** Hash com a chave da instância: compara e-mails e IPs sem guardá-los, e quem só tem o banco não consegue testar valores. */
+export function keyedHash(value: string, key = instanceKey()): string {
+  return createHmac("sha256", key).update(value).digest("hex");
 }
 
 export function safeEqual(a: string, b: string): boolean {

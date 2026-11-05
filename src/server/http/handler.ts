@@ -2,21 +2,29 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import type { z } from "zod";
 import { ensureScheduler, type Actor } from "@/server/engine";
+import type { Operation } from "@/shared/permissions";
+import { assertCan, FORBIDDEN_MESSAGE } from "../auth/authorize";
+import { clearedSessionCookies, isCrossSiteWrite, isOwnClient, readCookie, SESSION_COOKIE } from "../auth/session-cookie";
 import { authenticate } from "../auth/sessions";
 import type { AppUserRow } from "../db/repos/users";
 import { AppError, isAppError } from "../errors";
 import { log, redact, redactText } from "../log";
+import { assertBitrixAccess } from "../services/bitrix-access";
 import { parseInput, readJsonBody, readQuery } from "./input";
 import { errorJson, json, withBaseHeaders } from "./respond";
 
-/**
- * Envoltório das rotas da API: id da requisição → religa o agendador → autenticação (Bearer) → parâmetros →
- * entrada validada (zod) → serviço → JSON sem cache. Erros viram `ApiErrorDTO` em pt-BR; nada interno vaza.
- */
-export type AuthMode = "public" | "user" | "admin" | "install";
-type Signed = "user" | "admin";
+export { FORBIDDEN_MESSAGE };
 
-export interface RouteOptions<A extends AuthMode, S extends z.ZodType | undefined, K extends string> {
+/**
+ * Envoltório das rotas da API: id da requisição → religa o agendador → recusa escrita vinda de outro site → sessão →
+ * matriz de papel × operação → conta da pessoa no Bitrix24 → parâmetros → entrada validada (zod) → serviço → JSON sem cache.
+ * Erros viram `ApiErrorDTO` em pt-BR; nada interno vaza.
+ */
+export type AuthMode = "public" | "install" | "session";
+
+type RouteAccess<A extends AuthMode> = A extends "session" ? { operation: Operation } : { operation?: undefined };
+
+export type RouteOptions<A extends AuthMode, S extends z.ZodType | undefined, K extends string> = RouteAccess<A> & {
   /** public e install não exigem sessão (install confere o token de instalação no serviço). */
   auth: A;
   input?: S;
@@ -24,14 +32,14 @@ export interface RouteOptions<A extends AuthMode, S extends z.ZodType | undefine
   source?: "body" | "query";
   /** Segmentos dinâmicos do caminho (ex.: ["journeyId"]); ausente → 404. */
   params?: readonly K[];
-}
+};
 
 export interface RouteArgs<A extends AuthMode, I, K extends string> {
   request: Request;
   params: Record<K, string>;
   input: I;
-  user: A extends Signed ? AppUserRow : null;
-  tokenHash: A extends Signed ? string : null;
+  user: A extends "session" ? AppUserRow : null;
+  tokenHash: A extends "session" ? string : null;
   actor: Actor;
   requestId: string;
 }
@@ -41,8 +49,8 @@ type InputOf<S> = S extends z.ZodType ? z.output<S> : undefined;
 export type RouteHandler<K extends string> = (request: Request, context: { params: Promise<Record<K, string>> }) => Promise<Response>;
 
 export const UNAUTHENTICATED_MESSAGE = "Sua sessão expirou. Entre de novo.";
-export const FORBIDDEN_MESSAGE = "Peça a um administrador do Nexo para fazer isso.";
 export const INTERNAL_MESSAGE = "Algo deu errado. Tente de novo.";
+export const CROSS_SITE_MESSAGE = "Este pedido veio de outra página e foi recusado.";
 
 const SCHEDULER_WARN_EVERY_MS = 10 * 60 * 1000;
 let schedulerWarnedAt = 0;
@@ -86,6 +94,16 @@ async function resolveParams<K extends string>(context: { params: Promise<Record
   return out;
 }
 
+/**
+ * Sessão inválida: o navegador também apaga o cookie, se veio um. Só pedido da própria interface: um link externo para a
+ * API também traz o cookie e cai aqui, e não pode encerrar a sessão de quem clicou.
+ */
+function unauthenticated(request: Request, requestId: string): Response {
+  const response = errorJson(requestId, 401, "UNAUTHENTICATED", UNAUTHENTICATED_MESSAGE);
+  if (readCookie(request, SESSION_COOKIE) && isOwnClient(request)) for (const cookie of clearedSessionCookies()) response.headers.append("Set-Cookie", cookie);
+  return response;
+}
+
 export function route<A extends AuthMode, S extends z.ZodType | undefined = undefined, K extends string = never>(
   options: RouteOptions<A, S, K>,
   handler: (args: RouteArgs<A, InputOf<S>, K>) => unknown,
@@ -99,19 +117,22 @@ export function route<A extends AuthMode, S extends z.ZodType | undefined = unde
     try {
       nudgeScheduler(requestId);
 
+      if (isCrossSiteWrite(request)) {
+        status = 403;
+        return errorJson(requestId, 403, "CROSS_SITE_REQUEST", CROSS_SITE_MESSAGE);
+      }
+
       let user: AppUserRow | null = null;
       let tokenHash: string | null = null;
-      if (options.auth === "user" || options.auth === "admin") {
+      if (options.auth === "session") {
         const session = authenticate(request);
         if (!session) {
           status = 401;
-          return errorJson(requestId, 401, "UNAUTHENTICATED", UNAUTHENTICATED_MESSAGE);
+          return unauthenticated(request, requestId);
         }
-        if (options.auth === "admin" && session.user.role !== "admin") {
-          status = 403;
-          return errorJson(requestId, 403, "FORBIDDEN", FORBIDDEN_MESSAGE);
-        }
-        user = session.user;
+        const operation = options.operation as Operation;
+        assertCan(session.user, operation);
+        user = await assertBitrixAccess(session.user, operation);
         tokenHash = session.tokenHash;
       }
 

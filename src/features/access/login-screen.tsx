@@ -8,7 +8,7 @@ import { Field } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
 import { api, toApiError, type ApiError } from "@/lib/api-client";
 import { fieldErrors, focusFirstInvalid } from "@/lib/form-errors";
-import { safeReturnPath, useHasToken } from "@/lib/use-session";
+import { safeReturnPath, useHasSession } from "@/lib/use-session";
 import { loginInput } from "@/shared/schemas";
 import { AccessLayout } from "./access-layout";
 import styles from "./login-screen.module.css";
@@ -20,7 +20,7 @@ function returnPath(): string {
 /** `/entrar`: e-mail e senha. Mensagem clara quando o acesso fica bloqueado por tentativas. */
 export function LoginScreen() {
   const router = useRouter();
-  const hasToken = useHasToken();
+  const hasSession = useHasSession();
   const formRef = useRef<HTMLFormElement>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -31,8 +31,8 @@ export function LoginScreen() {
 
   // Já conectado (outra aba ou volta do navegador): segue direto.
   useEffect(() => {
-    if (hasToken === true && !pending) router.replace(returnPath());
-  }, [hasToken, pending, router]);
+    if (hasSession === true && !pending) router.replace(returnPath());
+  }, [hasSession, pending, router]);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

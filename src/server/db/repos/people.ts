@@ -1,6 +1,7 @@
 import "server-only";
 import type { PersonDTO } from "@/shared/contracts";
 import { getDb } from "..";
+import { openField, sealField } from "../../security/fields";
 import { newId, normalizeSearch, nowIso, toBool, toStringOrNull } from "./util";
 
 export interface PersonRow {
@@ -32,7 +33,7 @@ function map(row: Record<string, unknown>): PersonRow {
     id: String(row.id),
     bitrixUserId: toStringOrNull(row.bitrix_user_id),
     name: String(row.name),
-    email: toStringOrNull(row.email),
+    email: openField(row.email),
     position: toStringOrNull(row.position),
     department: toStringOrNull(row.department),
     active: toBool(row.active),
@@ -51,7 +52,8 @@ export function upsertBitrixPeople(people: BitrixPersonInput[]): number {
     VALUES (@id, @bitrixUserId, @name, @email, @position, @department, @active, 'bitrix', @updatedAt)
     ON CONFLICT(bitrix_user_id) DO UPDATE SET
       name = excluded.name, email = excluded.email, position = excluded.position,
-      department = excluded.department, active = excluded.active, source = 'bitrix', updated_at = excluded.updated_at`);
+      department = excluded.department, active = excluded.active, source = 'bitrix', updated_at = excluded.updated_at, erased_at = NULL
+      WHERE people.erased_at IS NULL OR excluded.active = 1`);
   const updatedAt = nowIso();
   db.tx(() => {
     for (const person of people) {
@@ -59,7 +61,7 @@ export function upsertBitrixPeople(people: BitrixPersonInput[]): number {
         id: newId(),
         bitrixUserId: person.bitrixUserId,
         name: person.name,
-        email: person.email ?? null,
+        email: sealField(person.email ?? null),
         position: person.position ?? null,
         department: person.department ?? null,
         active: person.active,
@@ -74,7 +76,7 @@ export function createPerson(input: { name: string; email?: string | null; sourc
   const id = newId();
   getDb()
     .prepare("INSERT INTO people (id, bitrix_user_id, name, email, active, source, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?)")
-    .run(id, input.bitrixUserId ?? null, input.name.trim(), input.email?.trim() || null, input.source, nowIso());
+    .run(id, input.bitrixUserId ?? null, input.name.trim(), sealField(input.email?.trim() || null), input.source, nowIso());
   return findPerson(id)!;
 }
 
@@ -86,6 +88,21 @@ export function findPerson(id: string): PersonRow | null {
 export function findPersonByBitrixId(bitrixUserId: string): PersonRow | null {
   const row = getDb().prepare("SELECT * FROM people WHERE bitrix_user_id = ?").get(bitrixUserId);
   return row ? map(row) : null;
+}
+
+/** Todas as pessoas com dados no Nexo, ativas ou não, de qualquer origem, menos as já excluídas (para a tela de dados pessoais). */
+export function listSubjects(): PersonRow[] {
+  return getDb().prepare("SELECT * FROM people WHERE erased_at IS NULL ORDER BY name COLLATE NOCASE").all().map(map);
+}
+
+/** Pessoas ativas do portal com este e-mail (o e-mail fica cifrado: a comparação é feita aqui, não no SQL). */
+export function findActivePeopleByEmail(email: string): PersonRow[] {
+  const wanted = email.trim().toLowerCase();
+  return getDb()
+    .prepare("SELECT * FROM people WHERE bitrix_user_id IS NOT NULL AND active = 1 AND email IS NOT NULL")
+    .all()
+    .map(map)
+    .filter((person) => person.email?.trim().toLowerCase() === wanted);
 }
 
 /** Busca por nome ou e-mail, sem acento e sem caixa. Pessoas ativas do Bitrix primeiro. */
@@ -125,7 +142,7 @@ export function linkPersonToBitrix(personId: string, bitrixUserId: string): Pers
 /** Situação do convite para o Bitrix24 (`null` limpa). Com `email`, grava o e-mail que recebe o convite. */
 export function setPersonInvite(personId: string, invite: { status: "sending" | "failed"; error?: string | null; email?: string } | null): void {
   const db = getDb();
-  if (invite?.email) db.prepare("UPDATE people SET email = ? WHERE id = ?").run(invite.email.trim(), personId);
+  if (invite?.email) db.prepare("UPDATE people SET email = ? WHERE id = ?").run(sealField(invite.email.trim()), personId);
   db.prepare("UPDATE people SET invite_status = ?, invite_error = ?, updated_at = ? WHERE id = ?").run(
     invite?.status ?? null,
     invite?.status === "failed" ? (invite.error ?? null) : null,
