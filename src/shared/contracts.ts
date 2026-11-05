@@ -447,6 +447,16 @@ export interface FullProbeDTO {
 export interface SessionTransportDTO {
   /** O cookie de teste da chamada anterior voltou: o navegador e a hospedagem aceitam o cookie protegido. */
   cookie: boolean;
+  /** O que chegou ao servidor neste pedido, para o diagnóstico dizer onde o cookie se perdeu. */
+  seen: SessionTransportSeenDTO;
+}
+
+export interface SessionTransportSeenDTO {
+  cookieHeader: boolean;
+  cookieCount: number;
+  probeReturned: boolean;
+  clientHeader: boolean;
+  fetchSite: string | null;
 }
 
 export interface MeDTO {

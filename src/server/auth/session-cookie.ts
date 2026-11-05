@@ -10,6 +10,7 @@ export const SESSION_COOKIE = "__Host-nexo_session";
 /** Dica sem segredo, legível pelo JavaScript: a interface sabe que vale a pena pedir `/api/me`. */
 export const SIGNED_COOKIE = "__Host-nexo_signed";
 export const PROBE_COOKIE = "__Host-nexo_probe";
+export const PROBE_HINT_COOKIE = "__Host-nexo_probe_hint";
 export const CLIENT_HEADER = "x-nexo-client";
 
 const ATTRIBUTES = "Path=/; Secure; SameSite=None; Partitioned";
@@ -25,6 +26,23 @@ export function clearedSessionCookies(): string[] {
 
 export function probeCookie(): string {
   return `${PROBE_COOKIE}=1; ${ATTRIBUTES}; HttpOnly; Max-Age=${PROBE_MAX_AGE_S}`;
+}
+
+/** Irmã do cookie de teste, sem segredo e legível pelo JavaScript: o diagnóstico vê se o Set-Cookie chegou ao navegador. */
+export function probeHintCookie(): string {
+  return `${PROBE_HINT_COOKIE}=1; ${ATTRIBUTES}; Max-Age=${PROBE_MAX_AGE_S}`;
+}
+
+/** Para o diagnóstico: de onde o navegador disse que o pedido veio, sem repetir valor desconhecido. */
+export function fetchSiteLabel(request: Request): string | null {
+  const site = fetchSite(request);
+  if (site === null) return null;
+  return ["same-origin", "same-site", "cross-site", "none"].includes(site) ? site : "outro";
+}
+
+export function countCookies(request: Request): number {
+  const header = request.headers.get("cookie");
+  return header ? header.split(";").filter((part) => part.trim()).length : 0;
 }
 
 export function readCookie(request: Request, name: string): string | null {

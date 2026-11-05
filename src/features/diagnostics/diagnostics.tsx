@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Logo } from "@/components/brand/logo";
 import { api, ApiError, hasSession, negotiateTransport } from "@/lib/api-client";
 import type { BasicProbeDTO, EgressAttemptDTO } from "@/shared/contracts";
+import { explainCookieTrace } from "./cookie-trace";
 import styles from "./diagnostics.module.css";
 
 type Status = "ok" | "falha" | "aviso" | "manual" | "aguardando";
@@ -35,6 +36,31 @@ function storageCheck(kind: "localStorage" | "sessionStorage"): Check {
 }
 
 const COOKIE_CHECK = "Sessão por cookie protegido";
+const PROBE_HINT = "__Host-nexo_probe_hint";
+const PAGE_TEST_COOKIE = "__Host-nexo_page_test";
+const COOKIE_ATTRIBUTES = "Path=/; Secure; SameSite=None; Partitioned";
+
+function hasCookie(name: string): boolean {
+  return document.cookie.split(";").some((part) => part.trim().startsWith(`${name}=`));
+}
+
+/** A própria página grava um cookie com os mesmos atributos: separa recusa do navegador de alteração na borda. */
+function pageCanWriteCookie(): boolean {
+  try {
+    document.cookie = `${PAGE_TEST_COOKIE}=1; ${COOKIE_ATTRIBUTES}; Max-Age=60`;
+    const works = hasCookie(PAGE_TEST_COOKIE);
+    document.cookie = `${PAGE_TEST_COOKIE}=; ${COOKIE_ATTRIBUTES}; Max-Age=0`;
+    return works;
+  } catch {
+    return false;
+  }
+}
+
+async function traceCookie() {
+  await api.sessionTransport();
+  const { cookie, seen } = await api.sessionTransport();
+  return { ...explainCookieTrace({ cookie, seen, hintVisible: hasCookie(PROBE_HINT), pageWriteWorks: pageCanWriteCookie() }), seen };
+}
 
 export function Diagnostics({ variant }: { variant: "same-origin" | "no-referrer" }) {
   const [jsReady, setJsReady] = useState(false);
@@ -56,13 +82,21 @@ export function Diagnostics({ variant }: { variant: "same-origin" | "no-referrer
     put("session", storageCheck("sessionStorage"));
     /* eslint-enable react-hooks/set-state-in-effect */
 
-    negotiateTransport().then((transport) =>
+    negotiateTransport().then((transport) => {
       put("cookie", {
         label: COOKIE_CHECK,
         status: transport === "cookie" ? "ok" : "aviso",
         detail: transport === "cookie" ? "Funciona: o token da sessão fica fora do alcance do JavaScript." : "Bloqueado aqui: o Nexo usa o modo alternativo, com sessão mais curta.",
-      }),
-    );
+      });
+      if (transport === "cookie") return;
+      traceCookie().then(
+        (trace) => {
+          put("cookieTrace", { label: "Onde o cookie se perde", status: "aviso", detail: trace.detail });
+          setServer((current: object) => ({ ...current, cookieTrace: trace }));
+        },
+        () => put("cookieTrace", { label: "Onde o cookie se perde", status: "aviso", detail: "O teste não respondeu." }),
+      );
+    });
 
     const started = performance.now();
     fetch("/api/probe", { headers: { Authorization: "Bearer sonda-sem-valor", "X-Nexo-Session": "sonda-sem-valor-0000000000" }, cache: "no-store" })
