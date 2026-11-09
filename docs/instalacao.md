@@ -67,8 +67,8 @@ Ajustes → Diagnóstico mostra se ele está ligado, e o teste de conexão em `/
 
 ### Antes de usar com dados reais
 
-1. Responda à lista de [`onnira-seguranca.md`](onnira-seguranca.md) com o suporte da Onnira: cifragem e backups do volume.
-2. Defina `NEXO_ENCRYPTION_KEY` (64 caracteres hexadecimais; gere com `openssl rand -hex 32`), para a chave não ficar no volume do banco, e guarde uma cópia dela em lugar seguro. **Numa instalação que já tem dados, antes copie o valor atual de `.nexo-key`:** com outra chave, o que já foi cifrado deixa de abrir.
+1. Responda à lista de [`onnira-seguranca.md`](onnira-seguranca.md) com o suporte da Onnira: acesso externo ao link do colaborador (`/j/*`), cookies na borda, cifragem e backups do volume.
+2. Defina `NEXO_ENCRYPTION_KEY` (64 caracteres hexadecimais; gere com `openssl rand -hex 32`), para a chave não ficar no volume do banco, e guarde uma cópia dela em lugar seguro. O painel da Onnira não tem campo para isso: peça ao suporte ou verifique a API. **Numa instalação que já tem dados, antes copie o valor atual de `.nexo-key`:** com outra chave, o que já foi cifrado deixa de abrir.
 3. Crie o webhook com uma conta dedicada e o mínimo de escopos. O Nexo avisa se houver privilégio a mais.
 4. Confira `/diagnostico` dentro do painel: "Sessão por cookie protegido" diz qual modo está em uso, e a CSP deve deixar a página funcionar normalmente.
 5. Baixe uma cópia em Ajustes → Dados pessoais e teste a restauração uma vez (`npm run backup:restaurar`).

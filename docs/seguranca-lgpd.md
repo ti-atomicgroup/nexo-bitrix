@@ -40,16 +40,18 @@ O que é apagado ou substituído não fica legível no arquivo: o banco usa `sec
   na pasta de dados) ou informada em `NEXO_ENCRYPTION_KEY`. O endereço nunca é devolvido ao navegador; na tela
   aparece mascarado (`https://empresa.bitrix24.com.br/rest/1/••••••/`).
   - Limitação conhecida: sem `NEXO_ENCRYPTION_KEY`, a chave fica no mesmo volume do banco. Quem leva o volume inteiro leva
-    os dois. Para separar, defina a variável no ambiente. Ajustes → Diagnóstico mostra onde a chave está.
+    os dois. Para separar, defina a variável no ambiente. O painel da Onnira não tem campo para isso: é preciso pedir ao suporte ou verificar a API.
+    Ajustes → Diagnóstico mostra onde a chave está.
 - **Sessões.** Token aleatório de 256 bits. O banco guarda só o hash.
-  - **Com cookie** (padrão): `__Host-nexo_session`, com `HttpOnly`, `Secure`, `SameSite=None` e `Partitioned`, o que funciona
-    dentro do iframe da Onnira. O token nunca passa pelo JavaScript: um XSS não consegue lê-lo. Validade de 12 horas, renovadas com o
-    uso, até no máximo 7 dias.
+  - **Com cookie** (padrão): `__Host-nexo_session`, com `HttpOnly`, `Secure`, `SameSite=None` e `Partitioned`, feito para funcionar em iframe.
+    O token nunca passa pelo JavaScript: um XSS não consegue lê-lo. Validade de 12 horas, renovadas com o uso, até no máximo 7 dias.
+    **Na Onnira vale o modo alternativo:** o navegador aceita e reenvia o cookie, mas a borda não o repassa ao app (conferido em 09/11/2026, [onnira-seguranca.md](onnira-seguranca.md)).
   - **Proteção contra CSRF.** O cookie só vale com o cabeçalho `X-Nexo-Client` e, quando o navegador informa, com
     `Sec-Fetch-Site: same-origin`. Outro site não consegue enviar esse cabeçalho sem CORS, que o Nexo não libera. Qualquer escrita vinda de outro
     site é recusada, mesmo em rotas públicas como o login.
   - **Modo alternativo.** Antes de entrar, o Nexo testa se o navegador e a hospedagem aceitam o cookie. Se não aceitarem (Safari em
     iframe, por exemplo), o token fica só na memória e no `sessionStorage` da aba, nunca no `localStorage`, e a sessão dura no máximo 24 horas.
+    Nesse modo, o JavaScript da aba alcança o token: a CSP passa a ser a principal defesa contra um XSS.
   - Cada token só vale pelo canal em que foi entregue.
 - **Content-Security-Policy.** Com nonce novo a cada página (`src/proxy.ts`) e sem `unsafe-inline` nem `unsafe-eval` em produção, nem para scripts, nem
   para estilos. A API responde com `default-src 'none'`. `frame-ancestors` limitado ao painel da Onnira, mais `nosniff` e `Referrer-Policy`.

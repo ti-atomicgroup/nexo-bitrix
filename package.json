@@ -1,6 +1,6 @@
 {
   "name": "nexo",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "private": true,
   "description": "Nexo: onboarding e offboarding de colaboradores integrados ao Bitrix24, hospedado na Onnira Cloud.",
   "engines": {

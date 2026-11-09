@@ -159,7 +159,7 @@ describe("Tudo o que entrou, sai", () => {
     expect(getLedgerItem(item.id)?.status).toBe("return_requested");
   });
 
-  it("checklists das tarefas abertas são relidos a cada ~4 min e refletem no inventário", async () => {
+  it("checklists das tarefas abertas são relidos a cada ~10 min e refletem no inventário", async () => {
     await prepare();
     const item = addManualLedgerItem(personId(), { kind: "access", name: "Notion", detail: "" }, HR_ACTOR);
     const id = startOffboarding(shortOffboarding().id);
@@ -168,7 +168,11 @@ describe("Tudo o que entrou, sai", () => {
     env.fake.checkItem(taskId, "Revogar acesso: Notion");
     await cycle();
     expect(getLedgerItem(item.id)?.status).toBe("return_requested");
+    // Aos 4 min ainda não relê: o intervalo é de 10 min, para poupar chamadas ao Bitrix24.
     advance(4 * 60_000 + 1_000);
+    await cycle();
+    expect(getLedgerItem(item.id)?.status).toBe("return_requested");
+    advance(6 * 60_000);
     await cycle();
     expect(getLedgerItem(item.id)?.status).toBe("closed");
   });

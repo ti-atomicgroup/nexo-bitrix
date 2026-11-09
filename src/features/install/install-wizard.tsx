@@ -2,7 +2,7 @@
 
 import { ArrowRight, LogIn, RefreshCw, Stethoscope } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { PageHeader } from "@/components/ui/page-header";
@@ -38,11 +38,21 @@ function deriveView(stage: SetupStage, hasSession: boolean, hasInstallToken: boo
 export function InstallWizard() {
   const router = useRouter();
   const hasSession = useHasSession();
-  const status = useApi((signal) => api.status({ signal }), [], { revalidateOnFocus: false });
+  // Depois de preparar, só abre o painel quando o servidor confirmar "pronto": consulta a cada 2 s até lá.
+  const [prepared, setPrepared] = useState(false);
+  const status = useApi((signal) => api.status({ signal }), [], { refreshMs: prepared ? 2_000 : undefined, revalidateOnFocus: false });
   const [override, setOverride] = useState<View | null>(null);
   const [check, setCheck] = useState<WebhookCheckDTO | null>(null);
+  const navigated = useRef(false);
 
   const stage = status.data?.setup;
+  useEffect(() => {
+    if (!prepared || stage !== "ready" || hasSession !== true || navigated.current) return;
+    navigated.current = true;
+    clearInstallToken();
+    router.replace("/hoje");
+  }, [prepared, stage, hasSession, router]);
+
   const installToken = check?.installToken ?? (stage ? getInstallToken() : null);
   const derived = stage && hasSession !== null ? deriveView(stage, hasSession, installToken !== null) : null;
   const view = override ?? derived;
@@ -101,8 +111,8 @@ export function InstallWizard() {
     content = (
       <PrepareStep
         onDone={() => {
-          clearInstallToken();
-          router.replace("/hoje");
+          setPrepared(true);
+          status.reload();
         }}
       />
     );

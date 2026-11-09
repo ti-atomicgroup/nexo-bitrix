@@ -11,8 +11,8 @@ import { applyLedgerEffects } from "./ledger-effects";
 import type { EngineContext } from "./runtime";
 import { confirmTaskMissing, markTaskMissing } from "./tasks";
 
-/** Checklists das tarefas abertas são relidos a cada ~4 min (e sempre que uma tarefa fecha). */
-export const CHECKLIST_POLL_MS = 4 * 60_000;
+/** Checklists das tarefas abertas são relidos a cada ~10 min (e sempre que uma tarefa fecha): menos chamadas ao Bitrix24. */
+export const CHECKLIST_POLL_MS = 10 * 60_000;
 const CHECKLIST_BATCH = 50;
 
 /** "Concluída" = status do Bitrix: 5 feita, 4 aguardando aprovação, 3 em andamento; 2/6/7 a fazer. */
@@ -125,7 +125,7 @@ async function refreshChecklists(ctx: EngineContext, activities: ActivityRow[]):
   }
 }
 
-/** Relê os checklists das tarefas abertas a cada ~4 min (via batch). */
+/** Relê os checklists das tarefas abertas a cada ~10 min (via batch). */
 export async function pollChecklists(ctx: EngineContext, now: number = Date.now()): Promise<void> {
   const last = getSyncState().checklistsPolledAt;
   if (last && now - Date.parse(last) < CHECKLIST_POLL_MS) return;
